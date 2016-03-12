@@ -1,7 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <queue>
-#include <algorithm>    // std::random_shuffle
+#include <algorithm>   
+//#include <random>
 
 
 
@@ -24,6 +25,7 @@
 using namespace std;
 using namespace BamTools;
 
+//#define COVERAGETVERBOSE
 
 #define MAXMAPPINGQUAL 257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
 #define MAXCOV          50     // maximal coverage
@@ -35,7 +37,11 @@ long double likeMismatch     [MAXMAPPINGQUAL];
 long double likeMatchProb    [MAXMAPPINGQUAL];
 long double likeMismatchProb [MAXMAPPINGQUAL];
 
-vector< vector<long double> > binomVec;
+vector< vector<long double> > binomVec (MAXCOV,vector<long double>(MAXCOV,0)) ;
+unsigned int totalBasesSum;
+unsigned int totalSitesSum;
+
+
 // // Returns logl( expl(x)+expl(y) )
 // inline long double oplusl(long double x, long double y ){
 //     return x > y 
@@ -44,11 +50,20 @@ vector< vector<long double> > binomVec;
 // }
 
 
+
+
+long double pdfPoisson(const long double l,const long double k ) {
+    return expl(k*logl(l)-lgammal(k+1.0)-l);
+}
+
+
 //! A method to initialize various probability scores to avoid recomputation
 /*!
   This method is called by the main after capturing the arguments
 */
 void initScores(){
+    totalBasesSum=0;
+    totalSitesSum=0;
 
     //Computing for quality scores 2 and up
     for(int i=0;i<MAXMAPPINGQUAL;i++){
@@ -60,22 +75,18 @@ void initScores(){
     }
 
 
-    binomVec.resize(MAXCOV);
-    for(int i=1;i<MAXCOV;i++){
-	binomVec[i].resize(MAXCOV);
-    }
 
     for(int i=1;i<MAXCOV;i++){
 	//cout<<i<<endl;
 
-	for(int j=0;j<=i;j++){
-	    //todo avoid precision loss
+	for(int j=0;j<=i;j++){	    
 	    binomVec[i][j] = ( logl(nChoosek(i,j))+logl(powl(0.5,i)) );	    
 	    //cout<<j<<"\t"<<(logl(nChoosek(i,j))+logl(powl(0.5,i)))<<endl;//todo: precompute that line
 	}
     }
 
-}
+}//end initScores
+
 
 long double computeLL(const char                 al1Current,
 		      const char                 al2Current,		      
@@ -141,19 +152,21 @@ long double computeLL(const char                 al1Current,
     //cout<<al1Current<<""<<al2Current<<"\t"<<llik<<"\t"<<expal1<<"\t"<<expal2<<"\t"<<binomE2<<"\t"<<(binomE2+llik)<<endl;
 
     return (binomE2+llik);
-}
+} //end computeLL
 
 
 class coverageComputeVisitor : public PileupVisitor {
   
 public:
-    coverageComputeVisitor(const RefVector& references)
+    coverageComputeVisitor(const RefVector& references,unsigned int leftCoord, unsigned int rightCoord)
 	: PileupVisitor()
 	, m_references(references)
-	  // , m_fastaReference(fastaReference)
+	, m_leftCoord(leftCoord)
+	, m_rightCoord(rightCoord)
     { 
 	totalBases=0;
 	totalSites=0;
+	
     }
     ~coverageComputeVisitor(void) {}
   
@@ -161,11 +174,24 @@ public:
 
     
     void Visit(const PileupPosition& pileupData) {   
-	totalSites++;
-	    
+	bool foundOneFragment=false;
+	if(pileupData.Position < int(m_leftCoord)   || 
+	   pileupData.Position > int(m_rightCoord) ){
+	    return ;
+	}
+	//cout<<m_leftCoord<<"\t"<<m_rightCoord<<"\t"<<pileupData.Position<<endl;
+
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
+	    // if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
+	    // 	pileupData.PileupAlignments[i].IsNextInsertion ){
+	    // 	continue;
+	    // }
+	    //foundOneFragment=true;		  
 	    totalBases++;
 	}
+
+	//if(foundOneFragment)
+	totalSites++;
     }
     
     unsigned int getTotalBases() const{
@@ -181,8 +207,10 @@ private:
     //Fasta * m_fastaReference;
     unsigned int totalBases;
     unsigned int totalSites;
-
-};
+    unsigned int m_leftCoord;
+    unsigned int m_rightCoord;
+    
+};//end coverageComputeVisitor
 
 
 
@@ -190,10 +218,11 @@ private:
 class heteroComputerVisitor : public PileupVisitor {
   
 public:
-    heteroComputerVisitor(const RefVector& references)
+    heteroComputerVisitor(const RefVector& references,unsigned int leftCoord, unsigned int rightCoord)
 	: PileupVisitor()
 	, m_references(references)
-	  // , m_fastaReference(fastaReference)
+	, m_leftCoord(leftCoord)
+	, m_rightCoord(rightCoord)
     { 
     }
     ~heteroComputerVisitor(void) { }
@@ -300,10 +329,12 @@ public:
 private:
     RefVector m_references;
     //Fasta * m_fastaReference;
-    unsigned int totalBases;
-    unsigned int totalSites;
+    // unsigned int totalBases;
+    // unsigned int totalSites;
+    unsigned int m_leftCoord;
+    unsigned int m_rightCoord;
 
-};
+};//heteroComputerVisitor
 
 
 
@@ -378,7 +409,7 @@ map<unsigned int, int>       threadID2Rank;
 
 */				
 void *mainHeteroComputationThread(void * argc){
-    initScores();
+
     int   rc;
     int rankThread=0;
 
@@ -481,13 +512,19 @@ void *mainHeteroComputationThread(void * argc){
 
     // cerr<<"Thread #"<<rankThread<<" "<<references[0].RefName<<"\t"<<setRegionRes<<endl;
 
-    if(!setRegionRes){
+    if( refID==-1 ||
+       !setRegionRes){
     	cerr << "Could not set region "<<currentChunk->rangeGen<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<" "<< currentChunk->rangeGen.getEndCoord()<< endl;
     	exit(1);
     }
 
    
-    heteroComputerVisitor* cv = new heteroComputerVisitor(references);
+    heteroComputerVisitor* cv = new heteroComputerVisitor(references,
+							  currentChunk->rangeGen.getStartCoord(), 
+							  currentChunk->rangeGen.getEndCoord()   );
+
+
+
     PileupEngine pileup;
     pileup.AddVisitor(cv);
 
@@ -519,7 +556,7 @@ void *mainHeteroComputationThread(void * argc){
     rc = pthread_mutex_lock(&mutexCounter);
     checkResults("pthread_mutex_lock()\n", rc);
     
-    queueDataTowrite.push(currentChunk);
+    //queueDataTowrite.push(currentChunk);
 
     rc = pthread_mutex_unlock(&mutexCounter);
     checkResults("pthread_mutex_unlock()\n", rc);
@@ -535,7 +572,7 @@ void *mainHeteroComputationThread(void * argc){
     cerr<<"Thread "<<rankThread<<" ended "<<endl;
     return NULL;
 
-}
+}// end mainHeteroComputationThread
 
 
 
@@ -544,7 +581,7 @@ void *mainHeteroComputationThread(void * argc){
 
 queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsample,unsigned int sizeToReturn){
 
-    if( sizeToReturn >queueDataToSubsample.size()){
+    if( sizeToReturn > queueDataToSubsample.size()){
 	cerr<<"Cannot subsample the queue to the size required"<<endl;
 	exit(1);
     }
@@ -565,21 +602,23 @@ queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsa
     }
 
     return toReturn;
-}
+} // end randomSubQueue
 
 
 
 void *mainCoverageComputationThread(void * argc){
     initScores();
     int   rc;
+#ifdef COVERAGETVERBOSE    
     int rankThread=0;
-
+#endif
     rc = pthread_mutex_lock(&mutexRank);
     checkResults("pthread_mutex_lock()\n", rc);
 
     threadID2Rank[*(int *)pthread_self()]  = threadID2Rank.size()+1;
+#ifdef COVERAGETVERBOSE    
     rankThread = threadID2Rank[*(int *)pthread_self()];
-
+#endif
     
     rc = pthread_mutex_unlock(&mutexRank);
     checkResults("pthread_mutex_unlock()\n", rc);
@@ -594,18 +633,20 @@ void *mainCoverageComputationThread(void * argc){
 
 
     bool foundData=false;
-    
-    cerr<<"Thread #"<<rankThread <<" started and is requesting data"<<endl;
-
+#ifdef COVERAGETVERBOSE
+    cerr<<"Thread coverage #"<<rankThread <<" started and is requesting data"<<endl;
+#endif
 
     DataChunk * currentChunk;
 
 
-    if(!queueDataToprocess.empty()){    
+    if(!queueDataForCoverage.empty()){    
  	foundData=true;
- 	currentChunk = queueDataToprocess.front();
- 	queueDataToprocess.pop();
+ 	currentChunk = queueDataForCoverage.front();
+ 	queueDataForCoverage.pop();
+#ifdef COVERAGETVERBOSE
  	cerr<<"Thread #"<<rankThread<<" is reading "<<currentChunk->rank<<endl;
+#endif
 	//cout<<"rank "<< &(currentChunk->dataToProcess) <<endl;
     }
 
@@ -618,10 +659,14 @@ void *mainCoverageComputationThread(void * argc){
 
 
 	if(readDataDone){
+#ifdef COVERAGETVERBOSE
 	    cerr<<"Thread #"<<rankThread<<" is done"<<endl;
+#endif
 	    return NULL;	
 	}else{
+#ifdef COVERAGETVERBOSE
 	    cerr<<"Thread #"<<rankThread<<" sleeping for "<<timeThreadSleep<<endl;
+#endif
 	    sleep(timeThreadSleep);
 	    goto checkqueue;
 	}
@@ -637,7 +682,9 @@ void *mainCoverageComputationThread(void * argc){
     //////////////////////////////////////////////////////////////
 
     //cout<<currentChunk->rangeGen<<endl;
+#ifdef COVERAGETVERBOSE
     cerr<<"Thread #"<<rankThread<<" is reading "<<currentChunk->rangeGen<<endl;
+#endif
     //sleep(10);
 
 
@@ -660,9 +707,13 @@ void *mainCoverageComputationThread(void * argc){
     // retrieve reference data
     const RefVector  references = reader.GetReferenceData();
     const int        refID      = reader.GetReferenceID( currentChunk->rangeGen.getChrName() );
-    
-    // cerr<<"Thread #"<<rankThread<<" refID "<<refID<<endl;    
+
+
+#ifdef COVERAGETVERBOSE    
+    cerr<<"Thread #"<<rankThread<<" refID "<<refID<<" "<<currentChunk->rangeGen.getStartCoord()<<" "<<currentChunk->rangeGen.getEndCoord()<<endl;    
+#endif
     // cerr<<"Thread #"<<rankThread<<" "<<references[0].RefName<<endl;
+
 
     BamRegion bregion (refID, 
 		       currentChunk->rangeGen.getStartCoord(), 
@@ -673,13 +724,16 @@ void *mainCoverageComputationThread(void * argc){
 
     // cerr<<"Thread #"<<rankThread<<" "<<references[0].RefName<<"\t"<<setRegionRes<<endl;
 
-    if(!setRegionRes){
+    if( refID!=-1 &&
+       !setRegionRes){
     	cerr << "Could not set region "<<currentChunk->rangeGen<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<" "<< currentChunk->rangeGen.getEndCoord()<< endl;
     	exit(1);
     }
 
    
-    heteroComputerVisitor* cv = new heteroComputerVisitor(references);
+    coverageComputeVisitor* cv = new coverageComputeVisitor(references,
+							    currentChunk->rangeGen.getStartCoord(),
+							    currentChunk->rangeGen.getEndCoord());
     PileupEngine pileup;
     pileup.AddVisitor(cv);
 
@@ -689,19 +743,24 @@ void *mainCoverageComputationThread(void * argc){
         pileup.AddAlignment(al);
     }
 
+    
     //clean up
     pileup.Flush();
     reader.Close();
     //fastaReference.Close();
-    
-    //cerr<<"Thread #"<<rankThread <<" "<<cv->getTotalBases()<<"\t"<<cv->getTotalSites()<<"\t"<<double(cv->getTotalBases())/double(cv->getTotalSites())<<endl;
+#ifdef COVERAGETVERBOSE    
+    cerr<<"Thread #"<<rankThread <<" "<<cv->getTotalBases()<<"\t"<<cv->getTotalSites()<<"\t"<<double(cv->getTotalBases())/double(cv->getTotalSites())<<endl;
+#endif
+
+    unsigned int totalBasesL=cv->getTotalBases();
+    unsigned int totalSitesL=cv->getTotalSites();
+
 
     delete cv;
-
 	
-
+#ifdef COVERAGETVERBOSE    
     cerr<<"Thread #"<<rankThread <<" is done with computations"<<endl;
-
+#endif
     //////////////////////////////////////////////////////////////
     //                END   COMPUTATION                         //
     //////////////////////////////////////////////////////////////
@@ -711,23 +770,29 @@ void *mainCoverageComputationThread(void * argc){
     rc = pthread_mutex_lock(&mutexCounter);
     checkResults("pthread_mutex_lock()\n", rc);
     
-    queueDataTowrite.push(currentChunk);
+//queueDataTowrite.push(currentChunk);
+    totalBasesSum+=totalBasesL;
+    totalSitesSum+=totalSitesL;
 
     rc = pthread_mutex_unlock(&mutexCounter);
     checkResults("pthread_mutex_unlock()\n", rc);
 
+#ifdef COVERAGETVERBOSE    
     cerr<<"Thread #"<<rankThread <<" is re-starting"<<endl;
+#endif
 
     goto checkqueue;	   
 
 
     
 
-    
+#ifdef COVERAGETVERBOSE        
     cerr<<"Thread "<<rankThread<<" ended "<<endl;
+#endif
+
     return NULL;
 
-}
+} // mainCoverageComputationThread
 
 
 
@@ -739,7 +804,7 @@ int main (int argc, char *argv[]) {
 	cerr<<"usage:"<<endl<<"\t"<<argv[0]<<" [bamfile in] [faidx] [# of threads]"<<endl<<endl;
 	return 1;
     }
-
+    initScores();
     bamFileToOpen            = string(argv[1]);
     string fastaIndex        = string(argv[2]);
     int    numberOfThreads   = destringify<int>( string(argv[3]) );
@@ -778,9 +843,9 @@ int main (int argc, char *argv[]) {
 	genomicRegionsToUse = int(queueDataToprocess.size());
     }
 
-    queueDataForCoverage ;
 
-    randomSubQueue( queueDataToprocess,genomicRegionsToUse);
+
+    queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
 
 
     pthread_mutex_init(&mutexQueue,   NULL);
@@ -791,25 +856,34 @@ int main (int argc, char *argv[]) {
 	rc = pthread_create(&thread[i], NULL, mainCoverageComputationThread, NULL);
 	checkResults("pthread_create()\n", rc);
     }
-
+    cout<<"creating threads"<<endl;
 
     //waiting for threads to finish
     for (int i=0; i <numberOfThreads; ++i) {
 	rc = pthread_join(thread[i], NULL);
 	checkResults("pthread_join()\n", rc);
     }
-
+    cout<<"done threads"<<endl;
     pthread_mutex_destroy(&mutexRank);
     pthread_mutex_destroy(&mutexQueue);
     pthread_mutex_destroy(&mutexCounter);
 
-    //writer.Close();
-    //reader.Close();    
-    pthread_exit(NULL);
+    //    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
+    //    pthread_exit(NULL);
     
+    long double rateForPoissonCov = ((long double)totalBasesSum)/((long double)totalSitesSum);
 
-    
+    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
+    // for(int i=0;i<20;i++){
+    // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
+    // }
 
+
+    for(int i=0;i<100;i++){
+	cout<<i<<"\t"<<pdfPoisson( (long double)i, 20)/pdfPoisson( 20, 20)<<endl;
+    }
+
+    return 1;
 
 
     ////////////////////////////

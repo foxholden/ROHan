@@ -1,5 +1,5 @@
 
-CXX      = g++   
+CXX      = g++
 LIBGAB   = /home/gabriel/lib/
 
 CXXFLAGS = -Wall -lm -O3 -lz -I${LIBGAB} -I${LIBGAB}/gzstream/ -Ibamtools/include/ -Ibamtools/src/  -c
