@@ -4,6 +4,8 @@
 #include <algorithm>   
 //#include <random>
 
+//TODO
+// add mappability
 
 
 #include <api/BamConstants.h>
@@ -25,6 +27,7 @@
 using namespace std;
 using namespace BamTools;
 
+//#define DEBUGCOMPUTELL
 //#define COVERAGETVERBOSE
 
 #define MAXMAPPINGQUAL 257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
@@ -80,21 +83,20 @@ void initScores(){
 	//cout<<i<<endl;
 
 	for(int j=0;j<=i;j++){	    
-	    binomVec[i][j] = ( logl(nChoosek(i,j))+logl(powl(0.5,i)) );	    
-	    //cout<<j<<"\t"<<(logl(nChoosek(i,j))+logl(powl(0.5,i)))<<endl;//todo: precompute that line
+	    binomVec[i][j] = ( logl(nChoosek(i,j))+logl(powl(0.5,i)) );	     
 	}
     }
 
 }//end initScores
 
 
-long double computeLL(const char                 al1Current,
-		      const char                 al2Current,		      
+long double computeLL(const int                  al1Current,
+		      const int                  al2Current,		      
 		      const vector<int>          obsBase   ,
 		      const vector<long double>  probDeam  ,
 		      const vector<int>          obsQual   ,
 		      const long double          contRate  ,
-		      const char                 alContCurrent ,
+		      const int                  alContCurrent ,
 		      const vector<long double>  mismappingProb
 		      ){
 
@@ -103,6 +105,9 @@ long double computeLL(const char                 al1Current,
     long double llik2=0;
     long double llikC=0;
     
+#ifdef DEBUGCOMPUTELL
+    cout<<al1Current<<"\t"<<al2Current<<endl;
+#endif
 
     for(int i=0;i<int(obsBase.size());i++){
 
@@ -130,8 +135,11 @@ long double computeLL(const char                 al1Current,
 	    llikAl2t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(    probDeam[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
 	}
 
-	// cout<<i<<"\t"<<likeMatchProb[obsQual[i]]<<"\t"<<likeMismatchProb[obsQual[i]]<<endl;
-	// cout<<i<<"\t"<<llikAl1t <<"\t"<<llikAl2t<<endl;
+#ifdef DEBUGCOMPUTELL
+	cout<<i<<obsBase[i]<<"\t"<<al1Current<<"\t"<<al2Current<<"\t"<<alContCurrent<<endl;
+	cout<<i<<"\t"<<likeMatchProb[obsQual[i]]<<"\t"<<likeMismatchProb[obsQual[i]]<<"\t"<<mismappingProb[i]<<endl;
+	cout<<i<<"\t"<<llikAl1t <<"\t"<<llikAl2t<<endl;
+#endif
 	// exit(1);
 	long double llikT  = (1.0-contRate)*( 0.5*llikAl1t + 0.5*llikAl2t ) + (contRate)*llikC  ;	
 	llik              += logl(llikT);
@@ -139,17 +147,26 @@ long double computeLL(const char                 al1Current,
  	llik1=oplusInitnatl( llik1, logl(llikAl1t) );
 	llik2=oplusInitnatl( llik2, logl(llikAl2t) );
 
-	// cout<<i<<"\t"<<llikAl1t <<"\t"<<llikAl2t<<"\t"<<llikC<<"\t"<<llikT<<endl;
+#ifdef DEBUGCOMPUTELL
+	cout<<i<<"\t"<<llikAl1t <<"\t"<<llikAl2t<<"\t"<<llikC<<"\t"<<llikT<<endl;
+#endif
 	// llik1+=logl( llikAl1t );
 	// llik2+=logl( llikAl2t );
     }
-    //cout<<"CC\t"<<llikCC<<"\t"<<llikCC1<<"\t"<<llikCC2<<endl;    
-    //cout<<llik1<<"\t"<<llik2<<"\t"<<expl(llik1)<<"\t"<<expl(llik2)<<endl;
+	//cout<<"CC\t"<<llikCC<<"\t"<<llikCC1<<"\t"<<llikCC2<<endl;    
+#ifdef DEBUGCOMPUTELL
+   cout<<llik1<<"\t"<<llik2<<"\t"<<expl(llik1)<<"\t"<<expl(llik2)<<endl;
+#endif
+
     long double expal1  = roundl(  int(obsBase.size()) * ( expl(llik1) / expl(oplusnatl(llik1,llik2))) );
     //long double expal1=roundl(  sizeAr * ( expl(llik1) / llik1+llik2)) );
     //long double expal2  = sizeAr-expal1;
     long double binomE2 = binomVec[int(obsBase.size())][expal1]; //logl(nChoosek(sizeAr,expal1)*powl(0.5,expal1+expal2));
-    //cout<<al1Current<<""<<al2Current<<"\t"<<llik<<"\t"<<expal1<<"\t"<<expal2<<"\t"<<binomE2<<"\t"<<(binomE2+llik)<<endl;
+
+#ifdef DEBUGCOMPUTELL
+    cout<<al1Current<<""<<al2Current<<"\t"<<llik<<"\t"<<expal1<<"\t"<<(int(obsBase.size())-expal1)<<"\t"<<binomE2<<"\t"<<(binomE2+llik)<<endl;
+#endif
+
 
     return (binomE2+llik);
 } //end computeLL
@@ -238,23 +255,29 @@ public:
 	vector<long double> probDeam  ;
 	vector<long double> mmProb    ;
 	unsigned int posAlign = pileupData.Position+1;
-    
+
+	for(unsigned int i=0;i<4;i++)
+	    counterB[i]=0;
+	
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
 	    if(i>=MAXCOV){
 		break;
 	    }
 
 	    char  b   =     pileupData.PileupAlignments[i].Alignment.QueryBases[ pileupData.PileupAlignments[i].PositionInAlignment ];
-	    if(!isResolvedDNA(b)){ continue; }//avoid Ns
+	    if(!isResolvedDNA(b)){ 
+		continue; 
+	    }//avoid Ns
 	    int bIndex = baseResolved2int(b);
 	    int   q   = int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offset); 
 	    int   m   = int(pileupData.PileupAlignments[i].Alignment.MapQuality);
 	    
+	    cout<<"pos "<<posAlign<<" "<<bIndex<<" "<<b<<endl;
 	    counterB[ bIndex ]++;
 	    
-	    obsBase.push_back( bIndex );
-	    obsQual.push_back( q      );
-	    mmProb.push_back(  m      );
+	    obsBase.push_back(             bIndex   );
+	    obsQual.push_back(                  q   );
+	    mmProb.push_back(  likeMismatchProb[m]  );
 	    
 	    //Fill deamination vector, do not forget fragment orientation
 	    //put proper probabilities
@@ -263,9 +286,12 @@ public:
 	
 	int counterUnique=0;
 	for(int i=0;i<4;i++){
-	    if(counterB[i]!=0) counterUnique++;
+	    if(counterB[i]!=0) 
+		counterUnique++;
 	}
-	
+
+	cout<<"pos "<<posAlign<<" unique "<<counterUnique<<endl;
+
 	//skip sites with no defined bases and tri/tetra allelic sites
 	if(counterUnique==0 ||
 	   counterUnique>=3){
@@ -282,7 +308,7 @@ public:
 	    alt=randomBPExceptInt(ref);	    //maybe put a better dna sub model here?
 	}
 
-
+	//TODO pick the alternative base with the highest post. of being deaminated
 	if(counterUnique==2){
 	    for(int i=0;i<4;i++){
 		if(counterB[i]!=0){
@@ -295,34 +321,36 @@ public:
 	}
 	
 
+	
+	char refB="ACGT"[ref];
+	char altB="ACGT"[alt];
 
-	
-	cout<<posAlign<<"\t"<<"ACGT"[ref]<<","<<"ACGT"[alt]<<"\t"
-	    <<"\t"<<computeLL(ref,
-			      ref,		      		  
-			      obsBase   ,
-			      probDeam  ,
-			      obsQual   ,
-			      0.0       ,//todo set contamination rate
-			      ref       ,
-			      mmProb)
-	    <<"\t"<<computeLL(ref,
-			      alt,		      		  
-			      obsBase   ,
-			      probDeam  ,
-			      obsQual   ,
-			      0.0       ,//todo set contamination rate
-			      ref       ,
-			      mmProb)
-	    <<"\t"<<computeLL(alt,
-			      alt,		      		  
-			      obsBase   ,
-			      probDeam  ,
-			      obsQual   ,
-			      0.0       ,//todo set contamination rate
-			      ref       ,
-			      mmProb)<<endl;
-	
+	cout<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
+	cout<<"rr "<<computeLL(ref,
+			       ref,		      		  
+			       obsBase   ,
+			       probDeam  ,
+			       obsQual   ,
+			       0.0       ,//todo set contamination rate
+			       ref       ,
+			       mmProb)<<endl;
+	cout<<"ra "<<computeLL(ref,
+			       alt,		      		  
+			       obsBase   ,
+			       probDeam  ,
+			       obsQual   ,
+			       0.0       ,//todo set contamination rate
+			       ref       ,
+			       mmProb)<<endl;
+	cout<<"aa "<<computeLL(alt,
+			       alt,		      		  
+			       obsBase   ,
+			       probDeam  ,
+			       obsQual   ,
+			       0.0       ,//todo set contamination rate
+			       ref       ,
+			       mmProb)<<endl;
+	exit(1);
     }
     
 
@@ -879,11 +907,11 @@ int main (int argc, char *argv[]) {
     // }
 
 
-    for(int i=0;i<100;i++){
-	cout<<i<<"\t"<<pdfPoisson( (long double)i, 20)/pdfPoisson( 20, 20)<<endl;
-    }
+    // for(int i=0;i<100;i++){
+    // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, 20)/pdfPoisson( 20, 20)<<endl;
+    // }
 
-    return 1;
+    //return 1;
 
 
     ////////////////////////////
