@@ -2,6 +2,7 @@
 #include <fstream>
 #include <queue>
 #include <algorithm>   
+#include <cfloat>   
 //#include <random>
 
 //TODO
@@ -47,7 +48,7 @@ unsigned int totalSitesSum;
 vector<substitutionRates> sub5p;
 vector<substitutionRates> sub3p;
 substitutionRates defaultSubMatch;
-
+long double contrate=0.0;
 
 // // Returns logl( expl(x)+expl(y) )
 // inline long double oplusl(long double x, long double y ){
@@ -239,11 +240,12 @@ private:
 class heteroComputerVisitor : public PileupVisitor {
   
 public:
-    heteroComputerVisitor(const RefVector& references,unsigned int leftCoord, unsigned int rightCoord)
+    heteroComputerVisitor(const RefVector& references,const unsigned int leftCoord,const unsigned int rightCoord,const long double contRate)
 	: PileupVisitor()
 	, m_references(references)
 	, m_leftCoord(leftCoord)
 	, m_rightCoord(rightCoord)
+	, m_contRate(contRate)
     { 
     }
     ~heteroComputerVisitor(void) { }
@@ -254,15 +256,18 @@ public:
     void Visit(const PileupPosition& pileupData) {   
 	
 	int                 counterB  [4];
+	long double         llBaseDeam[4];
 	vector<int>         obsBase   ;
 	vector<int>         obsQual   ;
 	vector<long double> probDeam  ;
 	vector<long double> mmProb    ;
 	unsigned int posAlign = pileupData.Position+1;
 
-	for(unsigned int i=0;i<4;i++)
-	    counterB[i]=0;
-	
+	for(unsigned int i=0;i<4;i++){
+	    counterB[i]   = 0;
+	    llBaseDeam[i] = 0.0;
+	}
+
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
 	    if(i>=MAXCOV){
 		break;
@@ -282,7 +287,8 @@ public:
             int dist5p=-1;
             int dist3p=-1;
 
-            if( pileupData.PileupAlignments[i].Alignment.IsReverseStrand() ){
+	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
+            if( isRev ){
                 dist5p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
                 dist3p = pileupData.PileupAlignments[i].PositionInAlignment;
             }else{
@@ -290,10 +296,11 @@ public:
                 dist3p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
             }
                                     
+
             // probSubstition * probSubMatchToUseEndo = &defaultSubMatch ;
             // probSubstition * probSubMatchToUseCont = &defaultSubMatch ;
             substitutionRates * probSubMatchToUseEndo = &defaultSubMatch ;
-            substitutionRates * probSubMatchToUseCont = &defaultSubMatch ;
+            // substitutionRates * probSubMatchToUseCont = &defaultSubMatch ;
 
             if(dist5p <= (int(sub5p.size()) -1)){
                 probSubMatchToUseEndo = &sub5p[  dist5p ];                      
@@ -313,10 +320,26 @@ public:
                 }
                     
             }
-
-                    
-            
-	    // BEGIN DEAMINATION COMPUTATION
+	    
+	    cout<<"deamdist\t"<<dist5p<<"\t"<<dist3p<<endl;
+            //we look for a damage going from bIndexAlt to bIndex
+	    for(int bIndexAlt=0;bIndexAlt<4;bIndexAlt++){
+		if(bIndex==bIndexAlt) continue;
+		
+		int dinucIndex;
+		if( isRev ){		    
+		    dinucIndex =     dimer2indexInt(complementInt(bIndexAlt),complementInt(bIndex));
+		}else{
+		    dinucIndex =     dimer2indexInt(              bIndexAlt ,              bIndex);
+		}
+                                                                         
+		long double probSubDeam              = probSubMatchToUseEndo->s[dinucIndex];
+		long double probSameDeam             = 1.0-probSubDeam;
+		//long double probSameDeam           = probSubMatch->s[dinucIndex
+		cout<<"deam\t"<<bIndex<<"\t"<<bIndexAlt<<"\t"<<probSubDeam<<"\t"<<probSameDeam<<endl;
+		llBaseDeam[bIndexAlt] += logl(probSameDeam);
+	    }
+	    // END DEAMINATION COMPUTATION
 
 
   
@@ -330,8 +353,27 @@ public:
 	    //Fill deamination vector, do not forget fragment orientation
 	    //put proper probabilities
 	    probDeam.push_back( 0.0   );
-	}
+	}//end for each read
 	
+	long double nonZerollBaseDeam  = 0;
+	int         nonZerollBaseDeamI = -1;
+
+	for(int i=0;i<4;i++){
+	    cout<<"deamres\t"<<i<<"\t"<<llBaseDeam[i]<<endl;
+	    if(llBaseDeam[i] !=0){
+		if(  nonZerollBaseDeam > llBaseDeam[i] ){
+		    nonZerollBaseDeam  = llBaseDeam[i];
+		    nonZerollBaseDeamI =            i;		    
+		}
+	    }
+	}
+
+	if(nonZerollBaseDeamI!=-1){
+	    cout<<"nonzero\t"<<nonZerollBaseDeam<<"\t"<<nonZerollBaseDeamI<<endl;
+	    //exit(1);
+	}
+
+
 	int counterUnique=0;
 	for(int i=0;i<4;i++){
 	    if(counterB[i]!=0) 
@@ -346,24 +388,34 @@ public:
 	    return;
 	}
 
-	int ref=-1;
+	int ref=-1; //not really reference base, just the majority base
 	int alt=-1;
 
 	if(counterUnique==1){
-	    for(int i=0;i<4;i++){
-		if(counterB[i]!=0) ref=i;
+	    if(nonZerollBaseDeamI!=-1){
+		alt=nonZerollBaseDeamI;
+	    }else{
+		for(int i=0;i<4;i++){
+		    if(counterB[i]!=0) ref=i;
+		}
+		alt=randomBPExceptInt(ref);	    //todo maybe put a better dna sub model here?
 	    }
-	    alt=randomBPExceptInt(ref);	    //maybe put a better dna sub model here?
 	}
 
-	//TODO pick the alternative base with the highest post. of being deaminated
+	//TODO: decide if   if(nonZerollBaseDeamI!=-1){ do we dump the site?
 	if(counterUnique==2){
 	    for(int i=0;i<4;i++){
 		if(counterB[i]!=0){
-		    if(ref == -1) 
+		    if(ref == -1){
 			ref=i;
-		    else         
-			alt=i;
+		    }else{
+			if(counterB[i] < counterB[ref] ){//more ref bases than i
+			    alt = i;
+			}else{//more alt bases than i, alt becomes ref
+			    alt = ref;
+			    ref = i;
+			}
+		    }
 		}
 	    }
 	}
@@ -374,31 +426,71 @@ public:
 	char altB="ACGT"[alt];
 
 	cout<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
-	cout<<"rr "<<computeLL(ref,
-			       ref,		      		  
-			       obsBase   ,
-			       probDeam  ,
-			       obsQual   ,
-			       0.0       ,//todo set contamination rate
-			       ref       ,
-			       mmProb)<<endl;
-	cout<<"ra "<<computeLL(ref,
-			       alt,		      		  
-			       obsBase   ,
-			       probDeam  ,
-			       obsQual   ,
-			       0.0       ,//todo set contamination rate
-			       ref       ,
-			       mmProb)<<endl;
-	cout<<"aa "<<computeLL(alt,
-			       alt,		      		  
-			       obsBase   ,
-			       probDeam  ,
-			       obsQual   ,
-			       0.0       ,//todo set contamination rate
-			       ref       ,
-			       mmProb)<<endl;
-	exit(1);
+	long double rrllCr=computeLL(ref         ,
+				     ref         ,		      		  
+				     obsBase     ,
+				     probDeam    ,
+				     obsQual     ,
+				     m_contRate  ,
+				     ref         ,
+				     mmProb      );
+	long double rallCr=computeLL(ref         ,
+				     alt         ,		      		  
+				     obsBase     ,
+				     probDeam    ,
+				     obsQual     ,
+				     m_contRate  ,
+				     ref         ,
+				     mmProb      );
+       long double aallCr=computeLL(alt          ,
+				    alt          ,		      		  
+				    obsBase      ,
+				    probDeam     ,
+				    obsQual      ,
+				    m_contRate   ,
+				    ref          ,
+				    mmProb       );
+
+
+       long double rrllCa=0;
+       long double rallCa=0;
+       long double aallCa=0;
+       
+       if(m_contRate>0){
+
+	   rrllCa=computeLL(ref          ,
+			    ref          ,		      		  
+			    obsBase      ,
+			    probDeam     ,
+			    obsQual      ,
+			    m_contRate   ,
+			    alt          ,
+			    mmProb       );
+
+	   rallCa=computeLL(ref          ,
+			    alt          ,		      		  
+			    obsBase      ,
+			    probDeam     ,
+			    obsQual      ,
+			    m_contRate   ,
+			    alt          ,
+			    mmProb       );
+
+	   aallCa=computeLL(alt          ,
+			    alt          ,		      		  
+			    obsBase      ,
+			    probDeam     ,
+			    obsQual      ,
+			    m_contRate   ,
+			    alt          ,
+			    mmProb       );
+
+       }else{
+	   rrllCa=rrllCr;
+	   rallCa=rallCr;
+	   aallCa=aallCr;
+       }
+
     }
     
 
@@ -409,7 +501,7 @@ private:
     // unsigned int totalSites;
     unsigned int m_leftCoord;
     unsigned int m_rightCoord;
-
+    long double  m_contRate;
 };//heteroComputerVisitor
 
 
@@ -597,7 +689,8 @@ void *mainHeteroComputationThread(void * argc){
    
     heteroComputerVisitor* cv = new heteroComputerVisitor(references,
 							  currentChunk->rangeGen.getStartCoord(), 
-							  currentChunk->rangeGen.getEndCoord()   );
+							  currentChunk->rangeGen.getEndCoord()  ,
+							  contrate);
 
 
 
@@ -894,6 +987,9 @@ int main (int argc, char *argv[]) {
     ////////////////////////////////////
 
 
+    ////////////////////////////////////
+    // BEGIN Parsing arguments        //
+    ////////////////////////////////////
 
     string cwdProg=getCWD(argv[0]);    
 
@@ -924,12 +1020,20 @@ int main (int argc, char *argv[]) {
 
 
 
+                              "\n\tSample options:\n"+
+                              "\t\t"+"-cont\t\t"+    "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
+                              // "\t\t"+"--phred64" +"\t\t\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
+			      
+			      
+
                               "\n\tDeamination options:\n"+                                   
                               "\t\t"+"-deam5p\t\t"+"[.prof file]" +"\t\t"+"5p deamination frequency for the endogenous\n\t\t\t\t\t\t\t(default: "+deam5pfreqE+")"+"\n"+
                               "\t\t"+"-deam3p\t\t"+"[.prof file]" +"\t\t"+"3p deamination frequency for the endogenous\n\t\t\t\t\t\t\t(default: "+deam3pfreqE+")"+"\n"+
                               // "\t\t"+"-deam5pc [.prof file]" +"\t\t"+"5p deamination frequency for the contaminant (default: "+deam5pfreqC+")"+"\n"+
                               // "\t\t"+"-deam3pc [.prof file]" +"\t\t"+"3p deamination frequency for the contaminant (default: "+deam3pfreqC+")"+"\n"+
-			      "");
+			      
+
+"");
 
 
     if( (argc== 1) ||
@@ -948,6 +1052,13 @@ int main (int argc, char *argv[]) {
             lastOpt=i;
             break;
         }
+
+        if( string(argv[i]) == "-cont"  ){
+            contrate=destringify<long double>(argv[i+1]);
+            i++;
+            continue;
+        }
+
 
         if(string(argv[i]) == "--phred64"  ){
             offsetQual=64;
@@ -972,6 +1083,20 @@ int main (int argc, char *argv[]) {
     }
 
 
+    if( contrate<0 || contrate>1 ){
+	cerr<<"The contamination rate must be between 0 and 1"<<endl;
+	return 1;	
+    }
+
+    ////////////////////////////////////
+    //   END Parsing arguments        //
+    ////////////////////////////////////
+
+
+
+
+       
+
     ////////////////////////////////////////////////////////////////////////
     //
     // BEGIN DEAMINATION PROFILE
@@ -979,10 +1104,10 @@ int main (int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////////////////
     readNucSubstitionRatesFreq(deam5pfreqE,sub5p);
     readNucSubstitionRatesFreq(deam3pfreqE,sub3p);
+
     for(int nuc=0;nuc<12;nuc++){
         defaultSubMatch.s[ nuc ] = 0.0;	
     }
-
     ////////////////////////////////////////////////////////////////////////
     //
     // END  DEAMINATION PROFILE
