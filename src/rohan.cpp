@@ -22,6 +22,7 @@
 
 #include "GenomicWindows.h"
 
+#include "miscfunc.h"
 #include "utils.h"
 
 using namespace std;
@@ -33,7 +34,7 @@ using namespace BamTools;
 #define MAXMAPPINGQUAL 257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
 #define MAXCOV          50     // maximal coverage
 
-char offset=33;
+char offsetQual=33;
 long double likeMatch        [MAXMAPPINGQUAL];
 long double likeMismatch     [MAXMAPPINGQUAL];
 
@@ -43,6 +44,9 @@ long double likeMismatchProb [MAXMAPPINGQUAL];
 vector< vector<long double> > binomVec (MAXCOV,vector<long double>(MAXCOV,0)) ;
 unsigned int totalBasesSum;
 unsigned int totalSitesSum;
+vector<substitutionRates> sub5p;
+vector<substitutionRates> sub3p;
+substitutionRates defaultSubMatch;
 
 
 // // Returns logl( expl(x)+expl(y) )
@@ -90,14 +94,14 @@ void initScores(){
 }//end initScores
 
 
-long double computeLL(const int                  al1Current,
-		      const int                  al2Current,		      
-		      const vector<int>          obsBase   ,
-		      const vector<long double>  probDeam  ,
-		      const vector<int>          obsQual   ,
-		      const long double          contRate  ,
-		      const int                  alContCurrent ,
-		      const vector<long double>  mismappingProb
+long double computeLL(const int                   al1Current,
+		      const int                   al2Current,		      
+		      const vector<int>         & obsBase   ,
+		      const vector<long double> & probDeam  ,
+		      const vector<int>         & obsQual   ,
+		      const long double           contRate  ,
+		      const int                   alContCurrent ,
+		      const vector<long double> & mismappingProb
 		      ){
 
     long double llik=0;
@@ -191,7 +195,7 @@ public:
 
     
     void Visit(const PileupPosition& pileupData) {   
-	bool foundOneFragment=false;
+	//bool foundOneFragment=false;
 	if(pileupData.Position < int(m_leftCoord)   || 
 	   pileupData.Position > int(m_rightCoord) ){
 	    return ;
@@ -269,9 +273,53 @@ public:
 		continue; 
 	    }//avoid Ns
 	    int bIndex = baseResolved2int(b);
-	    int   q   = int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offset); 
+	    int   q   = int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual); 
 	    int   m   = int(pileupData.PileupAlignments[i].Alignment.MapQuality);
-	    
+	  
+
+	    // BEGIN DEAMINATION COMPUTATION
+            //zero base distance to the 5p/3p end
+            int dist5p=-1;
+            int dist3p=-1;
+
+            if( pileupData.PileupAlignments[i].Alignment.IsReverseStrand() ){
+                dist5p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
+                dist3p = pileupData.PileupAlignments[i].PositionInAlignment;
+            }else{
+                dist5p = pileupData.PileupAlignments[i].PositionInAlignment;
+                dist3p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
+            }
+                                    
+            // probSubstition * probSubMatchToUseEndo = &defaultSubMatch ;
+            // probSubstition * probSubMatchToUseCont = &defaultSubMatch ;
+            substitutionRates * probSubMatchToUseEndo = &defaultSubMatch ;
+            substitutionRates * probSubMatchToUseCont = &defaultSubMatch ;
+
+            if(dist5p <= (int(sub5p.size()) -1)){
+                probSubMatchToUseEndo = &sub5p[  dist5p ];                      
+            }
+
+            if(dist3p <= (int(sub3p.size()) -1)){
+                probSubMatchToUseEndo = &sub3p[  dist3p ];
+            }
+            //we have substitution probabilities for both... take the closest
+            if(dist5p <= (int(sub5p.size()) -1) &&
+               dist3p <= (int(sub3p.size()) -1) ){
+                    
+                if(dist5p < dist3p){
+                    probSubMatchToUseEndo = &sub5p[  dist5p ];
+                }else{
+                    probSubMatchToUseEndo = &sub3p[  dist3p ];
+                }
+                    
+            }
+
+                    
+            
+	    // BEGIN DEAMINATION COMPUTATION
+
+
+  
 	    cout<<"pos "<<posAlign<<" "<<bIndex<<" "<<b<<endl;
 	    counterB[ bIndex ]++;
 	    
@@ -826,16 +874,131 @@ void *mainCoverageComputationThread(void * argc){
 
 
 
-int main (int argc, char *argv[]) {
+//! Main method
+/*!
+  The main:
+    calls initScores(), 
+    captures the arguments
+    reads the deamination profiles
+*/
 
-    if(argc!=4){
-	cerr<<"usage:"<<endl<<"\t"<<argv[0]<<" [bamfile in] [faidx] [# of threads]"<<endl<<endl;
+int main (int argc, char *argv[]) {
+    setlocale(LC_ALL, "POSIX");
+
+    ////////////////////////////////////
+    // BEGIN Initializing scores      //
+    ////////////////////////////////////
+    initScores();
+    ////////////////////////////////////
+    //    END Initializing scores     //
+    ////////////////////////////////////
+
+
+
+    string cwdProg=getCWD(argv[0]);    
+
+    string deam5pfreqE = getFullPath(cwdProg+"../deaminationProfile/none.prof");
+    string deam3pfreqE = getFullPath(cwdProg+"../deaminationProfile/none.prof");
+
+    //no contaminant deamination for now
+    // string deam5pfreqC = getCWD(argv[0])+"deaminationProfile/none.prof";
+    // string deam3pfreqC = getCWD(argv[0])+"deaminationProfile/none.prof";
+
+    vector<substitutionRates>    deam5PsubE;
+    vector<substitutionRates>    deam3PsubE;
+    // vector<substitutionRates>    deam5PsubC;
+    // vector<substitutionRates>    deam3PsubC;
+
+
+    int    numberOfThreads   = 1;
+
+
+
+    const string usage=string("\nThis program will do something beautiful\n\n\t"+
+                              string(argv[0])+                        
+                              " [options] [fasta file index] [bam file]  "+"\n\n"+
+
+                              "\n\tComputation options:\n"+
+                              "\t\t"+"-t\t\t"+    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
+                              "\t\t"+"--phred64" +"\t\t\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
+
+
+
+                              "\n\tDeamination options:\n"+                                   
+                              "\t\t"+"-deam5p\t\t"+"[.prof file]" +"\t\t"+"5p deamination frequency for the endogenous\n\t\t\t\t\t\t\t(default: "+deam5pfreqE+")"+"\n"+
+                              "\t\t"+"-deam3p\t\t"+"[.prof file]" +"\t\t"+"3p deamination frequency for the endogenous\n\t\t\t\t\t\t\t(default: "+deam3pfreqE+")"+"\n"+
+                              // "\t\t"+"-deam5pc [.prof file]" +"\t\t"+"5p deamination frequency for the contaminant (default: "+deam5pfreqC+")"+"\n"+
+                              // "\t\t"+"-deam3pc [.prof file]" +"\t\t"+"3p deamination frequency for the contaminant (default: "+deam3pfreqC+")"+"\n"+
+			      "");
+
+
+    if( (argc== 1) ||
+        (argc== 2 && string(argv[1]) == "-h") ||
+        (argc== 2 && string(argv[1]) == "-help") ||
+        (argc== 2 && string(argv[1]) == "--help") ){
+        cout<<usage<<endl;
+        return 1;
+    }
+
+    int lastOpt=1;
+
+    for(int i=1;i<(argc);i++){ 
+
+        if(string(argv[i])[0] != '-'  ){
+            lastOpt=i;
+            break;
+        }
+
+        if(string(argv[i]) == "--phred64"  ){
+            offsetQual=64;
+            continue;
+        }
+
+        if(string(argv[i]) == "-deam5p"  ){
+            deam5pfreqE=string(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if(string(argv[i]) == "-deam3p"  ){
+            deam3pfreqE=string(argv[i+1]);
+            i++;
+            continue;
+        }
+
+
+	cerr<<"Error: unknown option "<<string(argv[i])<<endl;
 	return 1;
     }
-    initScores();
-    bamFileToOpen            = string(argv[1]);
-    string fastaIndex        = string(argv[2]);
-    int    numberOfThreads   = destringify<int>( string(argv[3]) );
+
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // BEGIN DEAMINATION PROFILE
+    //
+    ////////////////////////////////////////////////////////////////////////
+    readNucSubstitionRatesFreq(deam5pfreqE,sub5p);
+    readNucSubstitionRatesFreq(deam3pfreqE,sub3p);
+    for(int nuc=0;nuc<12;nuc++){
+        defaultSubMatch.s[ nuc ] = 0.0;	
+    }
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // END  DEAMINATION PROFILE
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+    string fastaIndex        = string(argv[lastOpt]);
+    bamFileToOpen            = string(argv[lastOpt+1]);
+
+
     int    bpToExtract       = 500;
     
     pthread_t             thread[numberOfThreads];
@@ -884,14 +1047,14 @@ int main (int argc, char *argv[]) {
 	rc = pthread_create(&thread[i], NULL, mainCoverageComputationThread, NULL);
 	checkResults("pthread_create()\n", rc);
     }
-    cout<<"creating threads"<<endl;
-
+    cout<<"creating threads for coverage calculation, # of slices to process"<<queueDataForCoverage.size()<<endl;
+    
     //waiting for threads to finish
-    for (int i=0; i <numberOfThreads; ++i) {
+    for (int i=0; i <numberOfThreads; ++i) {	
 	rc = pthread_join(thread[i], NULL);
 	checkResults("pthread_join()\n", rc);
     }
-    cout<<"done threads"<<endl;
+    cout<<"coverage computations are done"<<endl;
     pthread_mutex_destroy(&mutexRank);
     pthread_mutex_destroy(&mutexQueue);
     pthread_mutex_destroy(&mutexCounter);
@@ -901,7 +1064,7 @@ int main (int argc, char *argv[]) {
     
     long double rateForPoissonCov = ((long double)totalBasesSum)/((long double)totalSitesSum);
 
-    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
+    cout<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<double(totalBasesSum)/double(totalSitesSum)<<endl;
     // for(int i=0;i<20;i++){
     // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
     // }
