@@ -1,6 +1,6 @@
 
-CXX      = g++
-LIBGAB   = /home/gabriel/lib/
+CXX      = g++ 
+LIBGAB   = /home/gabriel/lib/libgab/
 
 CXXFLAGS = -Wall -lm -O3 -lz -I${LIBGAB} -I${LIBGAB}/gzstream/ -I../bamtools/include/ -I../bamtools/src/  -c
 LDFLAGS  = -lz  -lpthread 

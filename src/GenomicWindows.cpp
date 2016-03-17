@@ -155,6 +155,12 @@ vector<GenomicRange> GenomicWindows::getGenomicWindowsChr(string chrName,int win
 	coord+=(windowSize-overlap);
     }
 
+    GenomicRange toAdd;
+    toAdd.setChrName(    chrFound[indexChr].name   );
+    toAdd.setStartCoord( coord                     );
+    toAdd.setEndCoord(   chrFound[indexChr].length );
+    toReturn.push_back(toAdd);
+    
     return toReturn;
 }
 

@@ -6,9 +6,11 @@
 //#include <random>
 
 //TODO
+// add deamination in calculation
 // add mappability
+//
 
-
+#include "api/internal/io/BgzfStream_p.h"
 #include <api/BamConstants.h>
 #include <api/BamMultiReader.h>
 #include <utils/bamtools_fasta.h>
@@ -30,7 +32,8 @@ using namespace std;
 using namespace BamTools;
 
 //#define DEBUGCOMPUTELL
-//#define COVERAGETVERBOSE
+#define HETVERBOSE
+// #define COVERAGETVERBOSE
 
 #define MAXMAPPINGQUAL 257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
 #define MAXCOV          50     // maximal coverage
@@ -42,13 +45,15 @@ long double likeMismatch     [MAXMAPPINGQUAL];
 long double likeMatchProb    [MAXMAPPINGQUAL];
 long double likeMismatchProb [MAXMAPPINGQUAL];
 
-vector< vector<long double> > binomVec (MAXCOV,vector<long double>(MAXCOV,0)) ;
+vector< vector<long double> > binomVec (MAXCOV+1,vector<long double>(MAXCOV+1,0)) ;
 unsigned int totalBasesSum;
 unsigned int totalSitesSum;
 vector<substitutionRates> sub5p;
 vector<substitutionRates> sub3p;
 substitutionRates defaultSubMatch;
 long double contrate=0.0;
+long double rateForPoissonCov;
+long double pdfRateForPoissonCov;
 
 // // Returns logl( expl(x)+expl(y) )
 // inline long double oplusl(long double x, long double y ){
@@ -58,6 +63,236 @@ long double contrate=0.0;
 // }
 
 
+
+
+//TODO: put different classes and functions in different files
+class DataChunk{
+private:
+    
+    public:
+    //vector<BamAlignment>  dataToProcess;    
+    GenomicRange rangeGen;
+    int rank;
+    
+    DataChunk();
+    DataChunk(const DataChunk & other);
+    ~DataChunk();
+    DataChunk & operator= (const DataChunk & other);
+};
+
+DataChunk::DataChunk(){
+    //cerr<<"Constructor addr: "<<this<<endl;
+}
+
+DataChunk::~DataChunk(){
+    //cerr<<"Destructor  addr: "<<this<<endl;
+}
+
+class CompareDataChunk {
+public:
+    bool operator() ( DataChunk * cd1, DataChunk * cd2)  {
+        //comparison code here
+	return ( cd1->rank > cd2->rank );
+    }
+};
+
+
+
+
+
+class PositionResult{
+private:
+    
+    public:
+
+    int          refID;
+    unsigned int pos ;
+    char         refB;
+    char         altB;
+    int          refC;
+    int          altC;
+
+    long double  rrll;
+    long double  rall;
+    long double  aall;
+
+    long double  lqual;
+    long double  llCov;
+    int          geno;
+    
+    PositionResult();
+    PositionResult(const PositionResult & other);
+    ~PositionResult();
+    string toString(const RefVector  references) const;
+
+    PositionResult & operator= (const PositionResult & other);
+    //    friend ostream & operator<<(ostream & os, const PositionResult & ct);
+};
+
+
+
+PositionResult::PositionResult(){
+    //cerr<<"Constructor addr: "<<this<<endl;
+}
+
+PositionResult::~PositionResult(){
+    //cerr<<"Destructor  addr: "<<this<<endl;
+}
+
+
+
+
+string PositionResult::toString(const RefVector  references) const{
+    //cerr<<"Constructor addr: "<<this<<endl;
+    string toReturn="";
+    toReturn += ""+references[refID].RefName+"\t";
+    toReturn += ""+stringify(pos)+"\t";
+
+    toReturn += ""+stringify(refB)+"\t";
+    toReturn += ""+stringify(altB)+"\t";
+
+    toReturn += ""+stringify(refC)+"\t";
+    toReturn += ""+stringify(altC)+"\t";
+
+    if(geno==0){
+	toReturn += "0/0\t";
+    }else{
+	if(geno==1){
+	    toReturn += "0/1\t";
+	}else{
+	    if(geno==2){
+		toReturn += "1/1\t";
+	    }else{
+		cerr<<"Internal error for genotype"<<endl;
+		exit(1);
+	    }	    
+	}
+    }
+
+
+    toReturn += ""+stringify(rrll)+"\t";
+    toReturn += ""+stringify(rall)+"\t";
+    toReturn += ""+stringify(aall)+"\t";
+
+    toReturn += ""+stringify(lqual)+"\t";
+    toReturn += ""+stringify(llCov)+"\t";
+
+    toReturn += "\n";
+
+    //cout<<"toString "<<toReturn<<endl;
+    return toReturn;
+}
+
+//TODO code to VCF
+// string PositionResult::toString(const RefVector  references) const{
+//     //cerr<<"Constructor addr: "<<this<<endl;
+//     string toReturn="";
+//     toReturn += ""+references[refID].RefName+"\t";
+//     toReturn += ""+stringify(pos)+"\t";
+//     toReturn += ""+stringify(refB)+"\t";
+//     toReturn += ""+stringify(altB)+"\t";
+//     toReturn += ".\t"; //ID
+//     toReturn += "0\t"; //QUAL   
+//     toReturn += "\t";
+
+//     toReturn += "\n";
+
+//     //cout<<"toString "<<toReturn<<endl;
+//     return toReturn;
+// }
+
+// ostream & operator << (ostream & os, const PositionResult & pr){
+
+
+//     os<<pr.toString();
+
+
+//     return os;
+// }
+
+
+
+
+
+
+class DataToWrite{
+private:
+    
+    public:
+    vector<PositionResult *>  * vecPositionResults;
+    GenomicRange rangeGen;
+    int rank;
+    
+    DataToWrite();
+    DataToWrite(const DataToWrite & other);
+    ~DataToWrite();
+    DataToWrite & operator= (const DataToWrite & other);
+};
+
+DataToWrite::DataToWrite(){
+    vecPositionResults =  new vector<PositionResult *>();
+    //cerr<<"Constructor addr: "<<this<<endl;
+}
+
+DataToWrite::~DataToWrite(){
+    for (unsigned int i =0; i< vecPositionResults->size();i++){
+	delete (vecPositionResults->at(i));
+    } 
+    vecPositionResults->clear();
+    delete vecPositionResults;
+    //cerr<<"Destructor  addr: "<<this<<endl;
+}
+
+class CompareDataToWrite {
+public:
+    bool operator() ( DataToWrite * cd1, DataToWrite * cd2)  {
+        //comparison code here
+	return ( cd1->rank > cd2->rank );
+    }
+};
+
+
+
+int    timeThreadSleep =    10;
+int    timeSleepWrite  =    1;
+
+bool      readDataDone = false;
+unsigned int sizeChunk =  5000;
+
+string                                                             bamFileToOpen;
+queue< DataChunk * >                                               queueDataToprocess;
+queue< DataChunk * >                                               queueDataForCoverage;
+
+priority_queue<DataToWrite *, vector<DataToWrite *>, CompareDataToWrite> queueDataTowrite;
+
+pthread_mutex_t  mutexQueue   = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t  mutexCounter = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t  mutexRank    = PTHREAD_MUTEX_INITIALIZER;
+
+//GLOBALLY accessed
+map<unsigned int, int>       threadID2Rank;
+
+
+//! Chunk of code to check if a certain thread call failed
+/*!
+  This block is calls by the pthread
+
+*/				
+#define checkResults(string, val) {             \
+ if (val) {                                     \
+     cerr<<"Failed with "<<val<<" at "<<string<<endl;	\
+   exit(1);                                     \
+ }                                              \
+}
+ 
+
+
+// typedef struct{
+//     long double ll;
+//     long double expal1; //expectation of # of allele 1
+//     long double expal2; //expectation of # of allele 2
+
+// } computeLLRes;
 
 
 long double pdfPoisson(const long double l,const long double k ) {
@@ -84,7 +319,7 @@ void initScores(){
 
 
 
-    for(int i=1;i<MAXCOV;i++){
+    for(int i=1;i<=MAXCOV;i++){
 	//cout<<i<<endl;
 
 	for(int j=0;j<=i;j++){	    
@@ -104,7 +339,7 @@ long double computeLL(const int                   al1Current,
 		      const int                   alContCurrent ,
 		      const vector<long double> & mismappingProb
 		      ){
-
+    //computeLLRes toreturn;
     long double llik=0;
     long double llik1=0;
     long double llik2=0;
@@ -167,12 +402,16 @@ long double computeLL(const int                   al1Current,
     //long double expal1=roundl(  sizeAr * ( expl(llik1) / llik1+llik2)) );
     //long double expal2  = sizeAr-expal1;
     long double binomE2 = binomVec[int(obsBase.size())][expal1]; //logl(nChoosek(sizeAr,expal1)*powl(0.5,expal1+expal2));
-
+    
 #ifdef DEBUGCOMPUTELL
-    cout<<al1Current<<""<<al2Current<<"\t"<<llik<<"\t"<<expal1<<"\t"<<(int(obsBase.size())-expal1)<<"\t"<<binomE2<<"\t"<<(binomE2+llik)<<endl;
+    cout<<al1Current<<""<<al2Current<<"\t"<<llik<<"\t"<<expal1<<"\t"<<(int(obsBase.size())-expal1)<<endl;
+    cout<<binomE2<<"\t"<<(binomE2+llik)<<endl;
 #endif
-
-
+    
+    // toreturn.ll     = (binomE2+llik);
+    // toreturn.expal1 = expal1;
+    // toreturn.expal2 = expal2;
+    
     return (binomE2+llik);
 } //end computeLL
 
@@ -204,10 +443,10 @@ public:
 	//cout<<m_leftCoord<<"\t"<<m_rightCoord<<"\t"<<pileupData.Position<<endl;
 
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-	    // if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
-	    // 	pileupData.PileupAlignments[i].IsNextInsertion ){
-	    // 	continue;
-	    // }
+	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
+	    	pileupData.PileupAlignments[i].IsNextInsertion ){
+	    	continue;
+	    }
 	    //foundOneFragment=true;		  
 	    totalBases++;
 	}
@@ -240,12 +479,19 @@ private:
 class heteroComputerVisitor : public PileupVisitor {
   
 public:
-    heteroComputerVisitor(const RefVector& references,const unsigned int leftCoord,const unsigned int rightCoord,const long double contRate)
+    heteroComputerVisitor(const RefVector& references, 
+			  const int refID,
+			  const unsigned int leftCoord,
+			  const unsigned int rightCoord,
+			  const long double contRate,
+			  vector<PositionResult *> * dataToWriteOut)
 	: PileupVisitor()
 	, m_references(references)
+	, m_refID(refID)
 	, m_leftCoord(leftCoord)
 	, m_rightCoord(rightCoord)
 	, m_contRate(contRate)
+	, m_dataToWriteOut( dataToWriteOut)
     { 
     }
     ~heteroComputerVisitor(void) { }
@@ -254,7 +500,14 @@ public:
 
     
     void Visit(const PileupPosition& pileupData) {   
-	
+
+
+	if(pileupData.Position < int(m_leftCoord)   || 
+	   pileupData.Position > int(m_rightCoord) ){
+	    return ;
+	}
+
+	int                 totalBases=0;
 	int                 counterB  [4];
 	long double         llBaseDeam[4];
 	vector<int>         obsBase   ;
@@ -269,6 +522,12 @@ public:
 	}
 
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
+	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
+	    	pileupData.PileupAlignments[i].IsNextInsertion ){
+	    	continue;
+	    }
+
+
 	    if(i>=MAXCOV){
 		break;
 	    }
@@ -321,7 +580,7 @@ public:
                     
             }
 	    
-	    cout<<"deamdist\t"<<dist5p<<"\t"<<dist3p<<endl;
+	    //cout<<"deamdist\t"<<dist5p<<"\t"<<dist3p<<endl;
             //we look for a damage going from bIndexAlt to bIndex
 	    for(int bIndexAlt=0;bIndexAlt<4;bIndexAlt++){
 		if(bIndex==bIndexAlt) continue;
@@ -336,21 +595,21 @@ public:
 		long double probSubDeam              = probSubMatchToUseEndo->s[dinucIndex];
 		long double probSameDeam             = 1.0-probSubDeam;
 		//long double probSameDeam           = probSubMatch->s[dinucIndex
-		cout<<"deam\t"<<bIndex<<"\t"<<bIndexAlt<<"\t"<<probSubDeam<<"\t"<<probSameDeam<<endl;
+		//cout<<"deam\t"<<bIndex<<"\t"<<bIndexAlt<<"\t"<<probSubDeam<<"\t"<<probSameDeam<<endl;
 		llBaseDeam[bIndexAlt] += logl(probSameDeam);
 	    }
 	    // END DEAMINATION COMPUTATION
 
 
   
-	    cout<<"pos "<<posAlign<<" "<<bIndex<<" "<<b<<endl;
+	    //cout<<"pos "<<posAlign<<" "<<bIndex<<" "<<b<<endl;
 	    counterB[ bIndex ]++;
-	    
+	    totalBases++;
 	    obsBase.push_back(             bIndex   );
 	    obsQual.push_back(                  q   );
 	    mmProb.push_back(  likeMismatchProb[m]  );
 	    
-	    //Fill deamination vector, do not forget fragment orientation
+	    //TODO: Fill deamination vector, do not forget fragment orientation
 	    //put proper probabilities
 	    probDeam.push_back( 0.0   );
 	}//end for each read
@@ -359,7 +618,7 @@ public:
 	int         nonZerollBaseDeamI = -1;
 
 	for(int i=0;i<4;i++){
-	    cout<<"deamres\t"<<i<<"\t"<<llBaseDeam[i]<<endl;
+	    //cout<<"deamres\t"<<i<<"\t"<<llBaseDeam[i]<<endl;
 	    if(llBaseDeam[i] !=0){
 		if(  nonZerollBaseDeam > llBaseDeam[i] ){
 		    nonZerollBaseDeam  = llBaseDeam[i];
@@ -368,10 +627,10 @@ public:
 	    }
 	}
 
-	if(nonZerollBaseDeamI!=-1){
-	    cout<<"nonzero\t"<<nonZerollBaseDeam<<"\t"<<nonZerollBaseDeamI<<endl;
-	    //exit(1);
-	}
+	// if(nonZerollBaseDeamI!=-1){
+	//     cout<<"nonzero\t"<<nonZerollBaseDeam<<"\t"<<nonZerollBaseDeamI<<endl;
+	//     //exit(1);
+	// }
 
 
 	int counterUnique=0;
@@ -380,7 +639,7 @@ public:
 		counterUnique++;
 	}
 
-	cout<<"pos "<<posAlign<<" unique "<<counterUnique<<endl;
+	// cout<<"pos "<<posAlign<<" unique "<<counterUnique<<endl;
 
 	//skip sites with no defined bases and tri/tetra allelic sites
 	if(counterUnique==0 ||
@@ -392,12 +651,13 @@ public:
 	int alt=-1;
 
 	if(counterUnique==1){
+	    for(int i=0;i<4;i++){
+		if(counterB[i]!=0) ref=i;
+	    }
+	    
 	    if(nonZerollBaseDeamI!=-1){
 		alt=nonZerollBaseDeamI;
 	    }else{
-		for(int i=0;i<4;i++){
-		    if(counterB[i]!=0) ref=i;
-		}
 		alt=randomBPExceptInt(ref);	    //todo maybe put a better dna sub model here?
 	    }
 	}
@@ -424,8 +684,17 @@ public:
 	
 	char refB="ACGT"[ref];
 	char altB="ACGT"[alt];
+	PositionResult * prToAdd=new PositionResult();
+	prToAdd->refID = m_refID;
+	prToAdd->pos   = posAlign;
+	prToAdd->refB  = refB;
+	prToAdd->altB  = altB;
+	prToAdd->refC  = counterB[ref];
+	prToAdd->altC  = counterB[alt];
 
-	cout<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
+
+
+	//cout<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
 	long double rrllCr=computeLL(ref         ,
 				     ref         ,		      		  
 				     obsBase     ,
@@ -490,8 +759,34 @@ public:
 	   rallCa=rallCr;
 	   aallCa=aallCr;
        }
+       
+       prToAdd->rrll  = oplusnatl( rrllCr+logl(0.5), rrllCa+logl(0.5));
+       prToAdd->rall  = oplusnatl( rallCr+logl(0.5), rallCa+logl(0.5));
+       prToAdd->aall  = oplusnatl( aallCr+logl(0.5), aallCa+logl(0.5));
+       vector<long double> arrLL (3,0); 
+       arrLL[0]       = prToAdd->rrll;
+       arrLL[1]       = prToAdd->rall;
+       arrLL[2]       = prToAdd->aall;
+       sort (arrLL.begin(), arrLL.end());
+       prToAdd->lqual = (arrLL[2]-arrLL[1]);
+       //1st most likely = 2
+       //2nd most likely = 1
 
-    }
+       if(arrLL[2]     == prToAdd->rrll){
+	   prToAdd->geno = 0;     //rr
+       }else{
+	   if(arrLL[2] == prToAdd->rall){
+	       prToAdd->geno = 1; //ra
+	   }else{
+	       prToAdd->geno = 2; //aa
+	   }
+       }
+
+       prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)/pdfRateForPoissonCov );
+
+       m_dataToWriteOut->push_back(prToAdd);
+       
+    }//end Visit()
     
 
 private:
@@ -499,75 +794,19 @@ private:
     //Fasta * m_fastaReference;
     // unsigned int totalBases;
     // unsigned int totalSites;
+    int          m_refID;
     unsigned int m_leftCoord;
     unsigned int m_rightCoord;
     long double  m_contRate;
+    vector<PositionResult *> * m_dataToWriteOut;
 };//heteroComputerVisitor
 
 
 
 
-class DataChunk{
-private:
-    
-public:
-    //vector<BamAlignment>  dataToProcess;    
-    GenomicRange rangeGen;
-    int rank;
-
-    DataChunk();
-    DataChunk(const DataChunk & other);
-    ~DataChunk();
-    DataChunk & operator= (const DataChunk & other);
-};
-
-DataChunk::DataChunk(){
-    //cerr<<"Constructor addr: "<<this<<endl;
-}
-
-DataChunk::~DataChunk(){
-    //cerr<<"Destructor  addr: "<<this<<endl;
-}
-
-class CompareDataChunk {
-public:
-    bool operator() ( DataChunk * cd1, DataChunk * cd2)  {
-        //comparison code here
-	return ( cd1->rank > cd2->rank );
-    }
-};
 
 
-int    timeThreadSleep =    10;
-bool      readDataDone = false;
-unsigned int sizeChunk =  5000;
 
-string                                                             bamFileToOpen;
-queue< DataChunk * >                                               queueDataToprocess;
-queue< DataChunk * >                                               queueDataForCoverage;
-
-priority_queue<DataChunk *, vector<DataChunk *>, CompareDataChunk> queueDataTowrite;
-
-pthread_mutex_t  mutexQueue   = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t  mutexCounter = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t  mutexRank    = PTHREAD_MUTEX_INITIALIZER;
-
-//GLOBALLY accessed
-map<unsigned int, int>       threadID2Rank;
-
-
-//! Chunk of code to check if a certain thread call failed
-/*!
-  This block is calls by the pthread
-
-*/				
-#define checkResults(string, val) {             \
- if (val) {                                     \
-     cerr<<"Failed with "<<val<<" at "<<string<<endl;	\
-   exit(1);                                     \
- }                                              \
-}
- 
 
 
 
@@ -579,14 +818,17 @@ map<unsigned int, int>       threadID2Rank;
 void *mainHeteroComputationThread(void * argc){
 
     int   rc;
+#ifdef HETVERBOSE    
     int rankThread=0;
-
+#endif
     rc = pthread_mutex_lock(&mutexRank);
     checkResults("pthread_mutex_lock()\n", rc);
 
     threadID2Rank[*(int *)pthread_self()]  = threadID2Rank.size()+1;
-    rankThread = threadID2Rank[*(int *)pthread_self()];
 
+#ifdef HETVERBOSE    
+    rankThread = threadID2Rank[*(int *)pthread_self()];
+#endif
     
     rc = pthread_mutex_unlock(&mutexRank);
     checkResults("pthread_mutex_unlock()\n", rc);
@@ -602,17 +844,20 @@ void *mainHeteroComputationThread(void * argc){
 
     bool foundData=false;
     
+#ifdef HETVERBOSE
     cerr<<"Thread #"<<rankThread <<" started and is requesting data"<<endl;
+#endif
 
-
-    DataChunk * currentChunk;
+    DataChunk    * currentChunk;
 
 
     if(!queueDataToprocess.empty()){    
  	foundData=true;
  	currentChunk = queueDataToprocess.front();
  	queueDataToprocess.pop();
+#ifdef HETVERBOSE
  	cerr<<"Thread #"<<rankThread<<" is reading "<<currentChunk->rank<<endl;
+#endif
 	//cout<<"rank "<< &(currentChunk->dataToProcess) <<endl;
     }
 
@@ -625,10 +870,14 @@ void *mainHeteroComputationThread(void * argc){
 
 
 	if(readDataDone){
+#ifdef HETVERBOSE
 	    cerr<<"Thread #"<<rankThread<<" is done"<<endl;
+#endif
 	    return NULL;	
 	}else{
+#ifdef HETVERBOSE
 	    cerr<<"Thread #"<<rankThread<<" sleeping for "<<timeThreadSleep<<endl;
+#endif
 	    sleep(timeThreadSleep);
 	    goto checkqueue;
 	}
@@ -644,7 +893,11 @@ void *mainHeteroComputationThread(void * argc){
     //////////////////////////////////////////////////////////////
 
     //cout<<currentChunk->rangeGen<<endl;
+
+#ifdef HETVERBOSE
     cerr<<"Thread #"<<rankThread<<" is reading "<<currentChunk->rangeGen<<endl;
+#endif
+
     //sleep(10);
 
 
@@ -682,17 +935,24 @@ void *mainHeteroComputationThread(void * argc){
 
     if( refID==-1 ||
        !setRegionRes){
-    	cerr << "Could not set region "<<currentChunk->rangeGen<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<" "<< currentChunk->rangeGen.getEndCoord()<< endl;
+    	cerr << "Heterozygous computation: could not set region "<<currentChunk->rangeGen<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<" "<< currentChunk->rangeGen.getEndCoord()<< endl;
     	exit(1);
     }
 
-   
+    DataToWrite  * dataToWrite = new DataToWrite();
+
+    dataToWrite->rangeGen      =  currentChunk->rangeGen;
+    dataToWrite->rank          =  currentChunk->rank;
+
+    //dataToWrite->dataToWriteOut=new vector<PositionResult *>();
     heteroComputerVisitor* cv = new heteroComputerVisitor(references,
+							  refID,
 							  currentChunk->rangeGen.getStartCoord(), 
 							  currentChunk->rangeGen.getEndCoord()  ,
-							  contrate);
+							  contrate,
+							  dataToWrite->vecPositionResults);
 
-
+    
 
     PileupEngine pileup;
     pileup.AddVisitor(cv);
@@ -713,8 +973,9 @@ void *mainHeteroComputationThread(void * argc){
     delete cv;
 
 	
-
+#ifdef HETVERBOSE
     cerr<<"Thread #"<<rankThread <<" is done with computations"<<endl;
+#endif
 
     //////////////////////////////////////////////////////////////
     //                END   COMPUTATION                         //
@@ -725,20 +986,25 @@ void *mainHeteroComputationThread(void * argc){
     rc = pthread_mutex_lock(&mutexCounter);
     checkResults("pthread_mutex_lock()\n", rc);
     
-    //queueDataTowrite.push(currentChunk);
+
+    //TODO ADD QUEUE
+    queueDataTowrite.push(dataToWrite);
 
     rc = pthread_mutex_unlock(&mutexCounter);
     checkResults("pthread_mutex_unlock()\n", rc);
 
+#ifdef HETVERBOSE
     cerr<<"Thread #"<<rankThread <<" is re-starting"<<endl;
-
+#endif
     goto checkqueue;	   
 
 
     
 
-    
+#ifdef HETVERBOSE    
     cerr<<"Thread "<<rankThread<<" ended "<<endl;
+#endif
+
     return NULL;
 
 }// end mainHeteroComputationThread
@@ -885,17 +1151,16 @@ void *mainCoverageComputationThread(void * argc){
 
 
     BamRegion bregion (refID, 
-		       currentChunk->rangeGen.getStartCoord(), 
-		       refID, 
-		       currentChunk->rangeGen.getEndCoord()   );
+    		       int(currentChunk->rangeGen.getStartCoord()), 
+    		       refID, 
+    		       int(currentChunk->rangeGen.getEndCoord() )  );
 
-    bool setRegionRes=reader.SetRegion( bregion   );
+    bool setRegionRes = reader.SetRegion( bregion   );
 
-    // cerr<<"Thread #"<<rankThread<<" "<<references[0].RefName<<"\t"<<setRegionRes<<endl;
 
-    if( refID!=-1 &&
-       !setRegionRes){
-    	cerr << "Could not set region "<<currentChunk->rangeGen<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<" "<< currentChunk->rangeGen.getEndCoord()<< endl;
+    if( refID==-1 ||
+       !setRegionRes){	
+    	cerr << "Coverage computation: could not set region "<<currentChunk->rangeGen<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<" "<< currentChunk->rangeGen.getEndCoord()<< "\trefID:"<<refID<<"\tset region fail?:"<<booleanAsString(setRegionRes)<<endl;
     	exit(1);
     }
 
@@ -1007,28 +1272,37 @@ int main (int argc, char *argv[]) {
 
 
     int    numberOfThreads   = 1;
-
+    string outFileSiteLL;
+    string sampleName        = "sample";
+    bool   useVCFoutput      = false;
 
 
     const string usage=string("\nThis program will do something beautiful\n\n\t"+
                               string(argv[0])+                        
-                              " [options] [fasta file index] [bam file]  "+"\n\n"+
-
-                              "\n\tComputation options:\n"+
-                              "\t\t"+"-t\t\t"+    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
-                              "\t\t"+"--phred64" +"\t\t\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
-
-
+                              " [options] [fasta file] [bam file]  "+"\n\n"+
+			      "\twhere:\n"+
+			      "\t\t[fasta file]\t\tThe fasta file used for alignement\n"
+			      "\t\t[bam file]\t\tThe aligned and indexed BAM file\n"+
+			      "\n\n"
+			      
+                              "\n\tI/O options:\n"+
+			      "\t\t"+"-o"+"\t"+"--out"  + "\t\t"   +    "[outfile]" +"\t\t"+"Output per-site likelihoods in BGZIP (default: none)"+"\n"+
+			      "\t\t"+""  +"\t"+"--name" + "\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
+			      "\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as  (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
+			      
+			      "\n\tComputation options:\n"+
+                              "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
+                              "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
+			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t"+"Size of windows in bp  (default: "+stringify(sizeChunk)+")"+"\n"+	      
 
                               "\n\tSample options:\n"+
-                              "\t\t"+"-cont\t\t"+    "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
+                              "\t\t"+""  +""+"--cont"  +"\t\t\t"    +  "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
                               // "\t\t"+"--phred64" +"\t\t\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 			      
 			      
-
                               "\n\tDeamination options:\n"+                                   
-                              "\t\t"+"-deam5p\t\t"+"[.prof file]" +"\t\t"+"5p deamination frequency for the endogenous\n\t\t\t\t\t\t\t(default: "+deam5pfreqE+")"+"\n"+
-                              "\t\t"+"-deam3p\t\t"+"[.prof file]" +"\t\t"+"3p deamination frequency for the endogenous\n\t\t\t\t\t\t\t(default: "+deam3pfreqE+")"+"\n"+
+                              "\t\t"+""  +""+"--deam5p\t\t"+"[.prof file]" +"\t\t"+"5p deamination frequency for the endogenous\n\t\t\t\t\t\t\t\t(default: "+deam5pfreqE+")"+"\n"+
+                              "\t\t"+""  +""+"--deam3p\t\t"+"[.prof file]" +"\t\t"+"3p deamination frequency for the endogenous\n\t\t\t\t\t\t\t\t(default: "+deam3pfreqE+")"+"\n"+
                               // "\t\t"+"-deam5pc [.prof file]" +"\t\t"+"5p deamination frequency for the contaminant (default: "+deam5pfreqC+")"+"\n"+
                               // "\t\t"+"-deam3pc [.prof file]" +"\t\t"+"3p deamination frequency for the contaminant (default: "+deam3pfreqC+")"+"\n"+
 			      
@@ -1053,8 +1327,34 @@ int main (int argc, char *argv[]) {
             break;
         }
 
-        if( string(argv[i]) == "-cont"  ){
+
+	
+        if( string(argv[i]) == "--size"  ){
+	    sizeChunk=destringify<unsigned int>(argv[i+1]);
+            continue;
+        }
+	
+        if( string(argv[i]) == "--vcf"  ){
+	    useVCFoutput=true;
+            continue;
+        }
+
+        if( string(argv[i]) == "--name"  ){
+            sampleName=string(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if( string(argv[i]) == "--cont"  ){
             contrate=destringify<long double>(argv[i+1]);
+            i++;
+            continue;
+        }
+
+
+        if( string(argv[i]) == "-o"    ||
+	    string(argv[i]) == "--out" ){
+            outFileSiteLL=string(argv[i+1]);
             i++;
             continue;
         }
@@ -1065,13 +1365,13 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
-        if(string(argv[i]) == "-deam5p"  ){
+        if(string(argv[i]) == "--deam5p"  ){
             deam5pfreqE=string(argv[i+1]);
             i++;
             continue;
         }
 
-        if(string(argv[i]) == "-deam3p"  ){
+        if(string(argv[i]) == "--deam3p"  ){
             deam3pfreqE=string(argv[i+1]);
             i++;
             continue;
@@ -1083,10 +1383,53 @@ int main (int argc, char *argv[]) {
     }
 
 
-    if( contrate<0 || contrate>1 ){
+    string fastaFile         = string(argv[lastOpt]);
+    bamFileToOpen            = string(argv[lastOpt+1]);
+    string fastaIndex        = fastaFile+".fai";
+
+    if( !isFile(fastaFile) ){
+	cerr<<"The fasta file "<<fastaFile<<" does not exists"<<endl;
+	return 1;	
+    }
+
+    if( !isFile(fastaIndex) ){
+	cerr<<"The fasta file "<<fastaFile<<"  does not have an index: "<<fastaIndex<<endl;
+	return 1;	
+    }
+
+    if( contrate<0 || 
+	contrate>1 ){
 	cerr<<"The contamination rate must be between 0 and 1"<<endl;
 	return 1;	
     }
+
+    if( !strEndsWith(outFileSiteLL,".gz")){
+	cerr<<"The output file "<<outFileSiteLL<<" must end with .gz"<<endl;
+	return 1;	
+    }
+
+
+
+
+    //Testing BAM file
+    BamReader reader;
+    if ( !reader.Open(bamFileToOpen) ) {
+	cerr << "Could not open input BAM file:" << bamFileToOpen <<endl;
+    	exit(1);
+    }
+
+    reader.LocateIndex();
+
+    if(!reader.HasIndex()){
+    	cerr << "The BAM file: " << bamFileToOpen <<" does not have an index"<<endl;
+    	exit(1);
+    }
+
+    // retrieve reference data
+    const RefVector  references = reader.GetReferenceData();
+
+
+    reader.Close();
 
     ////////////////////////////////////
     //   END Parsing arguments        //
@@ -1120,11 +1463,9 @@ int main (int argc, char *argv[]) {
 
 
 
-    string fastaIndex        = string(argv[lastOpt]);
-    bamFileToOpen            = string(argv[lastOpt+1]);
 
 
-    int    bpToExtract       = 500;
+    int    bpToExtract       = sizeChunk;
     
     pthread_t             thread[numberOfThreads];
     int                   rc=0;
@@ -1135,7 +1476,9 @@ int main (int argc, char *argv[]) {
     //TODO add genomic ranges in queue
     vector<GenomicRange> v = rw.getGenomicWindows(bpToExtract,0);
     if( v.size() == 0 ){    cerr<<"No range found using these chr/loci settings"<<endl; return 1;}
+    
     unsigned int rank=0;
+    int lastRank=-1;
 
     for(unsigned int i=0;i<v.size();i++){
 	//cout<<v[i]<<endl;
@@ -1143,12 +1486,13 @@ int main (int argc, char *argv[]) {
 
 	currentChunk->rangeGen = v[i];
 	currentChunk->rank     = rank;
+	lastRank               = rank;
 
 	queueDataToprocess.push(currentChunk);
 	rank++;
     }
     readDataDone=true;
-    //return 1;
+    //    return 1;
 
     /////////////////////////////
     // BEGIN  Compute coverage //
@@ -1172,14 +1516,21 @@ int main (int argc, char *argv[]) {
 	rc = pthread_create(&thread[i], NULL, mainCoverageComputationThread, NULL);
 	checkResults("pthread_create()\n", rc);
     }
-    cout<<"creating threads for coverage calculation, # of slices to process"<<queueDataForCoverage.size()<<endl;
+
+    cout<<"Creating threads for coverage calculation"<<endl;
+
+
+    while(queueDataForCoverage.size()!=0){
+	cout<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataToprocess.size()<<endl;
+	sleep(timeThreadSleep);
+    }
     
     //waiting for threads to finish
     for (int i=0; i <numberOfThreads; ++i) {	
 	rc = pthread_join(thread[i], NULL);
 	checkResults("pthread_join()\n", rc);
     }
-    cout<<"coverage computations are done"<<endl;
+    cout<<"Coverage computations are done"<<endl;
     pthread_mutex_destroy(&mutexRank);
     pthread_mutex_destroy(&mutexQueue);
     pthread_mutex_destroy(&mutexCounter);
@@ -1187,7 +1538,9 @@ int main (int argc, char *argv[]) {
     //    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
     //    pthread_exit(NULL);
     
-    long double rateForPoissonCov = ((long double)totalBasesSum)/((long double)totalSitesSum);
+    rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
+    pdfRateForPoissonCov = pdfPoisson( rateForPoissonCov, rateForPoissonCov);
+
 
     cout<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<double(totalBasesSum)/double(totalSitesSum)<<endl;
     // for(int i=0;i<20;i++){
@@ -1210,7 +1563,7 @@ int main (int argc, char *argv[]) {
     ///////////////////////
     //  Compute hetero   //
     ///////////////////////
-
+    cout<<"Creating threads for heterozygosity calculation"<<endl;
     pthread_mutex_init(&mutexQueue,   NULL);
     pthread_mutex_init(&mutexCounter, NULL);
     pthread_mutex_init(&mutexRank ,   NULL);
@@ -1219,20 +1572,147 @@ int main (int argc, char *argv[]) {
 	rc = pthread_create(&thread[i], NULL, mainHeteroComputationThread, NULL);
 	checkResults("pthread_create()\n", rc);
     }
+    // 	//threads are running here
+
+    // unsigned int originalSize = queueDataToprocess.size();
+    // while(queueDataToprocess.size()!=0){
+    // 	cout<<"# of slices left to process: "<<queueDataToprocess.size()<<"/"<<originalSize<<endl;
+    // 	sleep(timeThreadSleep);
+    // }
 
 
-    //waiting for threads to finish
+
+    Internal::BgzfStream bgzipWriter;
+    bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
+    if(!bgzipWriter.IsOpen()){
+	cerr<<"Cannot open file "<<outFileSiteLL<<" in bgzip writer"<<endl;
+	return 1;
+    }
+
+    string headerOutFile;
+    if(useVCFoutput){
+	headerOutFile="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
+    }else{
+	headerOutFile="#CHROM\tPOS\tA1\tA2\tA1c\tA2c\tGENO\tA1A1\tA1A2\tA2A2\tQualL\tCovL\n";	
+    }
+    bgzipWriter.Write(headerOutFile.c_str(),headerOutFile.size());
+
+    bool wroteEverything=false;
+    int lastWrittenChunk=-1;   
+
+    while(!wroteEverything){
+
+    	//threads are running here
+    	rc = pthread_mutex_lock(&mutexCounter);
+    	checkResults("pthread_mutex_lock()\n", rc);
+	
+	bool wroteData=false;
+    	if(!queueDataTowrite.empty()){
+	
+    	    DataToWrite *  dataToWrite= queueDataTowrite.top();
+
+    	    if( lastWrittenChunk == (dataToWrite->rank-1) ){ 	    //correct order
+    		queueDataTowrite.pop();
+		rc = pthread_mutex_unlock(&mutexCounter);
+		checkResults("pthread_mutex_unlock()\n", rc);
+
+		cout<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<dataToWrite->vecPositionResults->size()<<" records"<<endl;
+
+
+		string strToWrite="";
+		for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
+		    strToWrite += dataToWrite->vecPositionResults->at(i)->toString(references);
+		    //cout<<strToWrite<<endl;
+		    if( (i%500) == 499){
+			bgzipWriter.Write(strToWrite.c_str(), strToWrite.size());
+			strToWrite="";
+		    }
+		}
+		if(!strToWrite.empty()){
+		    bgzipWriter.Write(strToWrite.c_str(), strToWrite.size());
+		}
+		    
+		
+    		wroteData=true;		
+    		lastWrittenChunk=dataToWrite->rank;
+		
+    		if(dataToWrite->rank == lastRank)
+    		    wroteEverything=true;	
+    		delete dataToWrite;
+    	    }else{
+		//do nothing, we have to wait for the chunk with the right rank
+		rc = pthread_mutex_unlock(&mutexCounter);
+		checkResults("pthread_mutex_unlock()\n", rc);
+	
+    	    }
+
+    	}else{//end if queue not empty
+	    rc = pthread_mutex_unlock(&mutexCounter);
+	    checkResults("pthread_mutex_unlock()\n", rc);
+	}
+
+    	if(!wroteData)
+    	    sleep(timeSleepWrite);
+    }
+
+
+
+    // 	rc = pthread_mutex_lock(&mutexCounter);
+    // 	checkResults("pthread_mutex_lock()\n", rc);
+    // 	bool wroteData=false;
+    // 	if(!queueDataTowrite.empty()){
+	
+    // 	    DataChunk *  dataToWrite= queueDataTowrite.top();
+
+    // 	    if( lastWrittenChunk == (dataToWrite->rank-1) ){
+    // 		queueDataTowrite.pop();
+    // 		cout<<"writing "<<dataToWrite->rank<<endl;
+    // 		//writing dataToWrite
+    // 		for(unsigned int i=0;i<dataToWrite->dataToProcess.size();i++){
+    // 		    outfile<< dataToWrite->dataToProcess[i].ids 
+    // 			   << endl  
+    // 			   << dataToWrite->dataToProcess[i].seqs << endl
+    // 			   << "+" <<endl 
+    // 			   << dataToWrite->dataToProcess[i].qual << endl;
+    // 		}
+		
+    // 		wroteData=true;		
+    // 		lastWrittenChunk=dataToWrite->rank;
+		
+    // 		if(dataToWrite->rank == lastRank)
+    // 		    wroteEverything=true;	
+    // 		delete dataToWrite;
+    // 	    }else{
+		
+    // 	    }
+
+    // 	}
+
+    // 	rc = pthread_mutex_unlock(&mutexCounter);
+    // 	checkResults("pthread_mutex_unlock()\n", rc);
+
+    // 	if(!wroteData)
+    // 	    sleep(timeThreadSleep);
+    // }
+
+    //waiting for threads to finish    
     for (int i=0; i <numberOfThreads; ++i) {
 	rc = pthread_join(thread[i], NULL);
 	checkResults("pthread_join()\n", rc);
     }
-
+    cout<<"Heterozygosity computations are done"<<endl;
     pthread_mutex_destroy(&mutexRank);
     pthread_mutex_destroy(&mutexQueue);
     pthread_mutex_destroy(&mutexCounter);
 
-    //writer.Close();
-    //reader.Close();    
+
+
+    bgzipWriter.Close();
+
+
+
+
+
     pthread_exit(NULL);
 
     return 0;
