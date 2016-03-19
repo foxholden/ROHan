@@ -142,6 +142,65 @@ PositionResult::~PositionResult(){
 
 
 
+class GenoResults{
+private:
+    
+public:
+
+    long double  rrll;
+    long double  rall;
+    long double  aall;
+
+    long double  lqual;
+    long double  llCov;
+    int          geno;
+    
+    GenoResults();
+    GenoResults(long double  rrll ,
+		long double  rall ,
+		long double  aall ,
+		long double  lqual,
+		long double  llCov,
+		int          geno);
+    GenoResults(const PositionResult * pr);
+    GenoResults(const GenoResults    & other);
+    ~GenoResults();
+    GenoResults & operator= (const GenoResults & other);
+};
+
+GenoResults::GenoResults(){
+    //cerr<<"Constructor addr: "<<this<<endl;
+}
+
+GenoResults::GenoResults(const PositionResult * pr){
+    rrll   = pr->rrll ;
+    rall   = pr->rall ;
+    aall   = pr->aall ;
+    lqual  = pr->lqual;
+    llCov  = pr->llCov;
+    geno   = pr->geno ;    
+}
+
+GenoResults::GenoResults(long double  rrll ,
+			 long double  rall ,
+			 long double  aall ,
+			 long double  lqual,
+			 long double  llCov,
+			 int          geno): 
+    rrll(  rrll  ),
+    rall(  rall  ),
+    aall(  aall  ),
+    lqual( lqual ),
+    llCov( llCov ),
+    geno(  geno  ){
+    
+}
+
+GenoResults::~GenoResults(){
+    //cerr<<"Destructor  addr: "<<this<<endl;
+}
+
+
 string PositionResult::toString(const RefVector  references) const{
     //cerr<<"Constructor addr: "<<this<<endl;
     string toReturn="";
@@ -1273,6 +1332,8 @@ int main (int argc, char *argv[]) {
 
     int    numberOfThreads   = 1;
     string outFileSiteLL;
+    bool   outFileSiteLLFlag=false;
+
     string sampleName        = "sample";
     bool   useVCFoutput      = false;
 
@@ -1288,12 +1349,12 @@ int main (int argc, char *argv[]) {
                               "\n\tI/O options:\n"+
 			      "\t\t"+"-o"+"\t"+"--out"  + "\t\t"   +    "[outfile]" +"\t\t"+"Output per-site likelihoods in BGZIP (default: none)"+"\n"+
 			      "\t\t"+""  +"\t"+"--name" + "\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
-			      "\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as  (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
+			      "\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
 			      
 			      "\n\tComputation options:\n"+
                               "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
-			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t"+"Size of windows in bp  (default: "+stringify(sizeChunk)+")"+"\n"+	      
+			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t\t"+"Size of windows in bp  (default: "+stringify(sizeChunk)+")"+"\n"+	      
 
                               "\n\tSample options:\n"+
                               "\t\t"+""  +""+"--cont"  +"\t\t\t"    +  "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
@@ -1355,6 +1416,7 @@ int main (int argc, char *argv[]) {
         if( string(argv[i]) == "-o"    ||
 	    string(argv[i]) == "--out" ){
             outFileSiteLL=string(argv[i+1]);
+	    outFileSiteLLFlag=true;
             i++;
             continue;
         }
@@ -1403,10 +1465,11 @@ int main (int argc, char *argv[]) {
 	return 1;	
     }
 
-    if( !strEndsWith(outFileSiteLL,".gz")){
-	cerr<<"The output file "<<outFileSiteLL<<" must end with .gz"<<endl;
-	return 1;	
-    }
+    if(outFileSiteLLFlag)
+	if( !strEndsWith(outFileSiteLL,".gz")){
+	    cerr<<"The output file "<<outFileSiteLL<<" must end with .gz"<<endl;
+	    return 1;	
+	}
 
 
 
@@ -1581,79 +1644,100 @@ int main (int argc, char *argv[]) {
     // }
 
 
+    ///////////////////
+    //Writing data out/
+    ///////////////////
 
+    vector<GenoResults *> vectorGenoResults;
     Internal::BgzfStream bgzipWriter;
-    bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
-    if(!bgzipWriter.IsOpen()){
-	cerr<<"Cannot open file "<<outFileSiteLL<<" in bgzip writer"<<endl;
-	return 1;
-    }
 
-    string headerOutFile;
-    if(useVCFoutput){
-	headerOutFile="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
-    }else{
-	headerOutFile="#CHROM\tPOS\tA1\tA2\tA1c\tA2c\tGENO\tA1A1\tA1A2\tA2A2\tQualL\tCovL\n";	
+    if(outFileSiteLLFlag){
+	bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
+	if(!bgzipWriter.IsOpen()){
+	    cerr<<"Cannot open file "<<outFileSiteLL<<" in bgzip writer"<<endl;
+	    return 1;
+	}
+    
+
+	string headerOutFile;
+	if(useVCFoutput){
+	    headerOutFile="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
+	}else{
+	    headerOutFile="#CHROM\tPOS\tA1\tA2\tA1c\tA2c\tGENO\tA1A1\tA1A2\tA2A2\tQualL\tCovL\n";	
+	}
+
+	bgzipWriter.Write(headerOutFile.c_str(),headerOutFile.size());
     }
-    bgzipWriter.Write(headerOutFile.c_str(),headerOutFile.size());
 
     bool wroteEverything=false;
     int lastWrittenChunk=-1;   
-
+           
     while(!wroteEverything){
 
-    	//threads are running here
-    	rc = pthread_mutex_lock(&mutexCounter);
-    	checkResults("pthread_mutex_lock()\n", rc);
+	//threads are running here
+	rc = pthread_mutex_lock(&mutexCounter);
+	checkResults("pthread_mutex_lock()\n", rc);
 	
 	bool wroteData=false;
-    	if(!queueDataTowrite.empty()){
+	if(!queueDataTowrite.empty()){
 	
-    	    DataToWrite *  dataToWrite= queueDataTowrite.top();
+	    DataToWrite *  dataToWrite= queueDataTowrite.top();
 
-    	    if( lastWrittenChunk == (dataToWrite->rank-1) ){ 	    //correct order
-    		queueDataTowrite.pop();
+	    if( lastWrittenChunk == (dataToWrite->rank-1) ){ 	    //correct order
+		queueDataTowrite.pop();
 		rc = pthread_mutex_unlock(&mutexCounter);
 		checkResults("pthread_mutex_unlock()\n", rc);
 
 		cout<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<dataToWrite->vecPositionResults->size()<<" records"<<endl;
-
-
+		    
+		    
 		string strToWrite="";
 		for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
 		    strToWrite += dataToWrite->vecPositionResults->at(i)->toString(references);
 		    //cout<<strToWrite<<endl;
 		    if( (i%500) == 499){
+			if(outFileSiteLLFlag){
 			bgzipWriter.Write(strToWrite.c_str(), strToWrite.size());
+			}
 			strToWrite="";
 		    }
+			
+		    GenoResults * toadd =  new GenoResults( dataToWrite->vecPositionResults->at(i) );
+		    vectorGenoResults.push_back(toadd);
 		}
+
 		if(!strToWrite.empty()){
-		    bgzipWriter.Write(strToWrite.c_str(), strToWrite.size());
+		    if(outFileSiteLLFlag){
+			if(outFileSiteLLFlag){ bgzipWriter.Write(strToWrite.c_str(), strToWrite.size()); }
+		    }
 		}
 		    
 		
-    		wroteData=true;		
-    		lastWrittenChunk=dataToWrite->rank;
+		wroteData=true;		
+		lastWrittenChunk=dataToWrite->rank;
 		
-    		if(dataToWrite->rank == lastRank)
-    		    wroteEverything=true;	
-    		delete dataToWrite;
-    	    }else{
+		if(dataToWrite->rank == lastRank)
+		    wroteEverything=true;	
+		delete dataToWrite;
+	    }else{
 		//do nothing, we have to wait for the chunk with the right rank
 		rc = pthread_mutex_unlock(&mutexCounter);
 		checkResults("pthread_mutex_unlock()\n", rc);
 	
-    	    }
+	    }
 
-    	}else{//end if queue not empty
+	}else{//end if queue not empty
 	    rc = pthread_mutex_unlock(&mutexCounter);
 	    checkResults("pthread_mutex_unlock()\n", rc);
 	}
 
-    	if(!wroteData)
-    	    sleep(timeSleepWrite);
+	if(!wroteData)
+	    sleep(timeSleepWrite);
     }
+
+    ///////////////////////
+    //end Writing data out/
+    ///////////////////////
 
 
 
@@ -1706,15 +1790,136 @@ int main (int argc, char *argv[]) {
     pthread_mutex_destroy(&mutexCounter);
 
 
+    if(outFileSiteLLFlag){
+	bgzipWriter.Close();
+    }
 
-    bgzipWriter.Close();
-
-
-
-
+    for(unsigned int i=0;i<vectorGenoResults.size();i++){
+	delete( vectorGenoResults[i] );
+    }
 
     pthread_exit(NULL);
 
+    //Compute hetero rate
+    
+
+
+    long double h      = 0.01;
+    long double lambda = 0.0000000001;
+
+    while(true){
+
+	// if(h>=1){
+	//     h=1-espilon;
+	// }
+	// if(h<=0){
+	//     h=espilon;
+	// }
+	long double probNull=0.1;	
+	long double ll   = 0.0;
+	long double llP  = 0.0;
+	long double llPP = 0.0;
+
+	for(int i=0;i<size;i++){
+	    //log( (1-h)(1-o) + ho)
+	    //log( 1-o-h-ho    +ho)
+	    //f(h) = log( 1-o-h)
+	    //f'(h) = 1/(1-o-h) * -1
+	    //f'(h) = -1/(1-o-h) 
+	    //f''(h) = (-(1-o-h)^-1)'
+	    //f''(h) = -(1-o-h)^-2
+
+
+	    long double probNull=0.5;
+    	    //long double llT  = logl( (1-h)*(1-observations[i]) + (h)*(observations[i]) )  ;
+	    long double llT  = logl( (1-errorProbabs[i])
+				     *
+				     ( (1-h)*(1-observations[i]) + h*observations[i] )
+				     +
+				     errorProbabs[i]
+				     *
+				     probNull);
+    	    //long double llTP = (2.0*observations[i]-1)/( observations[i]*(2*h-1)-h+1 );
+
+
+    	    long double llTP = 
+		(  (1-errorProbabs[i])*(2.0*observations[i]-1) )
+		/
+		( (1-errorProbabs[i])
+		  *
+		  ( (1-h)*(1-observations[i]) + h*observations[i] )
+		  +
+		  errorProbabs[i]
+		  *
+		  probNull);
+
+
+    	    long double llTPP = -1.0*
+		(  powl((1-errorProbabs[i]),2.0) * powl((2.0*observations[i]-1),2.0) )
+		/
+		powl( ( (1-errorProbabs[i])
+			*
+			( (1-h)*(1-observations[i]) + h*observations[i] )
+			+
+			errorProbabs[i]
+			*
+			probNull),2.0);
+
+	    
+
+	    // long double llT  = logl( (1-errorProbabs[i])
+	    // 			 *
+	    // 			 ( (1-h)*(1-observations[i]) + (h)*(observations[i]) )
+	    // 			 +
+	    // 			 errorProbabs[i]
+	    // 			 *
+	    // 			 probNull  );
+
+	    // // long double llT  = logl( (1-errorProbabs[i])
+	    // // 			 *
+	    // // 			 (  1-observations[i]  -h+ 2.0*h*observations[i])    
+	    // // 			 +
+	    // // 			 (
+	    // // 			 (errorProbabs[i])
+	    // // 			 *
+	    // // 			 probNull ));
+
+
+	    // //long double llTP = (2.0*observations[i]-1)/( observations[i]*(2*h-1)-h+1 );
+
+
+	    // long double llTP = 
+	    //     ( (errorProbabs[i]-1.0)*(2.0*observations[i]+1.0))
+	    //       /
+	    //       ( -1.0*errorProbabs[i]*(probNull-2.0*observations[i]*h+observations[i]+h-1.0 ) -2.0*observations[i]*h+observations[i]+h-1.0);
+
+	    //       //+ observations[i]*(errorProbabs[i]*(h-1)-2*h+1 )+h-1);
+
+	    // // long double llTP = 
+	    // //     ( observations[i]*(errorProbabs[i]-2)-errorProbabs[i]+1)/
+	    // //     ( errorProbabs[i]*(probNull-h) + observations[i]*(errorProbabs[i]*(h-1)-2*h+1 )+h-1);
+
+	    // // long double llT   = logl( (1-h)*(1-observations[i]) + (h)*(observations[i]) )  ;
+	    // // long double llTP  = -1.0/(1.0-observations[i]-h);
+	    // long double llTPP = -1.0/powl((1.0-observations[i]-h),2.0);
+	    
+	    ll   += llT;
+	    llP  += llTP;
+	    llPP += llTPP;
+	}
+	
+	long double errorInter= 1.96/sqrtl(-1.0*llPP);
+	cout<<fixed<<h<<"\t"<<(1-h)<<"\t"<<ll<<"\t"<<llP<<"\t"<<llPP<<"\t"<<errorInter<<"\t"<<(h-errorInter)<<"\t"<<(h+errorInter)<<endl;	
+
+	//cout<<h<<"\t"<<(1-h)<<"\t"<<ll<<"\t"<<llP<<"\t"<<llPP<<endl;	
+
+	h=h+lambda*llP;
+    }
+
+
+
+
+    
     return 0;
 }
 

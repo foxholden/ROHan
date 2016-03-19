@@ -7,16 +7,11 @@ LDFLAGS  = -lz  -lpthread
 LDLIBS   = ../bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../bamtools/lib/libbamtools.a
 
 
-all: testComp testCompCont testPrior rohan
+all: testComp testCompCont rohan
 
 %.o: %.cpp
 	${CXX} ${CXXFLAGS} $^ -o $@
 
-testPrior.o:	testPrior.cpp
-	${CXX} ${CXXFLAGS} testPrior.cpp
-
-testPrior:	testPrior.o ${LIBGAB}utils.o  
-	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 testComp.o:	testComp.cpp
 	${CXX} ${CXXFLAGS} testComp.cpp
