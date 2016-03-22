@@ -33,6 +33,9 @@
 using namespace std;
 using namespace BamTools;
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 //#define DEBUGHDEAM
 #define DEBUGHCOMPUTE
 //#define DEBUGCOMPUTELL
@@ -544,8 +547,17 @@ public:
 	// 2 Matrices: probDeamR2A, probDeamA2R
 
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-	    int dinucIndexR2A;
-	    int dinucIndexA2R;
+	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
+	    	pileupData.PileupAlignments[i].IsNextInsertion ){
+	    	continue;
+	    }
+
+	    if(i>=MAXCOV){
+		break;
+	    }
+
+	    int dinucIndexR2A=-1;
+	    int dinucIndexA2R=-1;
 
 	    if( isRevVec[i] ){		    
 		dinucIndexR2A =     dimer2indexInt(complementInt(ref),complementInt(alt));
@@ -560,7 +572,7 @@ public:
 		dinucIndexA2R =     dimer2indexInt(              alt ,              ref);
 	    }
             
-
+	    //cout<<"indices "<<i<<"\t"<<ref<<"\t"<<alt<<"\t"<<dinucIndexR2A<<"\t"<<dinucIndexA2R<<endl;
 	    long double probSubDeamR2A              = substitutionRatesPerRead[i]->s[dinucIndexR2A];
 	    long double probSubDeamA2R              = substitutionRatesPerRead[i]->s[dinucIndexA2R];
 	    // long double probSameDeam             = 1.0-probSubDeam;
@@ -904,7 +916,13 @@ void *mainHeteroComputationThread(void * argc){
     checkResults("pthread_mutex_lock()\n", rc);
     
 
-    //TODO ADD QUEUE
+    //TODO: EACH THREAD WRITE TO A TEMP FILE 
+    //THEN COMBINED
+    // std::ifstream if_a("a.txt", std::ios_base::binary);
+    // std::ifstream if_b("b.txt", std::ios_base::binary);
+    // std::ofstream of_c("c.txt", std::ios_base::binary);    
+    // of_c << if_a.rdbuf() << if_b.rdbuf();
+
     queueDataTowrite.push(dataToWrite);
 
     rc = pthread_mutex_unlock(&mutexCounter);
@@ -957,7 +975,7 @@ queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsa
 } // end randomSubQueue
 
 
-
+//TODO: GC bias?
 void *mainCoverageComputationThread(void * argc){
     initScores();
     int   rc;
@@ -1174,9 +1192,13 @@ int main (int argc, char *argv[]) {
     ////////////////////////////////////
 
     string cwdProg=getCWD(argv[0]);    
-
     string deam5pfreqE = getFullPath(cwdProg+"../deaminationProfile/none.prof");
     string deam3pfreqE = getFullPath(cwdProg+"../deaminationProfile/none.prof");
+
+    // cout<<deam5pfreqE<<endl;
+    // cout<<deam3pfreqE<<endl;
+
+    // return 1;
 
     //no contaminant deamination for now
     // string deam5pfreqC = getCWD(argv[0])+"deaminationProfile/none.prof";
@@ -1551,6 +1573,7 @@ int main (int argc, char *argv[]) {
 		    
 		string strToWrite="";
 		for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
+		    //cout<<i<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(references)<<endl;
 		    strToWrite += dataToWrite->vecPositionResults->at(i)->toString(references);
 		    //cout<<strToWrite<<endl;
 		    if( (i%500) == 499){
@@ -1652,9 +1675,12 @@ int main (int argc, char *argv[]) {
 	bgzipWriter.Close();
     }
 
+    //////////////////////////////////
+    //                              //
+    // BEGIN COMPUTE HETERO RATE    //
+    //                              //
+    //////////////////////////////////
 
-    //Compute hetero rate
-    
     for(unsigned int i=0;i<vectorGenoResults.size();i++){
 	long double sumProbHomoz = oplusnatl( vectorGenoResults[i]->rrll , vectorGenoResults[i]->aall );
 	long double sumProbAll   = oplusnatl( sumProbHomoz               , vectorGenoResults[i]->rall );
@@ -1666,7 +1692,12 @@ int main (int argc, char *argv[]) {
 
 
 #ifdef DEBUGHCOMPUTE
-    long double h      = 0.01;//TODO add random h
+    long double h         = 1/ (long double)(randomInt(1000,20000));
+    long double he        = 1/ (long double)(randomInt(1000,20000));
+
+    long double h_old     = 10000;
+    long double hAccu     = 0.00000005;
+
     long double lambda = 0.0000000001;
     int iterationsMax=10000;
     int iterationsGrad=1;
@@ -1676,50 +1707,81 @@ int main (int argc, char *argv[]) {
 	// if(h>=1){
 	//     h=1-espilon;
 	// }
-	// if(h<=0){
-	//     h=espilon;
-	// }
 	long double probNull=0.000001;
 	long double ll   = 0.0;
 	long double llP  = 0.0;
 	long double llPP = 0.0;
 
-	// vectorGenoResults[i]->expectedH    = expl(           vectorGenoResults[i]->rall - sumProbAll);
-	// vectorGenoResults[i]->probAccurate = ( 1.0-(1.0/expl(vectorGenoResults[i]->lqual)) ) * expl(vectorGenoResults[i]->llCov);
 
 	for(unsigned int i=0;i<vectorGenoResults.size();i++){
 
-	    long double llT  = logl( (1-vectorGenoResults[i]->probAccurate)
-				     *
-				     ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-				     +
-				     vectorGenoResults[i]->probAccurate
-				     *
-				     probNull );
+
+	    long double llT;
+	    long double llTP;
+	    long double llTPP;
+
+	    // llT  = logl( (1-vectorGenoResults[i]->probAccurate)
+	    // 			     *
+	    // 			     ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )				     
+	    // 			     +
+	    // 			     vectorGenoResults[i]->probAccurate
+	    // 			     *
+	    // 			     probNull );
 
 
-    	    long double llTP = 
-		(  (1-vectorGenoResults[i]->probAccurate)*(2.0*vectorGenoResults[i]->expectedH-1) )
-		/
-		( (1-vectorGenoResults[i]->probAccurate)
-		  *
-		  ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-		  +
-		  vectorGenoResults[i]->probAccurate
-		  *
-		  probNull);
+    	    // llTP = 
+	    // 	(  (1-vectorGenoResults[i]->probAccurate)*(2.0*vectorGenoResults[i]->expectedH-1) )
+	    // 	/
+	    // 	(  (1-vectorGenoResults[i]->probAccurate)
+	    // 	  *
+	    // 	  ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
+	    // 	   +
+	    // 	   vectorGenoResults[i]->probAccurate
+	    // 	   *
+	    // 	   probNull);
 
 
-    	    long double llTPP = -1.0*
-		(  powl((1-vectorGenoResults[i]->probAccurate),2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
-		/
-		powl( ( (1-vectorGenoResults[i]->probAccurate)
-			*
-			( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-			+
-			vectorGenoResults[i]->probAccurate
-			*
-			probNull),2.0);
+
+
+    	    // llTPP = -1.0* 
+	    // 	(  powl((1-vectorGenoResults[i]->probAccurate),2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
+	    // 	/
+	    // 	powl( ( (1-vectorGenoResults[i]->probAccurate)
+	    // 		*
+	    // 		( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
+	    // 		+
+	    // 		vectorGenoResults[i]->probAccurate
+	    // 		*
+	    // 		probNull),2.0);
+
+
+
+	    llT  = logl( MAX((1-vectorGenoResults[i]->probAccurate),probNull)
+			 *
+			 ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
+			 );
+
+
+    	    llTP = 
+	    	(  MAX((1-vectorGenoResults[i]->probAccurate),probNull)*(2.0*vectorGenoResults[i]->expectedH-1) )
+	    	/
+	    	( MAX((1-vectorGenoResults[i]->probAccurate),probNull)
+	    	  *
+	    	  ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
+	    	  );
+
+
+    	    llTPP = -1.0*
+	    	(  powl( MAX((1-vectorGenoResults[i]->probAccurate),probNull),2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
+	    	/
+	    	powl( ( MAX((1-vectorGenoResults[i]->probAccurate),probNull)
+	    		*
+	    		( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
+	    		),2.0);
+
+	    //cout<<i<<"\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<(1-vectorGenoResults[i]->probAccurate)<<"\t"<<MAX((1-vectorGenoResults[i]->probAccurate),probNull)<<"\t"<<h<<"\t"<<vectorGenoResults[i]->expectedH<<"\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<llT<<"\t"<<llTP<<"\t"<<llTPP<<endl;
+
+
 
 	    	    
 	    ll   += llT;
@@ -1727,18 +1789,45 @@ int main (int argc, char *argv[]) {
 	    llPP += llTPP;
 	}
 	
-	long double errorInter= 1.96/sqrtl(-1.0*llPP);
-	cout<<fixed<<h<<"\t"<<(1-h)<<"\t"<<ll<<"\t"<<llP<<"\t"<<llPP<<"\t"<<errorInter<<"\t"<<(h-errorInter)<<"\t"<<(h+errorInter)<<endl;	
-
+	he = 1.96/sqrtl(-1.0*llPP);
+	cout<<fixed<<h<<"\t"<<(1-h)<<"\t"<<ll<<"\t"<<llP<<"\t"<<llPP<<"\t"<<he<<"\t"<<(h-he)<<"\t"<<(h+he)<<endl;
 	//cout<<h<<"\t"<<(1-h)<<"\t"<<ll<<"\t"<<llP<<"\t"<<llPP<<endl;	
 
+	h_old = h;
 	h=h+lambda*llP;
+	long double hDiff = fabsl(h_old - h);
+	if(hDiff<hAccu){
+	    break;
+	}
+	if(h<=0){
+	    h=0.000001;
+	    break;
+	}     
+
 	iterationsGrad++;
-    }
+    }//end loop of iterations
 
 #endif
+    long double hmin = (h-he);
+    long double hmax = (h+he);
+    if(hmin<0){
+	hmin=0;
+	hmax=he;
+	h=he/2;
+    }
+
+    cout<<"hetrate\t"<<h<<"\t"<<(hmin)<<"\t"<<(hmax)<<endl;
+    
+    ////////////////////////////////
+    //                            //
+    //  end COMPUTE HETERO RATE   //
+    //                            //
+    ////////////////////////////////
+    
 
     
+
+
 
     for(unsigned int i=0;i<vectorGenoResults.size();i++){
 	delete( vectorGenoResults[i] );
