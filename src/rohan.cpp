@@ -6,9 +6,11 @@
 //#include <random>
 
 //TODO
-// add deamination in calculation
-// add mappability
-//
+// test estimate of h across various coverage
+// test robustness of deamination
+// add mappability track
+
+
 
 #include "api/internal/io/BgzfStream_p.h"
 #include <api/BamConstants.h>
@@ -31,6 +33,8 @@
 using namespace std;
 using namespace BamTools;
 
+//#define DEBUGHDEAM
+#define DEBUGHCOMPUTE
 //#define DEBUGCOMPUTELL
 #define HETVERBOSE
 // #define COVERAGETVERBOSE
@@ -64,251 +68,28 @@ long double pdfRateForPoissonCov;
 
 
 
-
-//TODO: put different classes and functions in different files
-class DataChunk{
-private:
-    
-    public:
-    //vector<BamAlignment>  dataToProcess;    
-    GenomicRange rangeGen;
-    int rank;
-    
-    DataChunk();
-    DataChunk(const DataChunk & other);
-    ~DataChunk();
-    DataChunk & operator= (const DataChunk & other);
-};
-
-DataChunk::DataChunk(){
-    //cerr<<"Constructor addr: "<<this<<endl;
-}
-
-DataChunk::~DataChunk(){
-    //cerr<<"Destructor  addr: "<<this<<endl;
-}
-
-class CompareDataChunk {
-public:
-    bool operator() ( DataChunk * cd1, DataChunk * cd2)  {
-        //comparison code here
-	return ( cd1->rank > cd2->rank );
-    }
-};
-
-
-
-
-
-class PositionResult{
-private:
-    
-    public:
-
-    int          refID;
-    unsigned int pos ;
-    char         refB;
-    char         altB;
-    int          refC;
-    int          altC;
-
-    long double  rrll;
-    long double  rall;
-    long double  aall;
-
-    long double  lqual;
-    long double  llCov;
-    int          geno;
-    
-    PositionResult();
-    PositionResult(const PositionResult & other);
-    ~PositionResult();
-    string toString(const RefVector  references) const;
-
-    PositionResult & operator= (const PositionResult & other);
-    //    friend ostream & operator<<(ostream & os, const PositionResult & ct);
-};
-
-
-
-PositionResult::PositionResult(){
-    //cerr<<"Constructor addr: "<<this<<endl;
-}
-
-PositionResult::~PositionResult(){
-    //cerr<<"Destructor  addr: "<<this<<endl;
-}
-
-
-
-
-class GenoResults{
-private:
-    
-public:
-
-    long double  rrll;
-    long double  rall;
-    long double  aall;
-
-    long double  lqual;
-    long double  llCov;
-    int          geno;
-    
-    GenoResults();
-    GenoResults(long double  rrll ,
-		long double  rall ,
-		long double  aall ,
-		long double  lqual,
-		long double  llCov,
-		int          geno);
-    GenoResults(const PositionResult * pr);
-    GenoResults(const GenoResults    & other);
-    ~GenoResults();
-    GenoResults & operator= (const GenoResults & other);
-};
-
-GenoResults::GenoResults(){
-    //cerr<<"Constructor addr: "<<this<<endl;
-}
-
-GenoResults::GenoResults(const PositionResult * pr){
-    rrll   = pr->rrll ;
-    rall   = pr->rall ;
-    aall   = pr->aall ;
-    lqual  = pr->lqual;
-    llCov  = pr->llCov;
-    geno   = pr->geno ;    
-}
-
-GenoResults::GenoResults(long double  rrll ,
-			 long double  rall ,
-			 long double  aall ,
-			 long double  lqual,
-			 long double  llCov,
-			 int          geno): 
-    rrll(  rrll  ),
-    rall(  rall  ),
-    aall(  aall  ),
-    lqual( lqual ),
-    llCov( llCov ),
-    geno(  geno  ){
-    
-}
-
-GenoResults::~GenoResults(){
-    //cerr<<"Destructor  addr: "<<this<<endl;
-}
-
-
-string PositionResult::toString(const RefVector  references) const{
-    //cerr<<"Constructor addr: "<<this<<endl;
-    string toReturn="";
-    toReturn += ""+references[refID].RefName+"\t";
-    toReturn += ""+stringify(pos)+"\t";
-
-    toReturn += ""+stringify(refB)+"\t";
-    toReturn += ""+stringify(altB)+"\t";
-
-    toReturn += ""+stringify(refC)+"\t";
-    toReturn += ""+stringify(altC)+"\t";
-
-    if(geno==0){
-	toReturn += "0/0\t";
-    }else{
-	if(geno==1){
-	    toReturn += "0/1\t";
-	}else{
-	    if(geno==2){
-		toReturn += "1/1\t";
-	    }else{
-		cerr<<"Internal error for genotype"<<endl;
-		exit(1);
-	    }	    
-	}
-    }
-
-
-    toReturn += ""+stringify(rrll)+"\t";
-    toReturn += ""+stringify(rall)+"\t";
-    toReturn += ""+stringify(aall)+"\t";
-
-    toReturn += ""+stringify(lqual)+"\t";
-    toReturn += ""+stringify(llCov)+"\t";
-
-    toReturn += "\n";
-
-    //cout<<"toString "<<toReturn<<endl;
-    return toReturn;
-}
-
-//TODO code to VCF
-// string PositionResult::toString(const RefVector  references) const{
-//     //cerr<<"Constructor addr: "<<this<<endl;
-//     string toReturn="";
-//     toReturn += ""+references[refID].RefName+"\t";
-//     toReturn += ""+stringify(pos)+"\t";
-//     toReturn += ""+stringify(refB)+"\t";
-//     toReturn += ""+stringify(altB)+"\t";
-//     toReturn += ".\t"; //ID
-//     toReturn += "0\t"; //QUAL   
-//     toReturn += "\t";
-
-//     toReturn += "\n";
-
-//     //cout<<"toString "<<toReturn<<endl;
-//     return toReturn;
-// }
-
-// ostream & operator << (ostream & os, const PositionResult & pr){
-
-
-//     os<<pr.toString();
-
-
-//     return os;
-// }
+#include "DataChunk.h"
+#include "DataToWrite.h"
+#include "GenoResults.h"
 
 
 
 
 
 
-class DataToWrite{
-private:
-    
-    public:
-    vector<PositionResult *>  * vecPositionResults;
-    GenomicRange rangeGen;
-    int rank;
-    
-    DataToWrite();
-    DataToWrite(const DataToWrite & other);
-    ~DataToWrite();
-    DataToWrite & operator= (const DataToWrite & other);
-};
 
-DataToWrite::DataToWrite(){
-    vecPositionResults =  new vector<PositionResult *>();
-    //cerr<<"Constructor addr: "<<this<<endl;
-}
 
-DataToWrite::~DataToWrite(){
-    for (unsigned int i =0; i< vecPositionResults->size();i++){
-	delete (vecPositionResults->at(i));
-    } 
-    vecPositionResults->clear();
-    delete vecPositionResults;
-    //cerr<<"Destructor  addr: "<<this<<endl;
-}
 
-class CompareDataToWrite {
-public:
-    bool operator() ( DataToWrite * cd1, DataToWrite * cd2)  {
-        //comparison code here
-	return ( cd1->rank > cd2->rank );
-    }
-};
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -389,12 +170,13 @@ void initScores(){
 }//end initScores
 
 
-long double computeLL(const int                   al1Current,
-		      const int                   al2Current,		      
-		      const vector<int>         & obsBase   ,
-		      const vector<long double> & probDeam  ,
-		      const vector<int>         & obsQual   ,
-		      const long double           contRate  ,
+long double computeLL(const int                   al1Current    ,
+		      const int                   al2Current    ,		      
+		      const vector<int>         & obsBase       ,
+		      const vector<long double> & probDeam1to2  , //rate of deamination from al1 to al2
+		      const vector<long double> & probDeam2to1  , //rate of deamination from al2 to al1
+		      const vector<int>         & obsQual       ,
+		      const long double           contRate      ,
 		      const int                   alContCurrent ,
 		      const vector<long double> & mismappingProb
 		      ){
@@ -408,7 +190,7 @@ long double computeLL(const int                   al1Current,
     cout<<al1Current<<"\t"<<al2Current<<endl;
 #endif
 
-    for(int i=0;i<int(obsBase.size());i++){
+    for(int i=0;i<int(obsBase.size());i++){//iterating over each observed base
 
 	//contaminant
 	if(obsBase[i] == alContCurrent){
@@ -421,17 +203,17 @@ long double computeLL(const int                   al1Current,
 	long double llikAl2t=0;
 
 	//replace prob deam with proper value from matrix
-	if(obsBase[i] == al1Current){
-	    llikAl1t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(1.0-probDeam[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;;
-	}else{
-	    llikAl1t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(    probDeam[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
+	if(obsBase[i] == al1Current){ //matches al1Current
+	    llikAl1t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(1.0-probDeam1to2[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
+	}else{ //does not match al1Current but matches al2Current
+	    llikAl1t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(    probDeam1to2[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
 	}
 
 
-	if(obsBase[i] == al2Current){
-	    llikAl2t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(1.0-probDeam[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;;
-	}else{
-	    llikAl2t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(    probDeam[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
+	if(obsBase[i] == al2Current){ //matches al2Current
+	    llikAl2t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(1.0-probDeam2to1[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
+	}else{ //does not match al2Current but matches al1Current
+	    llikAl2t =     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(    probDeam2to1[i])  + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
 	}
 
 #ifdef DEBUGCOMPUTELL
@@ -566,14 +348,19 @@ public:
 	    return ;
 	}
 
-	int                 totalBases=0;
+	int                 totalBases=0 ;
 	int                 counterB  [4];
 	long double         llBaseDeam[4];
-	vector<int>         obsBase   ;
-	vector<int>         obsQual   ;
-	vector<long double> probDeam  ;
-	vector<long double> mmProb    ;
-	unsigned int posAlign = pileupData.Position+1;
+	vector<int>         obsBase      ;
+	vector<int>         obsQual      ;
+	vector<long double> probDeamR2A  ; // deamination rate from ref to alt
+	vector<long double> probDeamA2R  ; // deamination rate from alt to ref
+
+	vector<long double> mmProb       ; //mismapping probability
+
+	unsigned int                posAlign = pileupData.Position+1;
+	vector<substitutionRates *> substitutionRatesPerRead (pileupData.PileupAlignments.size(),NULL );
+	vector<bool>                isRevVec                 (pileupData.PileupAlignments.size(),false);
 
 	for(unsigned int i=0;i<4;i++){
 	    counterB[i]   = 0;
@@ -606,6 +393,8 @@ public:
             int dist3p=-1;
 
 	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
+	    isRevVec[i]=isRev;
+
             if( isRev ){
                 dist5p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
                 dist3p = pileupData.PileupAlignments[i].PositionInAlignment;
@@ -613,20 +402,28 @@ public:
                 dist5p = pileupData.PileupAlignments[i].PositionInAlignment;
                 dist3p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
             }
-                                    
+	    
+	    // cout<<"5p="<<dist5p<<" 3p="<<dist3p<<endl;
 
             // probSubstition * probSubMatchToUseEndo = &defaultSubMatch ;
             // probSubstition * probSubMatchToUseCont = &defaultSubMatch ;
             substitutionRates * probSubMatchToUseEndo = &defaultSubMatch ;
             // substitutionRates * probSubMatchToUseCont = &defaultSubMatch ;
 
-            if(dist5p <= (int(sub5p.size()) -1)){
+            if(dist5p <= (int(sub5p.size()) -1)){ //out of range
                 probSubMatchToUseEndo = &sub5p[  dist5p ];                      
-            }
+            }else{
+		//TODO what to do in between
+		//probSubMatchToUseEndo = &sub5p[  int(sub5p.size()) -1 ];                      
+	    }
 
-            if(dist3p <= (int(sub3p.size()) -1)){
+            if(dist3p <= (int(sub3p.size()) -1)){ // out of range
                 probSubMatchToUseEndo = &sub3p[  dist3p ];
-            }
+            }else{
+		//TODO what to do in between
+		//probSubMatchToUseEndo = &sub3p[ int(sub3p.size()) -1 ];
+	    }
+
             //we have substitution probabilities for both... take the closest
             if(dist5p <= (int(sub5p.size()) -1) &&
                dist3p <= (int(sub3p.size()) -1) ){
@@ -638,7 +435,9 @@ public:
                 }
                     
             }
-	    
+
+	    substitutionRatesPerRead[i] = probSubMatchToUseEndo;
+
 	    //cout<<"deamdist\t"<<dist5p<<"\t"<<dist3p<<endl;
             //we look for a damage going from bIndexAlt to bIndex
 	    for(int bIndexAlt=0;bIndexAlt<4;bIndexAlt++){
@@ -670,8 +469,8 @@ public:
 	    
 	    //TODO: Fill deamination vector, do not forget fragment orientation
 	    //put proper probabilities
-	    probDeam.push_back( 0.0   );
-	}//end for each read
+
+	}//END FOR EACH READ
 	
 	long double nonZerollBaseDeam  = 0;
 	int         nonZerollBaseDeamI = -1;
@@ -717,6 +516,7 @@ public:
 	    if(nonZerollBaseDeamI!=-1){
 		alt=nonZerollBaseDeamI;
 	    }else{
+		//TODO use randomBPExceptIntTS and randomBPExceptIntTV
 		alt=randomBPExceptInt(ref);	    //todo maybe put a better dna sub model here?
 	    }
 	}
@@ -739,7 +539,57 @@ public:
 	    }
 	}
 	
+	// We know what ref and alt bases are at this point
+	// Computing deamination for probDeam vector
+	// 2 Matrices: probDeamR2A, probDeamA2R
 
+	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
+	    int dinucIndexR2A;
+	    int dinucIndexA2R;
+
+	    if( isRevVec[i] ){		    
+		dinucIndexR2A =     dimer2indexInt(complementInt(ref),complementInt(alt));
+	    }else{
+		dinucIndexR2A =     dimer2indexInt(              ref ,              alt);
+	    }
+            
+
+	    if( isRevVec[i] ){		    
+		dinucIndexA2R =     dimer2indexInt(complementInt(alt),complementInt(ref));
+	    }else{
+		dinucIndexA2R =     dimer2indexInt(              alt ,              ref);
+	    }
+            
+
+	    long double probSubDeamR2A              = substitutionRatesPerRead[i]->s[dinucIndexR2A];
+	    long double probSubDeamA2R              = substitutionRatesPerRead[i]->s[dinucIndexA2R];
+	    // long double probSameDeam             = 1.0-probSubDeam;
+	    
+
+#ifdef DEBUGHDEAM
+	    if(probSubDeamR2A>0 
+	       ||
+	       probSubDeamA2R>0){
+		
+		int dist5p;
+		int dist3p;
+
+		if( isRevVec[i] ){
+		    dist5p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
+		    dist3p = pileupData.PileupAlignments[i].PositionInAlignment;
+		}else{
+		    dist5p = pileupData.PileupAlignments[i].PositionInAlignment;
+		    dist3p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
+		}
+                //cout<<posAlign<<"\t"<<"ACGT"[ref]<<"\t"<<"ACGT"[alt]<<"\tP[R2A]="<<probSubDeamR2A<<"\tP[A2R]="<<probSubDeamA2R<<"\tdist5p="<<dist5p<<"\tdist3p="<<dist3p<<"\trev="<<isRevVec[i]<<"\tiR2A"<<dinucIndexR2A<<"\tiA2R"<<dinucIndexA2R<<"\t"<<endl;
+	    }
+#endif
+
+
+	    probDeamR2A.push_back( probSubDeamR2A   );
+	    probDeamA2R.push_back( probSubDeamA2R   );
+
+	}// computing deamination for probDeam vector
 	
 	char refB="ACGT"[ref];
 	char altB="ACGT"[alt];
@@ -757,23 +607,28 @@ public:
 	long double rrllCr=computeLL(ref         ,
 				     ref         ,		      		  
 				     obsBase     ,
-				     probDeam    ,
+				     probDeamR2A ,
+				     probDeamA2R ,
 				     obsQual     ,
 				     m_contRate  ,
 				     ref         ,
 				     mmProb      );
+
 	long double rallCr=computeLL(ref         ,
 				     alt         ,		      		  
 				     obsBase     ,
-				     probDeam    ,
+				     probDeamR2A ,
+				     probDeamA2R ,
 				     obsQual     ,
 				     m_contRate  ,
 				     ref         ,
 				     mmProb      );
+
        long double aallCr=computeLL(alt          ,
 				    alt          ,		      		  
 				    obsBase      ,
-				    probDeam     ,
+				    probDeamR2A  ,
+				    probDeamA2R  ,
 				    obsQual      ,
 				    m_contRate   ,
 				    ref          ,
@@ -789,7 +644,8 @@ public:
 	   rrllCa=computeLL(ref          ,
 			    ref          ,		      		  
 			    obsBase      ,
-			    probDeam     ,
+			    probDeamR2A  ,
+			    probDeamA2R  ,
 			    obsQual      ,
 			    m_contRate   ,
 			    alt          ,
@@ -798,7 +654,8 @@ public:
 	   rallCa=computeLL(ref          ,
 			    alt          ,		      		  
 			    obsBase      ,
-			    probDeam     ,
+			    probDeamR2A  ,
+			    probDeamA2R  ,
 			    obsQual      ,
 			    m_contRate   ,
 			    alt          ,
@@ -807,7 +664,8 @@ public:
 	   aallCa=computeLL(alt          ,
 			    alt          ,		      		  
 			    obsBase      ,
-			    probDeam     ,
+			    probDeamR2A  ,
+			    probDeamA2R  ,
 			    obsQual      ,
 			    m_contRate   ,
 			    alt          ,
@@ -1580,11 +1438,11 @@ int main (int argc, char *argv[]) {
 	checkResults("pthread_create()\n", rc);
     }
 
-    cout<<"Creating threads for coverage calculation"<<endl;
+    cerr<<"Creating threads for coverage calculation"<<endl;
 
 
     while(queueDataForCoverage.size()!=0){
-	cout<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataToprocess.size()<<endl;
+	cerr<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataToprocess.size()<<endl;
 	sleep(timeThreadSleep);
     }
     
@@ -1593,7 +1451,7 @@ int main (int argc, char *argv[]) {
 	rc = pthread_join(thread[i], NULL);
 	checkResults("pthread_join()\n", rc);
     }
-    cout<<"Coverage computations are done"<<endl;
+    cerr<<"Coverage computations are done"<<endl;
     pthread_mutex_destroy(&mutexRank);
     pthread_mutex_destroy(&mutexQueue);
     pthread_mutex_destroy(&mutexCounter);
@@ -1605,7 +1463,7 @@ int main (int argc, char *argv[]) {
     pdfRateForPoissonCov = pdfPoisson( rateForPoissonCov, rateForPoissonCov);
 
 
-    cout<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<double(totalBasesSum)/double(totalSitesSum)<<endl;
+    cerr<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<double(totalBasesSum)/double(totalSitesSum)<<endl;
     // for(int i=0;i<20;i++){
     // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
     // }
@@ -1626,7 +1484,7 @@ int main (int argc, char *argv[]) {
     ///////////////////////
     //  Compute hetero   //
     ///////////////////////
-    cout<<"Creating threads for heterozygosity calculation"<<endl;
+    cerr<<"Creating threads for heterozygosity calculation"<<endl;
     pthread_mutex_init(&mutexQueue,   NULL);
     pthread_mutex_init(&mutexCounter, NULL);
     pthread_mutex_init(&mutexRank ,   NULL);
@@ -1688,7 +1546,7 @@ int main (int argc, char *argv[]) {
 		rc = pthread_mutex_unlock(&mutexCounter);
 		checkResults("pthread_mutex_unlock()\n", rc);
 
-		cout<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<dataToWrite->vecPositionResults->size()<<" records"<<endl;
+		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<dataToWrite->vecPositionResults->size()<<" records"<<endl;
 		    
 		    
 		string strToWrite="";
@@ -1784,7 +1642,7 @@ int main (int argc, char *argv[]) {
 	rc = pthread_join(thread[i], NULL);
 	checkResults("pthread_join()\n", rc);
     }
-    cout<<"Heterozygosity computations are done"<<endl;
+    cerr<<"Heterozygosity computations are done"<<endl;
     pthread_mutex_destroy(&mutexRank);
     pthread_mutex_destroy(&mutexQueue);
     pthread_mutex_destroy(&mutexCounter);
@@ -1794,20 +1652,26 @@ int main (int argc, char *argv[]) {
 	bgzipWriter.Close();
     }
 
-    for(unsigned int i=0;i<vectorGenoResults.size();i++){
-	delete( vectorGenoResults[i] );
-    }
-
-    pthread_exit(NULL);
 
     //Compute hetero rate
     
+    for(unsigned int i=0;i<vectorGenoResults.size();i++){
+	long double sumProbHomoz = oplusnatl( vectorGenoResults[i]->rrll , vectorGenoResults[i]->aall );
+	long double sumProbAll   = oplusnatl( sumProbHomoz               , vectorGenoResults[i]->rall );
+	
+	vectorGenoResults[i]->expectedH    = expl(           vectorGenoResults[i]->rall - sumProbAll);
+	vectorGenoResults[i]->probAccurate = 1.0 - (  (1.0-(1.0/expl(vectorGenoResults[i]->lqual)) ) * expl(vectorGenoResults[i]->llCov) );
+	//cout<<fixed<<i<<"\t"<<	vectorGenoResults[i]->expectedH<<"\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<sumProbHomoz<<"\t"<<sumProbAll<<endl;
+    }
 
 
-    long double h      = 0.01;
+#ifdef DEBUGHCOMPUTE
+    long double h      = 0.01;//TODO add random h
     long double lambda = 0.0000000001;
-
-    while(true){
+    int iterationsMax=10000;
+    int iterationsGrad=1;
+    //todo stopping condition
+    while( iterationsGrad<iterationsMax){
 
 	// if(h>=1){
 	//     h=1-espilon;
@@ -1815,94 +1679,49 @@ int main (int argc, char *argv[]) {
 	// if(h<=0){
 	//     h=espilon;
 	// }
-	long double probNull=0.1;	
+	long double probNull=0.000001;
 	long double ll   = 0.0;
 	long double llP  = 0.0;
 	long double llPP = 0.0;
 
-	for(int i=0;i<size;i++){
-	    //log( (1-h)(1-o) + ho)
-	    //log( 1-o-h-ho    +ho)
-	    //f(h) = log( 1-o-h)
-	    //f'(h) = 1/(1-o-h) * -1
-	    //f'(h) = -1/(1-o-h) 
-	    //f''(h) = (-(1-o-h)^-1)'
-	    //f''(h) = -(1-o-h)^-2
+	// vectorGenoResults[i]->expectedH    = expl(           vectorGenoResults[i]->rall - sumProbAll);
+	// vectorGenoResults[i]->probAccurate = ( 1.0-(1.0/expl(vectorGenoResults[i]->lqual)) ) * expl(vectorGenoResults[i]->llCov);
 
+	for(unsigned int i=0;i<vectorGenoResults.size();i++){
 
-	    long double probNull=0.5;
-    	    //long double llT  = logl( (1-h)*(1-observations[i]) + (h)*(observations[i]) )  ;
-	    long double llT  = logl( (1-errorProbabs[i])
+	    long double llT  = logl( (1-vectorGenoResults[i]->probAccurate)
 				     *
-				     ( (1-h)*(1-observations[i]) + h*observations[i] )
+				     ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
 				     +
-				     errorProbabs[i]
+				     vectorGenoResults[i]->probAccurate
 				     *
-				     probNull);
-    	    //long double llTP = (2.0*observations[i]-1)/( observations[i]*(2*h-1)-h+1 );
+				     probNull );
 
 
     	    long double llTP = 
-		(  (1-errorProbabs[i])*(2.0*observations[i]-1) )
+		(  (1-vectorGenoResults[i]->probAccurate)*(2.0*vectorGenoResults[i]->expectedH-1) )
 		/
-		( (1-errorProbabs[i])
+		( (1-vectorGenoResults[i]->probAccurate)
 		  *
-		  ( (1-h)*(1-observations[i]) + h*observations[i] )
+		  ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
 		  +
-		  errorProbabs[i]
+		  vectorGenoResults[i]->probAccurate
 		  *
 		  probNull);
 
 
     	    long double llTPP = -1.0*
-		(  powl((1-errorProbabs[i]),2.0) * powl((2.0*observations[i]-1),2.0) )
+		(  powl((1-vectorGenoResults[i]->probAccurate),2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
 		/
-		powl( ( (1-errorProbabs[i])
+		powl( ( (1-vectorGenoResults[i]->probAccurate)
 			*
-			( (1-h)*(1-observations[i]) + h*observations[i] )
+			( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
 			+
-			errorProbabs[i]
+			vectorGenoResults[i]->probAccurate
 			*
 			probNull),2.0);
 
-	    
-
-	    // long double llT  = logl( (1-errorProbabs[i])
-	    // 			 *
-	    // 			 ( (1-h)*(1-observations[i]) + (h)*(observations[i]) )
-	    // 			 +
-	    // 			 errorProbabs[i]
-	    // 			 *
-	    // 			 probNull  );
-
-	    // // long double llT  = logl( (1-errorProbabs[i])
-	    // // 			 *
-	    // // 			 (  1-observations[i]  -h+ 2.0*h*observations[i])    
-	    // // 			 +
-	    // // 			 (
-	    // // 			 (errorProbabs[i])
-	    // // 			 *
-	    // // 			 probNull ));
-
-
-	    // //long double llTP = (2.0*observations[i]-1)/( observations[i]*(2*h-1)-h+1 );
-
-
-	    // long double llTP = 
-	    //     ( (errorProbabs[i]-1.0)*(2.0*observations[i]+1.0))
-	    //       /
-	    //       ( -1.0*errorProbabs[i]*(probNull-2.0*observations[i]*h+observations[i]+h-1.0 ) -2.0*observations[i]*h+observations[i]+h-1.0);
-
-	    //       //+ observations[i]*(errorProbabs[i]*(h-1)-2*h+1 )+h-1);
-
-	    // // long double llTP = 
-	    // //     ( observations[i]*(errorProbabs[i]-2)-errorProbabs[i]+1)/
-	    // //     ( errorProbabs[i]*(probNull-h) + observations[i]*(errorProbabs[i]*(h-1)-2*h+1 )+h-1);
-
-	    // // long double llT   = logl( (1-h)*(1-observations[i]) + (h)*(observations[i]) )  ;
-	    // // long double llTP  = -1.0/(1.0-observations[i]-h);
-	    // long double llTPP = -1.0/powl((1.0-observations[i]-h),2.0);
-	    
+	    	    
 	    ll   += llT;
 	    llP  += llTP;
 	    llPP += llTPP;
@@ -1914,10 +1733,18 @@ int main (int argc, char *argv[]) {
 	//cout<<h<<"\t"<<(1-h)<<"\t"<<ll<<"\t"<<llP<<"\t"<<llPP<<endl;	
 
 	h=h+lambda*llP;
+	iterationsGrad++;
     }
 
+#endif
 
+    
 
+    for(unsigned int i=0;i<vectorGenoResults.size();i++){
+	delete( vectorGenoResults[i] );
+    }
+
+    pthread_exit(NULL);
 
     
     return 0;

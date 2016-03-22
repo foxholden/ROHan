@@ -28,7 +28,7 @@ testCompCont:	testCompCont.o ${LIBGAB}utils.o
 rohan.o:     rohan.cpp
 	${CXX} ${CXXFLAGS} rohan.cpp
 
-rohan:       rohan.o miscfunc.o ../bamtools/lib/libbamtools.a GenomicWindows.o GenomicRange.o ../bamtools/lib/libbamtools.a ${LIBGAB}FastQObj.o ${LIBGAB}FastQParser.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a 
+rohan:       rohan.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o ../bamtools/lib/libbamtools.a GenomicWindows.o GenomicRange.o ../bamtools/lib/libbamtools.a ${LIBGAB}FastQObj.o ${LIBGAB}FastQParser.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a 
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 ../bamtools/src/api/BamAlignment.h:
