@@ -6,8 +6,8 @@
 //#include <random>
 
 //TODO
-// test estimate of h across various coverage
 // test robustness of deamination
+// test estimate of h across various coverage ok at 10X10,000
 // add mappability track
 
 
@@ -520,11 +520,17 @@ public:
 		alt=nonZerollBaseDeamI;
 	    }else{
 		//TODO use randomBPExceptIntTS and randomBPExceptIntTV
-		alt=randomBPExceptInt(ref);	    //todo maybe put a better dna sub model here?
+		if(randProb()<0.3333){// transversion with prob 1/3
+		    alt=randomBPExceptIntTV(ref);
+		}else{//                 transition   with prob 2/3
+		    alt=randomBPExceptIntTS(ref);
+		}
+		//alt=randomBPExceptInt(ref);	    //todo maybe put a better dna sub model here?
 	    }
 	}
 
 	//TODO: decide if   if(nonZerollBaseDeamI!=-1){ do we dump the site?
+	//                   or add tri-allelic?
 	if(counterUnique==2){
 	    for(int i=0;i<4;i++){
 		if(counterB[i]!=0){
@@ -975,7 +981,7 @@ queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsa
 } // end randomSubQueue
 
 
-//TODO: GC bias?
+//TODO: GC bias for coverage?
 void *mainCoverageComputationThread(void * argc){
     initScores();
     int   rc;
@@ -1701,7 +1707,7 @@ int main (int argc, char *argv[]) {
     long double lambda = 0.0000000001;
     int iterationsMax=10000;
     int iterationsGrad=1;
-    //todo stopping condition
+
     while( iterationsGrad<iterationsMax){
 
 	// if(h>=1){
@@ -1826,6 +1832,13 @@ int main (int argc, char *argv[]) {
     
 
     
+
+
+    //////////////////////////////////
+    //                              //
+    // BEGIN HMM                    //
+    //                              //
+    //////////////////////////////////
 
 
 
