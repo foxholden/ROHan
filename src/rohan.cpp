@@ -520,7 +520,7 @@ public:
 		alt=nonZerollBaseDeamI;
 	    }else{
 		//TODO use randomBPExceptIntTS and randomBPExceptIntTV
-		if(randProb()<0.3333){// transversion with prob 1/3
+		if(randomProb()<0.3333){// transversion with prob 1/3
 		    alt=randomBPExceptIntTV(ref);
 		}else{//                 transition   with prob 2/3
 		    alt=randomBPExceptIntTS(ref);
