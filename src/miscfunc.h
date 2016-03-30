@@ -187,6 +187,16 @@ void readMTConsensus(const string consensusFile,map<int, PHREDgeno> & pos2phredg
 void readMTAlleleFreq(const string freqFile,	map<int, alleleFrequency> & pos2allelefreq);
 
 
+/* long double computeLL(const int                   al1Current    , */
+/* 		      const int                   al2Current    ,		       */
+/* 		      const vector<int>         & obsBase       , */
+/* 		      const vector<long double> & probDeam1to2  , //rate of deamination from al1 to al2 */
+/* 		      const vector<long double> & probDeam2to1  , //rate of deamination from al2 to al1 */
+/* 		      const vector<int>         & obsQual       , */
+/* 		      const long double           contRate      , */
+/* 		      const int                   alContCurrent , */
+/* 		      const vector<long double> & mismappingProb); */
+
 // Returns log( exp(x)+exp(y) ), but does so without causing
 // overflow or loss of precision.
 inline double oplusl( long double x, long double y ){

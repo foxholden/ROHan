@@ -9,6 +9,9 @@
 #include "miscfunc.h"
 
 
+
+
+
 void readIlluminaError(const string errFile,probSubstition & illuminaErrorsProb){
 
     igzstream errFileSt;

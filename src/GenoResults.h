@@ -33,6 +33,8 @@ public:
     long double  expectedH;
     
     GenoResults();
+    GenoResults(const string lineToAdd);
+
     GenoResults(long double  rrll ,
 		long double  rall ,
 		long double  aall ,

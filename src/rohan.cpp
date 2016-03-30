@@ -39,7 +39,7 @@ using namespace BamTools;
 //#define DEBUGHDEAM
 #define DEBUGHCOMPUTE
 //#define DEBUGCOMPUTELL
-#define HETVERBOSE
+//#define HETVERBOSE
 // #define COVERAGETVERBOSE
 
 #define MAXMAPPINGQUAL 257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
@@ -173,6 +173,7 @@ void initScores(){
 }//end initScores
 
 
+
 long double computeLL(const int                   al1Current    ,
 		      const int                   al2Current    ,		      
 		      const vector<int>         & obsBase       ,
@@ -220,19 +221,36 @@ long double computeLL(const int                   al1Current    ,
 	}
 
 #ifdef DEBUGCOMPUTELL
-	cout<<i<<obsBase[i]<<"\t"<<al1Current<<"\t"<<al2Current<<"\t"<<alContCurrent<<endl;
+	cout<<i<<"\tob="<<obsBase[i]<<"\ta1="<<al1Current<<"\ta2="<<al2Current<<"\talc"<<alContCurrent<<endl;
 	cout<<i<<"\t"<<likeMatchProb[obsQual[i]]<<"\t"<<likeMismatchProb[obsQual[i]]<<"\t"<<mismappingProb[i]<<endl;
 	cout<<i<<"\t"<<llikAl1t <<"\t"<<llikAl2t<<endl;
 #endif
 	// exit(1);
-	long double llikT  = (1.0-contRate)*( 0.5*llikAl1t + 0.5*llikAl2t ) + (contRate)*llikC  ;	
-	llik              += logl(llikT);
+	long double llikTE   = (llikAl1t + llikAl2t)/2.0 ;   //endogenous likelihood
+
+	//BEGIN ADDED March 26th
+	//TODO: why doesn't the binomial take care of this: ref_1	1178	G	C	17	1	0/1	-10.537	-9.63209	-129.881	0.904954	-3.30618	
+	//TODO maybe multiply prob by 0.5 for het
+	//Why does the 1 for het and 0.5 for homo work better at high coverage but not at low?
+	// if(al1Current == al2Current){//homozygous
+	//     llikTE  = llikAl1t;    //pick the 1st as they are equal
+	// }else{
+	//     if(llikAl1t>llikAl2t){
+	// 	llikTE  = llikAl1t;//pick the 1st as it is more likely
+	//     }else{
+	// 	llikTE  = llikAl2t;//pick the 2nd as it is more likely
+	//     }
+	// }
+	//END ADDED March 26th
+
+	long double llikT   = (1.0-contRate)*(  llikTE ) + (contRate)*llikC  ;	
+	llik               += logl(llikT);
 
  	llik1=oplusInitnatl( llik1, logl(llikAl1t) );
 	llik2=oplusInitnatl( llik2, logl(llikAl2t) );
 
 #ifdef DEBUGCOMPUTELL
-	cout<<i<<"\t"<<llikAl1t <<"\t"<<llikAl2t<<"\t"<<llikC<<"\t"<<llikT<<endl;
+	cout<<i<<"\tLL="<<llikAl1t <<"\t"<<llikAl2t<<"\t"<<llikC<<"\t"<<llikTE<<"\t"<<llikT<<endl;
 #endif
 	// llik1+=logl( llikAl1t );
 	// llik2+=logl( llikAl2t );
@@ -621,7 +639,9 @@ public:
 
 
 
-	//cout<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
+#ifdef DEBUGCOMPUTELL
+	cout<<"pos="<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
+#endif
 	long double rrllCr=computeLL(ref         ,
 				     ref         ,		      		  
 				     obsBase     ,
@@ -1223,7 +1243,10 @@ int main (int argc, char *argv[]) {
     string sampleName        = "sample";
     bool   useVCFoutput      = false;
 
+    string genoFileAsInput    ="";
+    bool   genoFileAsInputFlag=false;
 
+    
     const string usage=string("\nThis program will do something beautiful\n\n\t"+
                               string(argv[0])+                        
                               " [options] [fasta file] [bam file]  "+"\n\n"+
@@ -1236,7 +1259,7 @@ int main (int argc, char *argv[]) {
 			      "\t\t"+"-o"+"\t"+"--out"  + "\t\t"   +    "[outfile]" +"\t\t"+"Output per-site likelihoods in BGZIP (default: none)"+"\n"+
 			      "\t\t"+""  +"\t"+"--name" + "\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
 			      "\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
-			      
+			      //"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
 			      "\n\tComputation options:\n"+
                               "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
@@ -1251,10 +1274,8 @@ int main (int argc, char *argv[]) {
                               "\t\t"+""  +""+"--deam5p\t\t"+"[.prof file]" +"\t\t"+"5p deamination frequency for the endogenous\n\t\t\t\t\t\t\t\t(default: "+deam5pfreqE+")"+"\n"+
                               "\t\t"+""  +""+"--deam3p\t\t"+"[.prof file]" +"\t\t"+"3p deamination frequency for the endogenous\n\t\t\t\t\t\t\t\t(default: "+deam3pfreqE+")"+"\n"+
                               // "\t\t"+"-deam5pc [.prof file]" +"\t\t"+"5p deamination frequency for the contaminant (default: "+deam5pfreqC+")"+"\n"+
-                              // "\t\t"+"-deam3pc [.prof file]" +"\t\t"+"3p deamination frequency for the contaminant (default: "+deam3pfreqC+")"+"\n"+
-			      
-
-"");
+                              // "\t\t"+"-deam3pc [.prof file]" +"\t\t"+"3p deamination frequency for the contaminant (default: "+deam3pfreqC+")"+"\n"+			      
+                              "");
 
 
     if( (argc== 1) ||
@@ -1269,15 +1290,23 @@ int main (int argc, char *argv[]) {
 
     for(int i=1;i<(argc);i++){ 
 
-        if(string(argv[i])[0] != '-'  ){
+	//cout<<i<<"\t"<<string(argv[i])<<endl;
+
+        if(string(argv[i])[0] != '-' ){
             lastOpt=i;
             break;
         }
 
-
+	if( string(argv[i]) == "--ingeno" ){
+	    genoFileAsInput     = string(argv[i+1]);
+	    genoFileAsInputFlag = true;
+            i++;
+            continue;
+	}
 	
         if( string(argv[i]) == "--size"  ){
 	    sizeChunk=destringify<unsigned int>(argv[i+1]);
+            i++;
             continue;
         }
 	
@@ -1443,6 +1472,10 @@ int main (int argc, char *argv[]) {
     readDataDone=true;
     //    return 1;
 
+    vector<GenoResults *> vectorGenoResults;
+
+    if(!genoFileAsInputFlag){
+
     /////////////////////////////
     // BEGIN  Compute coverage //
     /////////////////////////////
@@ -1534,8 +1567,8 @@ int main (int argc, char *argv[]) {
     //Writing data out/
     ///////////////////
 
-    vector<GenoResults *> vectorGenoResults;
-    Internal::BgzfStream bgzipWriter;
+
+    Internal::BgzfStream  bgzipWriter;
 
     if(outFileSiteLLFlag){
 	bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
@@ -1588,7 +1621,7 @@ int main (int argc, char *argv[]) {
 			}
 			strToWrite="";
 		    }
-			
+		    
 		    GenoResults * toadd =  new GenoResults( dataToWrite->vecPositionResults->at(i) );
 		    vectorGenoResults.push_back(toadd);
 		}
@@ -1681,6 +1714,31 @@ int main (int argc, char *argv[]) {
 	bgzipWriter.Close();
     }
 
+    }else{//if we suply the geno file as input
+
+	string    lineGENOL;
+	igzstream myFileGENOL;
+
+	myFileGENOL.open(genoFileAsInput.c_str(), ios::in);
+
+	if (myFileGENOL.good()){
+	    getline (myFileGENOL,lineGENOL);//header
+	    while ( getline (myFileGENOL,lineGENOL)){
+
+		GenoResults * toadd =  new GenoResults( lineGENOL );
+		vectorGenoResults.push_back(toadd);
+
+	    }
+	    myFileGENOL.close();
+	}else{
+	    cerr << "Error: unable to open file with genotype likelihoods: "<<genoFileAsInput<<endl;
+	    return 1;
+	}
+
+
+    }
+
+
     //////////////////////////////////
     //                              //
     // BEGIN COMPUTE HETERO RATE    //
@@ -1689,10 +1747,14 @@ int main (int argc, char *argv[]) {
 
     for(unsigned int i=0;i<vectorGenoResults.size();i++){
 	long double sumProbHomoz = oplusnatl( vectorGenoResults[i]->rrll , vectorGenoResults[i]->aall );
-	long double sumProbAll   = oplusnatl( sumProbHomoz               , vectorGenoResults[i]->rall );
+	long double sumProbHeter = oplusnatl( vectorGenoResults[i]->rall , vectorGenoResults[i]->rall );//2*
+
+	long double sumProbAll   = oplusnatl( sumProbHomoz               , sumProbHeter );
+
 	
-	vectorGenoResults[i]->expectedH    = expl(           vectorGenoResults[i]->rall - sumProbAll);
+	vectorGenoResults[i]->expectedH    = expl(           sumProbHeter - sumProbAll);
 	vectorGenoResults[i]->probAccurate = 1.0 - (  (1.0-(1.0/expl(vectorGenoResults[i]->lqual)) ) * expl(vectorGenoResults[i]->llCov) );
+
 	//cout<<fixed<<i<<"\t"<<	vectorGenoResults[i]->expectedH<<"\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<sumProbHomoz<<"\t"<<sumProbAll<<endl;
     }
 
@@ -1761,26 +1823,29 @@ int main (int argc, char *argv[]) {
 	    // 		probNull),2.0);
 
 
-
-	    llT  = logl( MAX((1-vectorGenoResults[i]->probAccurate),probNull)
+	    long double pcorrect=MAX((1-vectorGenoResults[i]->probAccurate),probNull);
+	    llT  = logl( pcorrect
 			 *
 			 ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
+			 
+			 
+			 
 			 );
 
 
     	    llTP = 
-	    	(  MAX((1-vectorGenoResults[i]->probAccurate),probNull)*(2.0*vectorGenoResults[i]->expectedH-1) )
+	    	(  pcorrect*(2.0*vectorGenoResults[i]->expectedH-1) )
 	    	/
-	    	( MAX((1-vectorGenoResults[i]->probAccurate),probNull)
+	    	( pcorrect
 	    	  *
 	    	  ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
 	    	  );
 
 
     	    llTPP = -1.0*
-	    	(  powl( MAX((1-vectorGenoResults[i]->probAccurate),probNull),2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
+	    	(  powl( pcorrect,2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
 	    	/
-	    	powl( ( MAX((1-vectorGenoResults[i]->probAccurate),probNull)
+	    	powl( ( pcorrect
 	    		*
 	    		( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
 	    		),2.0);
@@ -1813,7 +1878,7 @@ int main (int argc, char *argv[]) {
 	iterationsGrad++;
     }//end loop of iterations
 
-#endif
+
     long double hmin = (h-he);
     long double hmax = (h+he);
     if(hmin<0){
@@ -1823,13 +1888,13 @@ int main (int argc, char *argv[]) {
     }
 
     cout<<"hetrate\t"<<h<<"\t"<<(hmin)<<"\t"<<(hmax)<<endl;
-    
+#endif    
     ////////////////////////////////
     //                            //
     //  end COMPUTE HETERO RATE   //
     //                            //
     ////////////////////////////////
-    
+        
 
     
 
@@ -1837,6 +1902,13 @@ int main (int argc, char *argv[]) {
     //////////////////////////////////
     //                              //
     // BEGIN HMM                    //
+    //                              //
+    //////////////////////////////////
+
+
+    //////////////////////////////////
+    //                              //
+    //  END HMM                     //
     //                              //
     //////////////////////////////////
 
