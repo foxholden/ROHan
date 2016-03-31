@@ -41,6 +41,7 @@ using namespace BamTools;
 //#define DEBUGCOMPUTELL
 //#define HETVERBOSE
 // #define COVERAGETVERBOSE
+#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
 #define MAXMAPPINGQUAL 257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
 #define MAXCOV          50     // maximal coverage
@@ -376,7 +377,6 @@ public:
 	vector<int>         obsQual      ;
 	vector<long double> probDeamR2A  ; // deamination rate from ref to alt
 	vector<long double> probDeamA2R  ; // deamination rate from alt to ref
-
 	vector<long double> mmProb       ; //mismapping probability
 
 	unsigned int                posAlign = pileupData.Position+1;
@@ -387,10 +387,15 @@ public:
 	    counterB[i]   = 0;
 	    llBaseDeam[i] = 0.0;
 	}
+	vector<bool> includeFragment (pileupData.PileupAlignments.size(),false);
 
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
-	    	pileupData.PileupAlignments[i].IsNextInsertion ){
+
+
+	    if( pileupData.PileupAlignments[i].IsCurrentDeletion ||
+	    	pileupData.PileupAlignments[i].IsNextInsertion ||
+		(pileupData.PileupAlignments[i].InsertionLength>0) ){		
+		//includeFragment was initialized as false
 	    	continue;
 	    }
 
@@ -481,15 +486,14 @@ public:
 
 
   
-	    //cout<<"pos "<<posAlign<<" "<<bIndex<<" "<<b<<endl;
+	    //cout<<"pos "<<posAlign<<" "<<bIndex<<" "<<b<<" "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
 	    counterB[ bIndex ]++;
 	    totalBases++;
 	    obsBase.push_back(             bIndex   );
 	    obsQual.push_back(                  q   );
 	    mmProb.push_back(  likeMismatchProb[m]  );
-	    
-	    //TODO: Fill deamination vector, do not forget fragment orientation
-	    //put proper probabilities
+	    includeFragment[i]=true;
+
 
 	}//END FOR EACH READ
 	
@@ -519,10 +523,87 @@ public:
 	}
 
 	// cout<<"pos "<<posAlign<<" unique "<<counterUnique<<endl;
+//hack to remove tri-allelic, we need to account for them
+#ifdef DUMPTRIALLELIC 
+	bool isTriallelic=false;
+	vector<int> indicesToRemove;
+	if(counterUnique==3){
+	    isTriallelic=true;
+	    // cout<<"pos "<<posAlign<<" unique "<<counterUnique<<endl;
+
+	    //find base most likely to be error
+	    long double   errorPForEachBase [4] = {0,0,0,0};	    
+	    for(int i=0;i<int(obsBase.size());i++){
+
+		long double errorP=logl( (1.0-mmProb[i])*(//likeMatchProb[obsQual[i]]*(0.0) + //no need to add it
+							   likeMismatchProb[obsQual[i]]*(0.5))
+						     +
+					  mmProb[i]*0.5);
+		errorPForEachBase[obsBase[i]]+=errorP;
+
+		///cout<<i<<"\t"<<(1.0-mmProb[i])<<"\t"<<likeMismatchProb[obsQual[i]]<<"\t"<<mmProb[i]<<"\t"<<errorP<<endl;
+		//     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(1.0) + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
+	    }
+	    
+	    // obsBase.push_back(             bIndex   );
+	    // obsQual.push_back(                  q   );
+	    // mmProb.push_back(  likeMismatchProb[m]  );
+
+
+
+	    long double errorPMAX = 0;
+	    int         errorPIDX =-1;
+	    for(int i=0;i<4;i++){
+		//cout<<i<<"\t"<<	errorPForEachBase[i]<<endl;
+		if(!(errorPForEachBase[i] < 0 )) continue;
+		if(errorPIDX==-1 ){
+		    errorPMAX =	errorPForEachBase[i];
+		    errorPIDX =	i;		    
+		}else{
+
+		    if(  errorPForEachBase[i] == errorPMAX){//tie
+			if(randomProb()){
+			    errorPMAX =	errorPForEachBase[i];
+			    errorPIDX =	i;
+			}
+		    }
+
+		    if(  errorPForEachBase[i] > errorPMAX){
+			errorPMAX =	errorPForEachBase[i];
+			errorPIDX =	i;		    
+		    }
+		}
+	    }
+
+
+	    //we remove errorPIDX
+	    for(int i=0;i<int(obsBase.size());i++){
+		if(obsBase[i] == errorPIDX){
+		    indicesToRemove.push_back(i);
+		}
+	    }
+
+	    if(indicesToRemove.empty()){
+		cerr<<"Internal error: at position "<<posAlign<<" the vector of indices to remove is empty"<<endl;
+		exit(1);
+	    }
+
+	    //cout<<"tri\t"<<errorPIDX<<"\t"<<vectorToString(indicesToRemove)<<endl;
+	    //cout<<
+	    //exit(1);
+	    counterUnique=2;
+	}
+	
+#endif
+
 
 	//skip sites with no defined bases and tri/tetra allelic sites
 	if(counterUnique==0 ||
 	   counterUnique>=3){
+	    // cout<<"skipped\trefID\t"<<m_refID<<"\tpos\t"<<posAlign<<"\t"<<counterUnique;
+	    // for(int i=0;i<4;i++)
+	    // 	cout<<"\t"<<counterB[i];
+	    // cout<<endl;
 	    return;
 	}
 
@@ -571,10 +652,12 @@ public:
 	// 2 Matrices: probDeamR2A, probDeamA2R
 
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
-	    	pileupData.PileupAlignments[i].IsNextInsertion ){
-	    	continue;
-	    }
+	    if(	!includeFragment[i])
+		continue;
+	    // if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
+	    // 	pileupData.PileupAlignments[i].IsNextInsertion ){
+	    // 	continue;
+	    // }
 
 	    if(i>=MAXCOV){
 		break;
@@ -626,7 +709,32 @@ public:
 	    probDeamA2R.push_back( probSubDeamA2R   );
 
 	}// computing deamination for probDeam vector
-	
+
+#ifdef DUMPTRIALLELIC 
+	if( isTriallelic ){
+	    // for(unsigned int i=0;i<obsBase.size();i++)
+	    // 	cout<<i<<"\t"<<obsBase[i]<<"\t"<<obsQual[i]<<"\t"<<probDeamR2A[i]<<"\t"<<probDeamA2R[i]<<"\t"<<mmProb[i]<<endl;
+
+	    for(unsigned int i=0;i<indicesToRemove.size();i++){
+		obsBase.erase(     obsBase.begin()     + indicesToRemove[i]);
+		obsQual.erase(     obsQual.begin()     + indicesToRemove[i]);
+		probDeamR2A.erase( probDeamR2A.begin() + indicesToRemove[i]);
+		probDeamA2R.erase( probDeamA2R.begin() + indicesToRemove[i]);
+		mmProb.erase(      mmProb.begin()      + indicesToRemove[i]);	       
+	    }
+
+	    // for(unsigned int i=0;i<obsBase.size();i++)
+	    // 	cout<<i<<"\t"<<obsBase[i]<<"\t"<<obsQual[i]<<"\t"<<probDeamR2A[i]<<"\t"<<probDeamA2R[i]<<"\t"<<mmProb[i]<<endl;
+
+
+	}
+#endif
+
+	if( probDeamR2A.size() != obsBase.size() ){
+	    cerr<<"Internal error: at position "<<posAlign<<" the deamination vector is not the same as the size of the observed bases"<<endl;
+	    exit(1);
+	}
+
 	char refB="ACGT"[ref];
 	char altB="ACGT"[alt];
 	PositionResult * prToAdd=new PositionResult();
