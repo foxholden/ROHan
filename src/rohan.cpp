@@ -711,17 +711,56 @@ public:
 	}// computing deamination for probDeam vector
 
 #ifdef DUMPTRIALLELIC 
+
 	if( isTriallelic ){
+
 	    // for(unsigned int i=0;i<obsBase.size();i++)
 	    // 	cout<<i<<"\t"<<obsBase[i]<<"\t"<<obsQual[i]<<"\t"<<probDeamR2A[i]<<"\t"<<probDeamA2R[i]<<"\t"<<mmProb[i]<<endl;
+	    //if(0)
 
-	    for(unsigned int i=0;i<indicesToRemove.size();i++){
-		obsBase.erase(     obsBase.begin()     + indicesToRemove[i]);
-		obsQual.erase(     obsQual.begin()     + indicesToRemove[i]);
-		probDeamR2A.erase( probDeamR2A.begin() + indicesToRemove[i]);
-		probDeamA2R.erase( probDeamA2R.begin() + indicesToRemove[i]);
-		mmProb.erase(      mmProb.begin()      + indicesToRemove[i]);	       
+	    vector<int>         obsBase_      ;
+	    vector<int>         obsQual_      ;
+	    vector<long double> probDeamR2A_  ; // deamination rate from ref to alt
+	    vector<long double> probDeamA2R_  ; // deamination rate from alt to ref
+	    vector<long double> mmProb_       ; //mismapping probability
+	    
+	    for(int i=0;i<int(obsBase.size());i++){	       
+		bool skip=false;
+		for(int j=0;j<int(indicesToRemove.size());j++)
+		    if(i==indicesToRemove[j]){
+			skip=true;
+		    }
+		if(skip) continue;
+
+		obsBase_.push_back(     obsBase[i]);
+		obsQual_.push_back(     obsQual[i]);
+		probDeamR2A_.push_back( probDeamR2A[i]);
+		probDeamA2R_.push_back( probDeamA2R[i]);
+		mmProb_.push_back(      mmProb[i]);	       
+
 	    }
+	    
+	    obsBase.clear();
+	    obsQual.clear();
+	    probDeamR2A.clear();
+	    probDeamA2R.clear();
+	    mmProb.clear();
+
+	    for(unsigned int i=0;i<obsBase_.size();i++){	       
+		obsBase.push_back(     obsBase_[i]);
+		obsQual.push_back(     obsQual_[i]);
+		probDeamR2A.push_back( probDeamR2A_[i]);
+		probDeamA2R.push_back( probDeamA2R_[i]);
+		mmProb.push_back(      mmProb_[i]);	       
+	    }
+
+	    // for(unsigned int i=0;i<indicesToRemove.size();i++){	       
+	    // 	obsBase.erase(     obsBase.begin()     + indicesToRemove[i]);
+	    // 	obsQual.erase(     obsQual.begin()     + indicesToRemove[i]);
+	    // 	probDeamR2A.erase( probDeamR2A.begin() + indicesToRemove[i]);
+	    // 	probDeamA2R.erase( probDeamA2R.begin() + indicesToRemove[i]);
+	    // 	mmProb.erase(      mmProb.begin()      + indicesToRemove[i]);	       
+	    // }
 
 	    // for(unsigned int i=0;i<obsBase.size();i++)
 	    // 	cout<<i<<"\t"<<obsBase[i]<<"\t"<<obsQual[i]<<"\t"<<probDeamR2A[i]<<"\t"<<probDeamA2R[i]<<"\t"<<mmProb[i]<<endl;
