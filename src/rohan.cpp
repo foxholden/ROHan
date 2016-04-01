@@ -192,7 +192,7 @@ long double computeLL(const int                   al1Current    ,
     long double llikC=0;
     
 #ifdef DEBUGCOMPUTELL
-    cout<<al1Current<<"\t"<<al2Current<<endl;
+    cout<<endl<<"al1="<<al1Current<<"\tal2="<<al2Current<<endl;
 #endif
 
     for(int i=0;i<int(obsBase.size());i++){//iterating over each observed base
@@ -223,8 +223,11 @@ long double computeLL(const int                   al1Current    ,
 
 #ifdef DEBUGCOMPUTELL
 	cout<<i<<"\tob="<<obsBase[i]<<"\ta1="<<al1Current<<"\ta2="<<al2Current<<"\talc"<<alContCurrent<<endl;
-	cout<<i<<"\t"<<likeMatchProb[obsQual[i]]<<"\t"<<likeMismatchProb[obsQual[i]]<<"\t"<<mismappingProb[i]<<endl;
-	cout<<i<<"\t"<<llikAl1t <<"\t"<<llikAl2t<<endl;
+	cout<<i<<"\tnodeam1to2="<<(1.0-probDeam1to2[i])<<"\tdeam="<<(probDeam1to2[i])<<endl;
+	cout<<i<<"\tnodeam2to1="<<(1.0-probDeam2to1[i])<<"\tdeam="<<(probDeam2to1[i])<<endl;
+
+	cout<<i<<"\tlm="<<likeMatchProb[obsQual[i]]<<"\tlmm="<<likeMismatchProb[obsQual[i]]<<"\tlmism="<<mismappingProb[i]<<endl;
+	cout<<i<<"\tla1="<<llikAl1t <<"\tla2="<<llikAl2t<<endl;
 #endif
 	// exit(1);
 	long double llikTE   = (llikAl1t + llikAl2t)/2.0 ;   //endogenous likelihood
@@ -251,14 +254,14 @@ long double computeLL(const int                   al1Current    ,
 	llik2=oplusInitnatl( llik2, logl(llikAl2t) );
 
 #ifdef DEBUGCOMPUTELL
-	cout<<i<<"\tLL="<<llikAl1t <<"\t"<<llikAl2t<<"\t"<<llikC<<"\t"<<llikTE<<"\t"<<llikT<<endl;
+	cout<<i<<"\tLLa1="<<llikAl1t <<"\tLLa2"<<llikAl2t<<"\tLLC"<<llikC<<"\tLLE"<<llikTE<<"\tLLT"<<llikT<<endl;
 #endif
 	// llik1+=logl( llikAl1t );
 	// llik2+=logl( llikAl2t );
     }
 	//cout<<"CC\t"<<llikCC<<"\t"<<llikCC1<<"\t"<<llikCC2<<endl;    
 #ifdef DEBUGCOMPUTELL
-   cout<<llik1<<"\t"<<llik2<<"\t"<<expl(llik1)<<"\t"<<expl(llik2)<<endl;
+    cout<<"ll1"<<llik1<<"\tll2"<<llik2<<"\tp1="<<expl(llik1)<<"\tp2="<<expl(llik2)<<endl;
 #endif
 
     long double expal1  = roundl(  int(obsBase.size()) * ( expl(llik1) / expl(oplusnatl(llik1,llik2))) );
@@ -267,8 +270,8 @@ long double computeLL(const int                   al1Current    ,
     long double binomE2 = binomVec[int(obsBase.size())][expal1]; //logl(nChoosek(sizeAr,expal1)*powl(0.5,expal1+expal2));
     
 #ifdef DEBUGCOMPUTELL
-    cout<<al1Current<<""<<al2Current<<"\t"<<llik<<"\t"<<expal1<<"\t"<<(int(obsBase.size())-expal1)<<endl;
-    cout<<binomE2<<"\t"<<(binomE2+llik)<<endl;
+    cout<<"a1="<<al1Current<<" a2="<<al2Current<<"\tll="<<llik<<"\tE[1]="<<expal1<<"\tE[2]="<<(int(obsBase.size())-expal1)<<endl;
+    cout<<"b="<<binomE2<<"\tb+l="<<(binomE2+llik)<<endl;
 #endif
     
     // toreturn.ll     = (binomE2+llik);
@@ -787,37 +790,37 @@ public:
 
 
 #ifdef DEBUGCOMPUTELL
-	cout<<"pos="<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
+	cout<<"---------------"<<endl<<"pos="<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
 #endif
-	long double rrllCr=computeLL(ref         ,
-				     ref         ,		      		  
+	long double rrllCr=computeLL(ref         ,//al1
+				     ref         ,//al2		      		  
 				     obsBase     ,
-				     probDeamR2A ,
-				     probDeamA2R ,
+				     probDeamR2A ,//al1 to al2
+				     probDeamR2A ,//al2 to al1
 				     obsQual     ,
 				     m_contRate  ,
 				     ref         ,
 				     mmProb      );
 
-	long double rallCr=computeLL(ref         ,
-				     alt         ,		      		  
+	long double rallCr=computeLL(ref         ,//al1
+				     alt         ,//al2		      		  
 				     obsBase     ,
-				     probDeamR2A ,
-				     probDeamA2R ,
+				     probDeamR2A ,//al1 to al2
+				     probDeamA2R ,//al2 to al1
 				     obsQual     ,
 				     m_contRate  ,
 				     ref         ,
 				     mmProb      );
 
-       long double aallCr=computeLL(alt          ,
-				    alt          ,		      		  
-				    obsBase      ,
-				    probDeamR2A  ,
-				    probDeamA2R  ,
-				    obsQual      ,
-				    m_contRate   ,
-				    ref          ,
-				    mmProb       );
+	long double aallCr=computeLL(alt          ,//al1
+				     alt          ,//al2
+				     obsBase      ,
+				     probDeamA2R  ,//al1 to al2
+				     probDeamA2R  ,//al2 to al1
+				     obsQual      ,
+				     m_contRate   ,
+				     ref          ,
+				     mmProb       );
 
 
        long double rrllCa=0;
@@ -830,7 +833,7 @@ public:
 			    ref          ,		      		  
 			    obsBase      ,
 			    probDeamR2A  ,
-			    probDeamA2R  ,
+			    probDeamR2A  ,
 			    obsQual      ,
 			    m_contRate   ,
 			    alt          ,
@@ -849,7 +852,7 @@ public:
 	   aallCa=computeLL(alt          ,
 			    alt          ,		      		  
 			    obsBase      ,
-			    probDeamR2A  ,
+			    probDeamA2R  ,
 			    probDeamA2R  ,
 			    obsQual      ,
 			    m_contRate   ,
