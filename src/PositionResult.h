@@ -27,14 +27,14 @@ private:
 
     int          refID;
     unsigned int pos ;
-    char         refB;
-    char         altB;
-    int          refC;
-    int          altC;
+    /* char         refB; */
+    /* char         altB; */
+    int         baseC[4];
+    /* int          refC; */
+    /* int          altC; */
 
-    long double  rrll;
-    long double  rall;
-    long double  aall;
+    //AA,AC,AG,AT,CC,CG,CT,GG,GT,TT
+    long double  ll[10];
 
     long double  lqual;
     long double  llCov;

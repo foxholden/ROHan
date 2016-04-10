@@ -17,25 +17,29 @@ PositionResult::~PositionResult(){
 
 
 string PositionResult::toString(const RefVector  references) const{
+    stringstream s;
+    s.precision(13);
     //cerr<<"Constructor addr: "<<this<<endl;
-    string toReturn="";
-    toReturn += ""+references[refID].RefName+"\t";
-    toReturn += ""+stringify(pos)+"\t";
+    //string toReturn="";
+    s<<references[refID].RefName<<"\t";
+    s<<pos<<"\t";
 
-    toReturn += ""+stringify(refB)+"\t";
-    toReturn += ""+stringify(altB)+"\t";
+    for(int n=0;n<4;n++)
+	s<<baseC[n]<<"\t";
+    // s<<refB<<"\t";
+    // s<<altB<<"\t";
 
-    toReturn += ""+stringify(refC)+"\t";
-    toReturn += ""+stringify(altC)+"\t";
+    // s<<refC<<"\t";
+    // s<<altC<<"\t";
 
     if(geno==0){
-	toReturn += "0/0\t";
+	s<<"0/0\t";
     }else{
 	if(geno==1){
-	    toReturn += "0/1\t";
+	    s<<"0/1\t";
 	}else{
 	    if(geno==2){
-		toReturn += "1/1\t";
+		s<<"1/1\t";
 	    }else{
 		cerr<<"Internal error for genotype"<<endl;
 		exit(1);
@@ -43,18 +47,19 @@ string PositionResult::toString(const RefVector  references) const{
 	}
     }
 
+    for(int g=0;g<10;g++)
+	s<<ll[g]<<"\t";	
+    // s<<rrll<<"\t";
+    // s<<rall<<"\t";
+    // s<<aall<<"\t";
 
-    toReturn += ""+stringify(rrll)+"\t";
-    toReturn += ""+stringify(rall)+"\t";
-    toReturn += ""+stringify(aall)+"\t";
+    s<<lqual<<"\t";
+    s<<llCov<<"\t";
 
-    toReturn += ""+stringify(lqual)+"\t";
-    toReturn += ""+stringify(llCov)+"\t";
-
-    toReturn += "\n";
+    s<<"\n";
 
     //cout<<"toString "<<toReturn<<endl;
-    return toReturn;
+    return s.str();
 }
 
 //TODO code to VCF

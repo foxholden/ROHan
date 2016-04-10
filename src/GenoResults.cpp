@@ -67,3 +67,17 @@ GenoResults::~GenoResults(){
 }
 
 
+
+
+ostream & operator << (ostream & os, const GenoResults & gr){
+    os<<"rr= "<<gr.rrll<<"\t"
+	"ra= "<<gr.rall<<"\t"
+	"aa= "<<gr.aall<<"\t"
+	"q= "<<gr.lqual<<"\t"
+	"cov= "<<gr.llCov<<"\t"
+	"gen= "<<gr.geno;
+	// "pacc= "<<gr.probAccurate<<"\t"
+	// "exp= "<<gr.expectedH;
+
+    return os;
+}

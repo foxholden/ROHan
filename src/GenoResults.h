@@ -45,6 +45,8 @@ public:
     GenoResults(const GenoResults    & other);
     ~GenoResults();
     GenoResults & operator= (const GenoResults & other);
+    friend ostream & operator<<(ostream & os, const GenoResults & gr);
+
 };
 
 
