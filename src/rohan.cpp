@@ -84,6 +84,9 @@ long double randomPMismatch4Bases =  ( (long double)(3) ) /  ( (long double)(4) 
 long double randomPMatch4Bases    =  1.0-randomPMismatch4Bases;                     // 1/4
 
 long double randomPMmToABase      =  ( (long double)(1) ) /  ( (long double)(3) );  // 1/3, prob of a mismatch to given base
+
+string genoIdx2Code [10] = {"AA","AC","AG","AT","CC","CG","CT","GG","GT","TT"};
+
 #include "DataChunk.h"
 #include "DataToWrite.h"
 #include "GenoResults.h"
@@ -684,6 +687,8 @@ public:
 
 	}//END FOR EACH READ
 
+	if(totalBases == 0) 
+	    return;
 
 	PositionResult * prToAdd=new PositionResult();
 	prToAdd->refID = m_refID;
@@ -692,6 +697,9 @@ public:
 	int counterUnique=0;
 	for(int i=0;i<4;i++){
 	    prToAdd->baseC[i] = counterB[i];
+	    if(counterB[i]!=0) 
+		counterUnique++;
+
 	}
 
 
@@ -722,302 +730,46 @@ public:
 	    }
 
 	}else{
+	    for(int genoIdx=0;genoIdx<10;genoIdx++)
+		prToAdd->ll[genoIdx] = 0.0;
+	    long double factorScale = logl( ( (long double)1) / ((long double)counterUnique) );
+
 	    for(int alc=0;alc<4;alc++){//for each contaminant
 		if(counterB[alc]==0) //just concentrate on bases that are there
 		    continue;
-		//TODO
+
+				
+		int genoIdx=0;
+		for(int al1=0;al1<4;al1++){
+		    for(int al2=0;al2<4;al2++){
+			if(al2<al1)
+			    continue;
+			
+			
+			long double ll=computeLL(al1         ,//al1
+						 al2         ,//al2		      		  
+						 obsBase     ,
+						 obsQual     ,
+						 substitutionRatesPerRead,
+						 isRevVec    ,
+						 m_contRate  ,
+						 alc         ,//cont
+						 mmProb      );
+						
+			prToAdd->ll[genoIdx]=oplusInitnatl(prToAdd->ll[genoIdx],ll+factorScale);
+			//cout<<"ACGT"[al1]<<"\t"<<"ACGT"[al2]<<"\t""\t"<<"ACGT"[alc]<<"\t"<<ll<<"\t"<<factorScale<<"\t"<<prToAdd->ll[genoIdx]<<endl;
+			genoIdx++;
+		    }
+		}
+
 	    }
 	}	
-// 	// long double rrllCr=computeLL(ref         ,//al1
-// 	// 			     ref         ,//al2		      		  
-// 	// 			     obsBase     ,
-// 	// 			     probDeamR2A ,//al1 to al2
-// 	// 			     probDeamR2A ,//al2 to al1
-// 	// 			     obsQual     ,
-// 	// 			     m_contRate  ,
-// 	// 			     ref         ,
-// 	// 			     mmProb      );
+	
 
 	
 
 
 
-// 	long double nonZerollBaseDeam  = 0;
-// 	int         nonZerollBaseDeamI = -1;
-
-// 	for(int i=0;i<4;i++){
-// 	    //cout<<"deamres\t"<<i<<"\t"<<llBaseDeam[i]<<endl;
-// 	    if(llBaseDeam[i] !=0){
-// 		if(  nonZerollBaseDeam > llBaseDeam[i] ){
-// 		    nonZerollBaseDeam  = llBaseDeam[i];
-// 		    nonZerollBaseDeamI =            i;		    
-// 		}
-// 	    }
-// 	}
-
-// 	// if(nonZerollBaseDeamI!=-1){
-// 	//     cout<<"nonzero\t"<<nonZerollBaseDeam<<"\t"<<nonZerollBaseDeamI<<endl;
-// 	//     //exit(1);
-// 	// }
-
-
-// 	int counterUnique=0;
-// 	for(int i=0;i<4;i++){
-// 	    if(counterB[i]!=0) 
-// 		counterUnique++;
-// 	}
-
-// 	// cout<<"pos "<<posAlign<<" unique "<<counterUnique<<endl;
-// //hack to remove tri-allelic, we need to account for them
-// #ifdef DUMPTRIALLELIC 
-// 	bool isTriallelic=false;
-// 	vector<int> indicesToRemove;
-// 	if(counterUnique==3){
-// 	    isTriallelic=true;
-// 	    // cout<<"pos "<<posAlign<<" unique "<<counterUnique<<endl;
-
-// 	    //find base most likely to be error
-// 	    long double   errorPForEachBase [4] = {0,0,0,0};	    
-// 	    for(int i=0;i<int(obsBase.size());i++){
-
-// 		long double errorP=logl( (1.0-mmProb[i])*(//likeMatchProb[obsQual[i]]*(0.0) + //no need to add it
-// 							   likeMismatchProb[obsQual[i]]*(0.5))
-// 						     +
-// 					  mmProb[i]*0.5);
-// 		errorPForEachBase[obsBase[i]]+=errorP;
-
-// 		///cout<<i<<"\t"<<(1.0-mmProb[i])<<"\t"<<likeMismatchProb[obsQual[i]]<<"\t"<<mmProb[i]<<"\t"<<errorP<<endl;
-// 		//     (1.0-mismappingProb[i])*(likeMatchProb[obsQual[i]]*(1.0) + likeMismatchProb[obsQual[i]]*(0.5))+mismappingProb[i]*0.5;
-// 	    }
-	    
-// 	    // obsBase.push_back(             bIndex   );
-// 	    // obsQual.push_back(                  q   );
-// 	    // mmProb.push_back(  likeMismatchProb[m]  );
-
-
-
-// 	    long double errorPMAX = 0;
-// 	    int         errorPIDX =-1;
-// 	    for(int i=0;i<4;i++){
-// 		//cout<<i<<"\t"<<	errorPForEachBase[i]<<endl;
-// 		if(!(errorPForEachBase[i] < 0 )) continue;
-// 		if(errorPIDX==-1 ){
-// 		    errorPMAX =	errorPForEachBase[i];
-// 		    errorPIDX =	i;		    
-// 		}else{
-
-// 		    if(  errorPForEachBase[i] == errorPMAX){//tie
-// 			if(randomProb()){
-// 			    errorPMAX =	errorPForEachBase[i];
-// 			    errorPIDX =	i;
-// 			}
-// 		    }
-
-// 		    if(  errorPForEachBase[i] > errorPMAX){
-// 			errorPMAX =	errorPForEachBase[i];
-// 			errorPIDX =	i;		    
-// 		    }
-// 		}
-// 	    }
-
-
-// 	    //we remove errorPIDX
-// 	    for(int i=0;i<int(obsBase.size());i++){
-// 		if(obsBase[i] == errorPIDX){
-// 		    indicesToRemove.push_back(i);
-// 		}
-// 	    }
-
-// 	    if(indicesToRemove.empty()){
-// 		cerr<<"Internal error: at position "<<posAlign<<" the vector of indices to remove is empty"<<endl;
-// 		exit(1);
-// 	    }
-
-// 	    //cout<<"tri\t"<<errorPIDX<<"\t"<<vectorToString(indicesToRemove)<<endl;
-// 	    //cout<<
-// 	    //exit(1);
-// 	    counterUnique=2;
-// 	}
-	
-// #endif
-
-
-// 	//skip sites with no defined bases and tri/tetra allelic sites
-// 	if(counterUnique==0 ||
-// 	   counterUnique>=3){
-// 	    // cout<<"skipped\trefID\t"<<m_refID<<"\tpos\t"<<posAlign<<"\t"<<counterUnique;
-// 	    // for(int i=0;i<4;i++)
-// 	    // 	cout<<"\t"<<counterB[i];
-// 	    // cout<<endl;
-// 	    return;
-// 	}
-
-// 	int ref=-1; //not really reference base, just the majority base
-// 	int alt=-1;
-
-// 	if(counterUnique==1){
-// 	    for(int i=0;i<4;i++){
-// 		if(counterB[i]!=0) ref=i;
-// 	    }
-	    
-// 	    if(nonZerollBaseDeamI!=-1){
-// 		alt=nonZerollBaseDeamI;
-// 	    }else{
-// 		//TODO use randomBPExceptIntTS and randomBPExceptIntTV
-// 		if(randomProb()<0.3333){// transversion with prob 1/3
-// 		    alt=randomBPExceptIntTV(ref);
-// 		}else{//                 transition   with prob 2/3
-// 		    alt=randomBPExceptIntTS(ref);
-// 		}
-// 		//alt=randomBPExceptInt(ref);	    //todo maybe put a better dna sub model here?
-// 	    }
-// 	}
-
-// 	//TODO: decide if   if(nonZerollBaseDeamI!=-1){ do we dump the site?
-// 	//                   or add tri-allelic?
-// 	if(counterUnique==2){
-// 	    for(int i=0;i<4;i++){
-// 		if(counterB[i]!=0){
-// 		    if(ref == -1){
-// 			ref=i;
-// 		    }else{
-// 			if(counterB[i] < counterB[ref] ){//more ref bases than i
-// 			    alt = i;
-// 			}else{//more alt bases than i, alt becomes ref
-// 			    alt = ref;
-// 			    ref = i;
-// 			}
-// 		    }
-// 		}
-// 	    }
-// 	}
-	
-// 	// We know what ref and alt bases are at this point
-// 	// Computing deamination for probDeam vector
-// 	// 2 Matrices: probDeamR2A, probDeamA2R
-
-// 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-// 	    if(	!includeFragment[i])
-// 		continue;
-// 	    // if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
-// 	    // 	pileupData.PileupAlignments[i].IsNextInsertion ){
-// 	    // 	continue;
-// 	    // }
-
-// 	    if(i>=MAXCOV){
-// 		break;
-// 	    }
-
-// 	    int dinucIndexR2A=-1;
-// 	    int dinucIndexA2R=-1;
-
-// 	    if( isRevVec[i] ){		    
-// 		dinucIndexR2A =     dimer2indexInt(complementInt(ref),complementInt(alt));
-// 	    }else{
-// 		dinucIndexR2A =     dimer2indexInt(              ref ,              alt);
-// 	    }
-            
-
-// 	    if( isRevVec[i] ){		    
-// 		dinucIndexA2R =     dimer2indexInt(complementInt(alt),complementInt(ref));
-// 	    }else{
-// 		dinucIndexA2R =     dimer2indexInt(              alt ,              ref);
-// 	    }
-            
-// 	    //cout<<"indices "<<i<<"\t"<<ref<<"\t"<<alt<<"\t"<<dinucIndexR2A<<"\t"<<dinucIndexA2R<<endl;
-// 	    long double probSubDeamR2A              = substitutionRatesPerRead[i]->s[dinucIndexR2A];
-// 	    long double probSubDeamA2R              = substitutionRatesPerRead[i]->s[dinucIndexA2R];
-// 	    // long double probSameDeam             = 1.0-probSubDeam;
-	    
-
-// #ifdef DEBUGHDEAM
-// 	    if(probSubDeamR2A>0 
-// 	       ||
-// 	       probSubDeamA2R>0){
-		
-// 		int dist5p;
-// 		int dist3p;
-
-// 		if( isRevVec[i] ){
-// 		    dist5p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
-// 		    dist3p = pileupData.PileupAlignments[i].PositionInAlignment;
-// 		}else{
-// 		    dist5p = pileupData.PileupAlignments[i].PositionInAlignment;
-// 		    dist3p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
-// 		}
-//                 //cout<<posAlign<<"\t"<<"ACGT"[ref]<<"\t"<<"ACGT"[alt]<<"\tP[R2A]="<<probSubDeamR2A<<"\tP[A2R]="<<probSubDeamA2R<<"\tdist5p="<<dist5p<<"\tdist3p="<<dist3p<<"\trev="<<isRevVec[i]<<"\tiR2A"<<dinucIndexR2A<<"\tiA2R"<<dinucIndexA2R<<"\t"<<endl;
-// 	    }
-// #endif
-
-
-// 	    probDeamR2A.push_back( probSubDeamR2A   );
-// 	    probDeamA2R.push_back( probSubDeamA2R   );
-
-// 	}// computing deamination for probDeam vector
-
-// #ifdef DUMPTRIALLELIC 
-
-// 	if( isTriallelic ){
-
-// 	    // for(unsigned int i=0;i<obsBase.size();i++)
-// 	    // 	cout<<i<<"\t"<<obsBase[i]<<"\t"<<obsQual[i]<<"\t"<<probDeamR2A[i]<<"\t"<<probDeamA2R[i]<<"\t"<<mmProb[i]<<endl;
-// 	    //if(0)
-
-// 	    vector<int>         obsBase_      ;
-// 	    vector<int>         obsQual_      ;
-// 	    vector<long double> probDeamR2A_  ; // deamination rate from ref to alt
-// 	    vector<long double> probDeamA2R_  ; // deamination rate from alt to ref
-// 	    vector<long double> mmProb_       ; //mismapping probability
-	    
-// 	    for(int i=0;i<int(obsBase.size());i++){	       
-// 		bool skip=false;
-// 		for(int j=0;j<int(indicesToRemove.size());j++)
-// 		    if(i==indicesToRemove[j]){
-// 			skip=true;
-// 		    }
-// 		if(skip) continue;
-
-// 		obsBase_.push_back(     obsBase[i]);
-// 		obsQual_.push_back(     obsQual[i]);
-// 		probDeamR2A_.push_back( probDeamR2A[i]);
-// 		probDeamA2R_.push_back( probDeamA2R[i]);
-// 		mmProb_.push_back(      mmProb[i]);	       
-
-// 	    }
-	    
-// 	    obsBase.clear();
-// 	    obsQual.clear();
-// 	    probDeamR2A.clear();
-// 	    probDeamA2R.clear();
-// 	    mmProb.clear();
-
-// 	    for(unsigned int i=0;i<obsBase_.size();i++){	       
-// 		obsBase.push_back(     obsBase_[i]);
-// 		obsQual.push_back(     obsQual_[i]);
-// 		probDeamR2A.push_back( probDeamR2A_[i]);
-// 		probDeamA2R.push_back( probDeamA2R_[i]);
-// 		mmProb.push_back(      mmProb_[i]);	       
-// 	    }
-
-// 	    // for(unsigned int i=0;i<indicesToRemove.size();i++){	       
-// 	    // 	obsBase.erase(     obsBase.begin()     + indicesToRemove[i]);
-// 	    // 	obsQual.erase(     obsQual.begin()     + indicesToRemove[i]);
-// 	    // 	probDeamR2A.erase( probDeamR2A.begin() + indicesToRemove[i]);
-// 	    // 	probDeamA2R.erase( probDeamA2R.begin() + indicesToRemove[i]);
-// 	    // 	mmProb.erase(      mmProb.begin()      + indicesToRemove[i]);	       
-// 	    // }
-
-// 	    // for(unsigned int i=0;i<obsBase.size();i++)
-// 	    // 	cout<<i<<"\t"<<obsBase[i]<<"\t"<<obsQual[i]<<"\t"<<probDeamR2A[i]<<"\t"<<probDeamA2R[i]<<"\t"<<mmProb[i]<<endl;
-
-
-// 	}
-// #endif
-
-// 	if( probDeamR2A.size() != obsBase.size() ){
-// 	    cerr<<"Internal error: at position "<<posAlign<<" the deamination vector is not the same as the size of the observed bases"<<endl;
-// 	    exit(1);
-// 	}
 
 
 	//TODO
@@ -1034,81 +786,6 @@ public:
 
 
 
-// #ifdef DEBUGCOMPUTELL
-// 	cout<<"---------------"<<endl<<"pos="<<posAlign<<"\t"<<refB<<","<<altB<<"\t"<<counterB[ref]<<"\t"<<counterB[alt]<<endl;
-// #endif
-// 	long double rrllCr=computeLL(ref         ,//al1
-// 				     ref         ,//al2		      		  
-// 				     obsBase     ,
-// 				     probDeamR2A ,//al1 to al2
-// 				     probDeamR2A ,//al2 to al1
-// 				     obsQual     ,
-// 				     m_contRate  ,
-// 				     ref         ,
-// 				     mmProb      );
-
-// 	long double rallCr=computeLL(ref         ,//al1
-// 				     alt         ,//al2		      		  
-// 				     obsBase     ,
-// 				     probDeamR2A ,//al1 to al2
-// 				     probDeamA2R ,//al2 to al1
-// 				     obsQual     ,
-// 				     m_contRate  ,
-// 				     ref         ,
-// 				     mmProb      );
-
-// 	long double aallCr=computeLL(alt          ,//al1
-// 				     alt          ,//al2
-// 				     obsBase      ,
-// 				     probDeamA2R  ,//al1 to al2
-// 				     probDeamA2R  ,//al2 to al1
-// 				     obsQual      ,
-// 				     m_contRate   ,
-// 				     ref          ,
-// 				     mmProb       );
-
-
-//        long double rrllCa=0;
-//        long double rallCa=0;
-//        long double aallCa=0;
-       
-//        if(m_contRate>0){
-
-// 	   rrllCa=computeLL(ref          ,
-// 			    ref          ,		      		  
-// 			    obsBase      ,
-// 			    probDeamR2A  ,
-// 			    probDeamR2A  ,
-// 			    obsQual      ,
-// 			    m_contRate   ,
-// 			    alt          ,
-// 			    mmProb       );
-
-// 	   rallCa=computeLL(ref          ,
-// 			    alt          ,		      		  
-// 			    obsBase      ,
-// 			    probDeamR2A  ,
-// 			    probDeamA2R  ,
-// 			    obsQual      ,
-// 			    m_contRate   ,
-// 			    alt          ,
-// 			    mmProb       );
-
-// 	   aallCa=computeLL(alt          ,
-// 			    alt          ,		      		  
-// 			    obsBase      ,
-// 			    probDeamA2R  ,
-// 			    probDeamA2R  ,
-// 			    obsQual      ,
-// 			    m_contRate   ,
-// 			    alt          ,
-// 			    mmProb       );
-
-//        }else{
-// 	   rrllCa=rrllCr;
-// 	   rallCa=rallCr;
-// 	   aallCa=aallCr;
-//        }
        
 
 
@@ -1120,19 +797,71 @@ public:
        // prToAdd->rrll  = oplusnatl( rrllCr+logl(0.5), rrllCa+logl(0.5));
        // prToAdd->rall  = oplusnatl( rallCr+logl(0.5), rallCa+logl(0.5));
        // prToAdd->aall  = oplusnatl( aallCr+logl(0.5), aallCa+logl(0.5));
-       // vector<long double> arrLL (3,0); 
-       // arrLL[0]       = prToAdd->rrll;
-       // arrLL[1]       = prToAdd->rall;
-       // arrLL[2]       = prToAdd->aall;
-       // sort (arrLL.begin(), arrLL.end());
-       // prToAdd->lqual = (arrLL[2]-arrLL[1]);//log ratio of most likely to second most likely
-       // //1st most likely = 2
-       // //2nd most likely = 1
+	vector<long double> arrLL (10,0.0); 
+
+	
+	//for(int g=0;g<10;g++){
+	for(int genoIdx=0;genoIdx<10;genoIdx++){
+	    arrLL[genoIdx] = prToAdd->ll[genoIdx];
+	}
+	// cout<<"-----"<<endl;
+	
+	// arrLL[0]       = prToAdd->rrll;
+	// arrLL[1]       = prToAdd->rall;
+	// arrLL[2]       = prToAdd->aall;
+	sort (arrLL.begin(), arrLL.end() , greater<long double>());
+	
+	// for(int genoIdx=0;genoIdx<10;genoIdx++){
+	//     cout<<genoIdx<<"\t"<<arrLL[genoIdx]<<endl;
+	// }
+
+	prToAdd->lqual = (arrLL[1]-arrLL[0]);//log ratio of most likely to second most likely
+	// //1st most likely = 0
+	// //2nd most likely = 1
 
 
 	//TODO
-	prToAdd->geno = 0;     //rr
-	prToAdd->lqual = -1;
+	// 0	0	0
+	// 4	1	1
+	// 7	2	2
+	// 9	3	3
+	vector<int> genoPriority (10,0);
+	genoPriority[0] = 0;
+	genoPriority[1] = 4;
+	genoPriority[2] = 7;
+	genoPriority[3] = 9;
+
+	genoPriority[4] = 1;
+	genoPriority[5] = 2;
+	genoPriority[6] = 3;
+	genoPriority[7] = 5;
+	genoPriority[8] = 6;
+	genoPriority[9] = 8;
+
+	for(int g=0;g<10;g++){
+	    int genoIdx = genoPriority[g];
+	    //cout<<genoIdx<<"\t"<<prToAdd->ll[genoIdx]<<"\t"<<arrLL[0]<<endl;
+	    if( prToAdd->ll[genoIdx] == arrLL[0]){
+		if(genoIdx == 0 ||
+		   genoIdx == 4 ||
+		   genoIdx == 7 ||
+		   genoIdx == 9 ){
+		    prToAdd->geno = 0;     //rr
+		}else{
+		    prToAdd->geno = 1;     //ra
+		}
+
+		prToAdd->genoS[0] = genoIdx2Code[genoIdx][0];
+		prToAdd->genoS[1] = genoIdx2Code[genoIdx][1];
+		//cout<<genoIdx<<"\t"<<prToAdd->geno<<"\t"<<prToAdd->genoS[0]<<prToAdd->genoS[1]<<endl;
+		break;
+	    }
+	}
+	// cout<<prToAdd->geno<<endl;
+
+
+	
+	//prToAdd->lqual = -1;
        // if(arrLL[2]     == prToAdd->rrll){
        // 	   prToAdd->geno = 0;     //rr
        // }else{
@@ -2132,7 +1861,7 @@ int main (int argc, char *argv[]) {
 	if(useVCFoutput){
 	    headerOutFile="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
 	}else{
-	    headerOutFile="#CHROM\tPOS\tA\tC\tG\tT\tGENO\tAA\tAC\tAG\tAT\tCC\tCG\tCT\tGG\tGT\tTT\tQualL\tCovL\n";	
+	    headerOutFile="#CHROM\tPOS\tA\tC\tG\tT\tGENO\tGENOS\tQualL\tCovL\tAA\tAC\tAG\tAT\tCC\tCG\tCT\tGG\tGT\tTT\n";	
 	}
 
 	bgzipWriter.Write(headerOutFile.c_str(),headerOutFile.size());
@@ -2209,7 +1938,7 @@ int main (int argc, char *argv[]) {
     //end Writing data out/
     ///////////////////////
 
-    return 1;
+    //return 1;
 
     // 	rc = pthread_mutex_lock(&mutexCounter);
     // 	checkResults("pthread_mutex_lock()\n", rc);
@@ -2294,7 +2023,7 @@ int main (int argc, char *argv[]) {
     // BEGIN COMPUTE HETERO RATE    //
     //                              //
     //////////////////////////////////
-
+    return 1;
     long double randomLog=log(10000000);
 
     for(unsigned int i=0;i<vectorGenoResults.size();i++){
@@ -2326,11 +2055,11 @@ int main (int argc, char *argv[]) {
 
 	// if(i == 796868){
 
-	cout<<fixed<<i<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\tp[q]=\t"<<(1.0-(1.0/expl(vectorGenoResults[i]->lqual)) ) <<"\tcov=\t"<<expl(vectorGenoResults[i]->llCov)<<"\tconf\t"<<confidence<<"\tP[acc]\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<sumProbHomoz<<"\t"<<sumProbAll<<"\thom\t"<<sumProbHomoz<<"\tHet\t"<<sumProbHeter<<"\t"<<randomLog<<endl;
+	//cout<<fixed<<i<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\tp[q]=\t"<<(1.0-(1.0/expl(vectorGenoResults[i]->lqual)) ) <<"\tcov=\t"<<expl(vectorGenoResults[i]->llCov)<<"\tconf\t"<<confidence<<"\tP[acc]\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<sumProbHomoz<<"\t"<<sumProbAll<<"\thom\t"<<sumProbHomoz<<"\tHet\t"<<sumProbHeter<<"\t"<<randomLog<<endl;
 	//     return 1;
 	// }
     }
-    return 1;
+
 
 #ifdef DEBUGHCOMPUTE
     long double h         = 1/ (long double)(randomInt(1000,20000));

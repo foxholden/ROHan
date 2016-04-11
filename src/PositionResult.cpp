@@ -41,11 +41,16 @@ string PositionResult::toString(const RefVector  references) const{
 	    if(geno==2){
 		s<<"1/1\t";
 	    }else{
-		cerr<<"Internal error for genotype"<<endl;
+		cerr<<"Internal error for genotype ="<<geno<<endl;
 		exit(1);
 	    }	    
 	}
     }
+
+    s<<genoS[0]<<genoS[1]<<"\t";
+
+    s<<lqual<<"\t";
+    s<<llCov<<"\t";
 
     for(int g=0;g<10;g++)
 	s<<ll[g]<<"\t";	
@@ -53,8 +58,6 @@ string PositionResult::toString(const RefVector  references) const{
     // s<<rall<<"\t";
     // s<<aall<<"\t";
 
-    s<<lqual<<"\t";
-    s<<llCov<<"\t";
 
     s<<"\n";
 

@@ -39,6 +39,7 @@ private:
     long double  lqual;
     long double  llCov;
     int          geno;
+    char         genoS [2];
 
     
     PositionResult();
