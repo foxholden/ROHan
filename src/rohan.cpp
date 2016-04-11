@@ -470,8 +470,19 @@ inline long double computeLL(const int                           al1Current    ,
     long double expal_fb= binomVec[int(obsBase.size())][expal_f];
     long double expal_cb= binomVec[int(obsBase.size())][expal_c];
 
-    long double expal_fr = expal1-expal_f;
-    long double expal_cr = expal_c-expal1;
+    long double expal_fr = 1-(expal1-expal_f);
+    long double expal_cr = 1-(expal_c-expal1);
+
+    // if(expal_f == expal_c){
+    // 	expal_fr = 1.0;
+    // 	expal_cr = 0.0;
+    // }
+
+#ifdef DEBUGCOMPUTELL
+    cout<<"expal1="<<expal1<<endl;
+    cout<<"expal_f="<<expal_f<<"\texpal_fb="<<expal_fb<<"\texpal_fr="<<expal_fr<<endl;
+    cout<<"expal_c="<<expal_c<<"\texpal_cb="<<expal_cb<<"\texpal_cr="<<expal_cr<<endl;
+#endif
 
     //long double expal1=roundl(  sizeAr * ( expl(llik1) / llik1+llik2)) );
     //long double expal2  = sizeAr-expal1;
@@ -746,6 +757,7 @@ public:
 			    continue;
 			
 			
+			
 			long double ll=computeLL(al1         ,//al1
 						 al2         ,//al2		      		  
 						 obsBase     ,
@@ -757,7 +769,10 @@ public:
 						 mmProb      );
 						
 			prToAdd->ll[genoIdx]=oplusInitnatl(prToAdd->ll[genoIdx],ll+factorScale);
-			//cout<<"ACGT"[al1]<<"\t"<<"ACGT"[al2]<<"\t""\t"<<"ACGT"[alc]<<"\t"<<ll<<"\t"<<factorScale<<"\t"<<prToAdd->ll[genoIdx]<<endl;
+
+#ifdef DEBUGCOMPUTELL
+			cout<<"ACGT"[al1]<<"\t"<<"ACGT"[al2]<<"\t""\t"<<"ACGT"[alc]<<"\t"<<ll<<"\t"<<factorScale<<"\t"<<prToAdd->ll[genoIdx]<<endl<<"--------------------"<<endl;
+#endif
 			genoIdx++;
 		    }
 		}
