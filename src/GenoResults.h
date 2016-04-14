@@ -20,14 +20,15 @@ private:
     
 public:
 
-    long double  rrll;
-    long double  rall;
-    long double  aall;
-
+    /* long double  rrll; */
+    /* long double  rall; */
+    /* long double  aall; */
+    long double  ll [10];
     long double  lqual;
     long double  llCov;
+    int          cov;
     int          geno;
-
+    char         genoS[2];
     //computed
     long double  probAccurate;
     long double  expectedH;
@@ -35,12 +36,12 @@ public:
     GenoResults();
     GenoResults(const string lineToAdd);
 
-    GenoResults(long double  rrll ,
-		long double  rall ,
-		long double  aall ,
-		long double  lqual,
-		long double  llCov,
-		int          geno);
+    /* GenoResults(long double  rrll , */
+    /* 		long double  rall , */
+    /* 		long double  aall , */
+    /* 		long double  lqual, */
+    /* 		long double  llCov, */
+    /* 		int          geno); */
     GenoResults(const PositionResult * pr);
     GenoResults(const GenoResults    & other);
     ~GenoResults();
@@ -48,6 +49,4 @@ public:
     friend ostream & operator<<(ostream & os, const GenoResults & gr);
 
 };
-
-
 #endif

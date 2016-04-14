@@ -87,6 +87,13 @@ long double randomPMmToABase      =  ( (long double)(1) ) /  ( (long double)(3) 
 
 string genoIdx2Code [10] = {"AA","AC","AG","AT","CC","CG","CT","GG","GT","TT"};
 
+// 0	0	0
+// 4	1	1
+// 7	2	2
+// 9	3	3
+vector<int> genoPriority (10,0);
+
+
 #include "DataChunk.h"
 #include "DataToWrite.h"
 #include "GenoResults.h"
@@ -169,6 +176,21 @@ void initScores(){
     totalBasesSum=0;
     totalSitesSum=0;
 
+
+    //homoz
+    genoPriority[0] = 0;
+    genoPriority[1] = 4;
+    genoPriority[2] = 7;
+    genoPriority[3] = 9;
+
+    //hetero
+    genoPriority[4] = 1;
+    genoPriority[5] = 2;
+    genoPriority[6] = 3;
+    genoPriority[7] = 5;
+    genoPriority[8] = 6;
+    genoPriority[9] = 8;
+
 // long double likeMatchMap        [MAXMAPPINGQUAL];
 // long double likeMismatchMap     [MAXMAPPINGQUAL];
 
@@ -246,6 +268,15 @@ inline long double computeBaseAl2Obs(const int al,
 	dinucal2al =                   al*4+               al;       //genotype is 1, observed is obsBase
     }
 
+    // //TO REMOVE
+    // if(dinucal2al<0){
+    // 	cerr<<"1 "<<al<<"\t"<<al<<endl;
+    // 	exit(1);
+    // }
+    // if(dinucal2al>=16){
+    // 	cerr<<"2 "<<al<<"\t"<<al<<endl;
+    // 	exit(1);
+    // }
 
     if(probDeam->s[dinucal2al] == 1.0){ //simple case, no deamination
 	int dinucIndexal2ob;
@@ -371,15 +402,25 @@ inline long double computeLL(const int                           al1Current    ,
 	// 					     )+mismappingProb[i]*randomPMatch4Bases;
 	// }
 
+
+	
+	// const vector<bool>                & isRev         ,//false = plus strand, true = reverse		      
+	//     const long double                   contRate      ,
+	//     const int                           alCCurrent ,
+	//     const vector<long double>         & mismappingProb
+
+
 	long double llikAl1t=0;
 	long double llikAl2t=0;
+	
+	
 
 
 	
 	llikAl1t = computeBaseAl2Obs(al1Current   ,
 				     obsBase[i]   ,
 				     obsQual[i]   ,
-				     probDeam[i] , //deamination for the endogenous
+				     probDeam[i]  , //deamination for the endogenous
 				     isRev[i]     ,
 				     mismappingProb[i]);
 
@@ -595,27 +636,40 @@ public:
 	int                 totalBases=0 ;
 	int                 counterB  [4];
 	//long double         llBaseDeam[4];
-	vector<int>         obsBase      ;
-	vector<int>         obsQual      ;
-	vector<long double> probDeamR2A  ; // deamination rate from ref to alt
-	vector<long double> probDeamA2R  ; // deamination rate from alt to ref
-	vector<long double> mmProb       ; //mismapping probability
+	vector<int>              obsBase      ;
+	vector<int>              obsQual      ;
+	vector<long double>      mmProb       ; //mismapping probability
+	vector<probSubstition *> substitutionRatesPerRead;
+	vector<bool>             isRevVec;
+	// vector<probSubstition *> substitutionRatesPerRead    (pileupData.PileupAlignments.size(),NULL );
+	// vector<bool>             isRevVec                    (pileupData.PileupAlignments.size(),false);
+	
+	//reserve
+	//cout<<"init1 "<<obsBase.size()<<"\t"<<substitutionRatesPerRead.size()<<"\t"<<pileupData.PileupAlignments.size()<<endl;
+	//TODO Debub resize
+	// obsBase.resize(pileupData.PileupAlignments.size());
+	// obsQual.resize(pileupData.PileupAlignments.size());
+	// mmProb.resize(pileupData.PileupAlignments.size());
+	// substitutionRatesPerRead.resize(pileupData.PileupAlignments.size());
+	// isRevVec.resize(pileupData.PileupAlignments.size());
+	// cout<<"init2 "<<obsBase.size()<<"\t"<<substitutionRatesPerRead.size()<<"\t"<<pileupData.PileupAlignments.size()<<endl;
+
 
 	unsigned int                posAlign = pileupData.Position+1;
-	vector<probSubstition *> substitutionRatesPerRead (pileupData.PileupAlignments.size(),NULL );
-	vector<bool>                isRevVec                 (pileupData.PileupAlignments.size(),false);
 
 	for(unsigned int i=0;i<4;i++){
 	    counterB[i]   = 0;
 	    //llBaseDeam[i] = 0.0;
 	}
-	vector<bool> includeFragment (pileupData.PileupAlignments.size(),false);
+	//vector<bool> includeFragment (pileupData.PileupAlignments.size(),false);
 
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
 
 
-	    if( pileupData.PileupAlignments[i].IsCurrentDeletion ||
-	    	pileupData.PileupAlignments[i].IsNextInsertion ||
+	    if( pileupData.PileupAlignments[i].IsCurrentDeletion   ||
+	    	pileupData.PileupAlignments[i].IsNextInsertion     ||
+	    	pileupData.PileupAlignments[i].IsNextDeletion      ||
+		(pileupData.PileupAlignments[i].DeletionLength>0)  ||
 		(pileupData.PileupAlignments[i].InsertionLength>0) ){		
 		//includeFragment was initialized as false
 	    	continue;
@@ -631,8 +685,8 @@ public:
 		continue; 
 	    }//avoid Ns
 	    int bIndex = baseResolved2int(b);
-	    int   q   = int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual); 
-	    int   m   = int(pileupData.PileupAlignments[i].Alignment.MapQuality);
+	    int   q    = int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual); 
+	    int   m    = int(pileupData.PileupAlignments[i].Alignment.MapQuality);
 	  
 
 	    // BEGIN DEAMINATION COMPUTATION
@@ -641,7 +695,7 @@ public:
             int dist3p=-1;
 
 	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
-	    isRevVec[i]=isRev;
+	    //isRevVec[i]=isRev;
 	    
             if( isRev ){
                 dist5p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
@@ -657,6 +711,7 @@ public:
             // probSubstition * probSubMatchToUseCont = &defaultSubMatch ;
             probSubstition * probSubMatchToUseEndo = &defaultSubMatch ;
             // substitutionRates * probSubMatchToUseCont = &defaultSubMatch ;
+	    
 
             if(dist5p <= (int(sub5p.size()) -1)){ //out of range
                 probSubMatchToUseEndo = &sub5p[  dist5p ];                      
@@ -683,18 +738,20 @@ public:
                 }
                     
             }
-
-	    substitutionRatesPerRead[i] = probSubMatchToUseEndo;
+	    //cout<<"add= "<<i<<"\t"<<bIndex<<"\t"<<probSubMatchToUseEndo<<"\t"<<obsBase.size()<<"\t"<<substitutionRatesPerRead.size()<<endl;
+	    //substitutionRatesPerRead[i] = probSubMatchToUseEndo;
 
   
 	    //cout<<"pos "<<posAlign<<" "<<bIndex<<" "<<b<<" "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
 	    counterB[ bIndex ]++;
 	    totalBases++;
+
 	    obsBase.push_back(             bIndex   );
 	    obsQual.push_back(                  q   );
 	    mmProb.push_back(  likeMismatchProbMap[m]  );
-	    includeFragment[i]=true;
-
+	    substitutionRatesPerRead.push_back( probSubMatchToUseEndo );
+	    isRevVec.push_back(isRev);
+	    //	    includeFragment[i]=true;
 
 	}//END FOR EACH READ
 
@@ -723,6 +780,19 @@ public:
 			continue;
 
 		    //cout<<"ACGT"[al1]<<"\t"<<"ACGT"[al2]<<"\t"<<counterB[al1]<<"\t"<<counterB[al2]<<endl;
+		    
+		    
+		    //TO REMOVE
+		    // if(obsBase.size() != substitutionRatesPerRead.size() ){
+		    // 	cerr<<"problem2 "<<obsBase.size()<<" "<<substitutionRatesPerRead.size()<<endl;
+		    // 	cerr<<prToAdd->refID<<"\t"<<prToAdd->pos<<endl;
+		    // 	exit(1);
+		    // }
+
+		    // for(unsigned int i=0;i<substitutionRatesPerRead.size();i++){
+		    // 	cout<<"ll "<<i<<"\t"<<obsBase[i]<<"\t"<<substitutionRatesPerRead[i]<<endl;
+		    // }
+
 
 		    long double ll=computeLL(al1         ,//al1
 					     al2         ,//al2		      		  
@@ -733,6 +803,7 @@ public:
 					     m_contRate  ,
 					     alc         ,//cont
 					     mmProb      );
+
 
 		    //cout<<"ACGT"[al1]<<"\t"<<"ACGT"[al2]<<"\t"<<ll<<endl;
 		    prToAdd->ll[genoIdx]=ll;
@@ -831,27 +902,12 @@ public:
 	// }
 
 	prToAdd->lqual = (arrLL[1]-arrLL[0]);//log ratio of most likely to second most likely
+
 	// //1st most likely = 0
 	// //2nd most likely = 1
 
 
-	//TODO
-	// 0	0	0
-	// 4	1	1
-	// 7	2	2
-	// 9	3	3
-	vector<int> genoPriority (10,0);
-	genoPriority[0] = 0;
-	genoPriority[1] = 4;
-	genoPriority[2] = 7;
-	genoPriority[3] = 9;
-
-	genoPriority[4] = 1;
-	genoPriority[5] = 2;
-	genoPriority[6] = 3;
-	genoPriority[7] = 5;
-	genoPriority[8] = 6;
-	genoPriority[9] = 8;
+	
 
 	for(int g=0;g<10;g++){
 	    int genoIdx = genoPriority[g];
@@ -2038,16 +2094,40 @@ int main (int argc, char *argv[]) {
     // BEGIN COMPUTE HETERO RATE    //
     //                              //
     //////////////////////////////////
-    return 1;
-    long double randomLog=log(10000000);
+
+    long double randomLog=log(3000);
 
     for(unsigned int i=0;i<vectorGenoResults.size();i++){
 	// if(i == 796868){
 	//cout<<*(vectorGenoResults[i])<<endl;
 	// }
+	long double sumProbHomoz=0;
+	long double sumProbHeter=0;
+	long double mostLikeHomozy =  -1.0*numeric_limits<long double>::infinity();
+	long double mostLikeHetero =  -1.0*numeric_limits<long double>::infinity();
 
-	long double sumProbHomoz = oplusnatl( vectorGenoResults[i]->rrll , vectorGenoResults[i]->aall );
-	long double sumProbHeter = oplusnatl( vectorGenoResults[i]->rall , vectorGenoResults[i]->rall );//twice
+
+
+	for(int g=0;g<4;g++){
+	    sumProbHomoz = oplusInitnatl( sumProbHomoz , vectorGenoResults[i]->ll[ genoPriority[g] ]+logl( ( 1/( (long double)4))) );
+
+	    if( mostLikeHomozy < vectorGenoResults[i]->ll[ genoPriority[g] ]){
+		mostLikeHomozy = vectorGenoResults[i]->ll[ genoPriority[g] ];
+	    }
+
+	}
+
+
+	for(int g=4;g<10;g++){
+	    sumProbHeter = oplusInitnatl( sumProbHeter , vectorGenoResults[i]->ll[ genoPriority[g] ]+logl( ( 1/( (long double)6))) );
+
+	    if( mostLikeHetero  < vectorGenoResults[i]->ll[ genoPriority[g] ]){
+		mostLikeHetero  = vectorGenoResults[i]->ll[ genoPriority[g] ];
+	    }
+
+	}
+	//  = oplusnatl( vectorGenoResults[i]->rrll , vectorGenoResults[i]->aall );
+	// long double sumProbHeter = oplusnatl( vectorGenoResults[i]->rall , vectorGenoResults[i]->rall );//twice
 	
 	long double minSumProb   = MIN( sumProbHomoz, sumProbHeter);
 
@@ -2058,22 +2138,39 @@ int main (int argc, char *argv[]) {
 
 	//confidence = MIN(0,confidence+randomLog);
 
-	
+
 	//confidence=1-expl(confidence);
+	long double covCorrect = (logl(2)) * vectorGenoResults[i]->cov; //multiply by 2 = log(2)
+	long double sumProbHoHe;
+	long double lqual=-1.0*numeric_limits<long double>::infinity();
+	if(mostLikeHomozy>mostLikeHetero){//if is homozygous, check if scaling the het changes
+	    long double mostLikeHeteroC         = MIN( mostLikeHetero+covCorrect , mostLikeHomozy);//takes care of coverage =1,2
+	    sumProbHoHe                         = oplusnatl( mostLikeHomozy,mostLikeHeteroC);
+	    vectorGenoResults[i]->expectedH     = expl(  mostLikeHeteroC - sumProbHoHe );
+	    lqual                               = (mostLikeHetero-mostLikeHomozy)/1.0;
+	}else{//most likely is hetero
+	    sumProbHoHe                         = oplusnatl( mostLikeHomozy,mostLikeHetero);
+	    vectorGenoResults[i]->expectedH     = expl(  mostLikeHetero - sumProbHoHe );
+	    lqual                               = (mostLikeHetero-mostLikeHomozy)/2.0;
+	}
 
 	
-	vectorGenoResults[i]->expectedH    = expl(  sumProbHeter - sumProbAll );
 
-	vectorGenoResults[i]->probAccurate = 1.0 - (  (1.0-(1.0/expl(vectorGenoResults[i]->lqual)) ) * expl(vectorGenoResults[i]->llCov)  );
-	
+	//TODO check if covCorrect mitigates low cov problem
+	cout<<mostLikeHomozy<<"\t"<<mostLikeHetero<<"\t"<<sumProbHoHe<<"\t"<<vectorGenoResults[i]->cov<<"\t"<<covCorrect<<"\t"<<vectorGenoResults[i]->expectedH<<"\t"<<lqual<<endl;
 	
 
+
+	vectorGenoResults[i]->probAccurate =  (  (1.0-expl(vectorGenoResults[i]->lqual) ) * expl(vectorGenoResults[i]->llCov)  );
+	//scale for coverage 2xhomo
+	
+	//cout<<fixed<<i<<"\th="<<vectorGenoResults[i]->expectedH<<"\t"<<"\t"<<sumProbHomoz<<"\t"<<sumProbAll<<"\thom\t"<<sumProbHomoz<<"\tHet\t"<<sumProbHeter<<endl;
 	// if(i == 796868){
-
-	//cout<<fixed<<i<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\tp[q]=\t"<<(1.0-(1.0/expl(vectorGenoResults[i]->lqual)) ) <<"\tcov=\t"<<expl(vectorGenoResults[i]->llCov)<<"\tconf\t"<<confidence<<"\tP[acc]\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<sumProbHomoz<<"\t"<<sumProbAll<<"\thom\t"<<sumProbHomoz<<"\tHet\t"<<sumProbHeter<<"\t"<<randomLog<<endl;
+	//cout<<fixed<<i<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\tp[q]=\t"<<(1.0-expl(vectorGenoResults[i]->lqual ) ) <<"\tcov=\t"<<expl(vectorGenoResults[i]->llCov)<<"\tconf\t"<<confidence<<"\tP[acc]\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<"\t"<<sumProbAll<<"\thom="<<sumProbHomoz<<"\tHet="<<sumProbHeter<<"\t"<<randomLog<<endl;
 	//     return 1;
 	// }
     }
+    return 1;
 
 
 #ifdef DEBUGHCOMPUTE
@@ -2120,7 +2217,7 @@ int main (int argc, char *argv[]) {
 
 
 	    
-	    long double pcorrect=MAX((1-vectorGenoResults[i]->probAccurate),probNull);
+	    long double pcorrect=MAX((vectorGenoResults[i]->probAccurate),probNull);
 	    
 	    llT  = logl( pcorrect
 			 *
