@@ -875,10 +875,20 @@ public:
        
 
 
+	//normalize
+	long double llEvidence=prToAdd->ll[0] ;
+	for(int genoIdx=1;genoIdx<10;genoIdx++){
+	    llEvidence = oplusnatl(llEvidence,prToAdd->ll[genoIdx] );
+	    //cout<<genoIdx<<"\t"<<prToAdd->ll[genoIdx]<<"\t"<<llEvidence<<endl;
+	}
 
+	for(int genoIdx=0;genoIdx<10;genoIdx++){
+	    prToAdd->ll[genoIdx] = prToAdd->ll[genoIdx] - llEvidence;
+	    //cout<<genoIdx<<"\t"<<prToAdd->ll[genoIdx]<<"\t"<<llEvidence<<endl;
+	}
 
-
-
+	
+	//	exit(1);
 	//TODO
        // prToAdd->rrll  = oplusnatl( rrllCr+logl(0.5), rrllCa+logl(0.5));
        // prToAdd->rall  = oplusnatl( rallCr+logl(0.5), rallCa+logl(0.5));
@@ -2054,6 +2064,7 @@ int main (int argc, char *argv[]) {
 	rc = pthread_join(thread[i], NULL);
 	checkResults("pthread_join()\n", rc);
     }
+
     cerr<<"Heterozygosity computations are done"<<endl;
     pthread_mutex_destroy(&mutexRank);
     pthread_mutex_destroy(&mutexQueue);
@@ -2074,7 +2085,7 @@ int main (int argc, char *argv[]) {
 	if (myFileGENOL.good()){
 	    getline (myFileGENOL,lineGENOL);//header
 	    while ( getline (myFileGENOL,lineGENOL)){
-
+		//cout<<lineGENOL<<endl;
 		GenoResults * toadd =  new GenoResults( lineGENOL );
 		vectorGenoResults.push_back(toadd);
 		sizeGenome++;
@@ -2088,7 +2099,7 @@ int main (int argc, char *argv[]) {
 
     }
 
-
+    //    return 1;
     //////////////////////////////////
     //                              //
     // BEGIN COMPUTE HETERO RATE    //
@@ -2110,23 +2121,24 @@ int main (int argc, char *argv[]) {
 
 
 	for(int g=0;g<4;g++){
-	    sumProbHomoz = oplusInitnatl( sumProbHomoz , vectorGenoResults[i]->ll[ genoPriority[g] ]+logl( ( 1/( (long double)4))) );
+	    sumProbHomoz = oplusInitnatl( sumProbHomoz , vectorGenoResults[i]->ll[ genoPriority[g] ] );//+logl( ( 1/( (long double)4))) );
 
 	    if( mostLikeHomozy < vectorGenoResults[i]->ll[ genoPriority[g] ]){
 		mostLikeHomozy = vectorGenoResults[i]->ll[ genoPriority[g] ];
 	    }
 
 	}
-
+	sumProbHomoz = sumProbHomoz + logl( ((long double)1)/((long double)4) );
 
 	for(int g=4;g<10;g++){
-	    sumProbHeter = oplusInitnatl( sumProbHeter , vectorGenoResults[i]->ll[ genoPriority[g] ]+logl( ( 1/( (long double)6))) );
+	    sumProbHeter = oplusInitnatl( sumProbHeter , vectorGenoResults[i]->ll[ genoPriority[g] ] );//+logl( ( 1/( (long double)6))) );
 
 	    if( mostLikeHetero  < vectorGenoResults[i]->ll[ genoPriority[g] ]){
 		mostLikeHetero  = vectorGenoResults[i]->ll[ genoPriority[g] ];
 	    }
 
 	}
+	sumProbHeter = sumProbHeter + logl( ((long double)1)/((long double)6) );
 	//  = oplusnatl( vectorGenoResults[i]->rrll , vectorGenoResults[i]->aall );
 	// long double sumProbHeter = oplusnatl( vectorGenoResults[i]->rall , vectorGenoResults[i]->rall );//twice
 	
@@ -2142,36 +2154,38 @@ int main (int argc, char *argv[]) {
 
 	//confidence=1-expl(confidence);
 	long double covCorrect = (logl(2)) * vectorGenoResults[i]->cov; //multiply by 2 = log(2)
-	long double sumProbHoHe;
+	long double sumProbHoHe = oplusnatl( sumProbHomoz,sumProbHeter);
 	long double lqual=-1.0*numeric_limits<long double>::infinity();
+
 	if(mostLikeHomozy>mostLikeHetero){//if is homozygous, check if scaling the het changes
-	    long double mostLikeHeteroC         = MIN( mostLikeHetero+covCorrect , mostLikeHomozy);//takes care of coverage =1,2
-	    sumProbHoHe                         = oplusnatl( mostLikeHomozy,mostLikeHeteroC);
-	    vectorGenoResults[i]->expectedH     = expl(  mostLikeHeteroC - sumProbHoHe );
+	    // long double mostLikeHeteroC         = MIN( mostLikeHetero+covCorrect , mostLikeHomozy);//takes care of coverage =1,2	   
 	    lqual                               = (mostLikeHetero-mostLikeHomozy)/1.0;
 	}else{//most likely is hetero
-	    sumProbHoHe                         = oplusnatl( mostLikeHomozy,mostLikeHetero);
-	    vectorGenoResults[i]->expectedH     = expl(  mostLikeHetero - sumProbHoHe );
-	    lqual                               = (mostLikeHomozy-mostLikeHetero)/2.0;
+	    
+	    //lqual                               = (mostLikeHomozy-mostLikeHetero)/2.0;
+	    lqual                               = (mostLikeHomozy-mostLikeHetero)/1.0;
+	    //lqual                               = (mostLikeHomozy-mostLikeHetero)/1.8;
 	}
+	vectorGenoResults[i]->expectedH     = expl(  sumProbHeter - sumProbHoHe );	
 
+	lqual = lqual*expl(vectorGenoResults[i]->llCov);
 	
 
 	//TODO check if covCorrect mitigates low cov problem
 	
 	
 	
-	//cout<<mostLikeHomozy<<"\t"<<mostLikeHetero<<"\t"<<sumProbHoHe<<"\t"<<vectorGenoResults[i]->cov<<"\t"<<covCorrect<<"\t"<<vectorGenoResults[i]->expectedH<<"\t"<<lqual<<"\t"<<vectorGenoResults[i]->lqual<<"\t"<<expl(vectorGenoResults[i]->llCov)<<"\t"<<vectorGenoResults[i]->probAccurate<<endl;
+	cout<<i<<"\t"<<mostLikeHomozy<<"\t"<<mostLikeHetero<<"\t"<<sumProbHomoz<<"\t"<<sumProbHeter<<"\t"<<sumProbHoHe<<"\t"<<vectorGenoResults[i]->cov<<"\t"<<covCorrect<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\t"<<lqual<<"\t"<<vectorGenoResults[i]->lqual<<"\t"<<expl(vectorGenoResults[i]->llCov)<<"\t"<<vectorGenoResults[i]->probAccurate<<endl;
 	vectorGenoResults[i]->probAccurate =  (  (1.0-expl(vectorGenoResults[i]->lqual) ) );//* expl(vectorGenoResults[i]->llCov)  );
 	//cout<<vectorGenoResults[i]->lqual <<"\t"<< randomLog<<endl;
 
-	if( lqual < randomLog){
-	    vectorGenoResultsT.push_back( vectorGenoResults[i] );
-	} else {
-	     delete vectorGenoResults[i];
-	}
+	//	if( lqual < randomLog){
+	vectorGenoResultsT.push_back( vectorGenoResults[i] );
+	// } else {
+	//     delete vectorGenoResults[i];
+	// }
 	//scale for coverage 2xhomo
-
+	//cout<<"passed"<<endl;
 	
 	
 	//cout<<fixed<<i<<"\th="<<vectorGenoResults[i]->expectedH<<"\t"<<"\t"<<sumProbHomoz<<"\t"<<sumProbAll<<"\thom\t"<<sumProbHomoz<<"\tHet\t"<<sumProbHeter<<endl;
@@ -2182,7 +2196,7 @@ int main (int argc, char *argv[]) {
 
     }
 
-
+    return 1;
 
     vectorGenoResults = vectorGenoResultsT;
     // for(unsigned int i=0;i<vectorGenoResults.size();i++){
@@ -2247,7 +2261,7 @@ int main (int argc, char *argv[]) {
 	
     // 	cout<<mostLikeHomozy<<"\t"<<mostLikeHetero<<"\t"<<sumProbHoHe<<"\t"<<vectorGenoResults[i]->cov<<"\t"<<covCorrect<<"\t"<<vectorGenoResults[i]->expectedH<<"\t"<<lqual<<"\t"<<vectorGenoResults[i]->lqual<<"\t"<<expl(vectorGenoResults[i]->llCov)<<"\t"<<vectorGenoResults[i]->probAccurate<<endl;
     // }
-    //return 1;
+
 
 #ifdef DEBUGHCOMPUTE
     long double h         = 1/ (long double)(randomInt(1000,20000));

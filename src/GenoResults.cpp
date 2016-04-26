@@ -36,13 +36,13 @@ GenoResults::GenoResults(const string lineToAdd){
 	cov+=destringify<int>(tokensS[2+n]);
     }
    
-    if(tokensS[6+0] == "0/0"){
+    if(         tokensS[6+0] == "0/0"){
 	geno=0;
     }else{
-	if(tokensS[6+0] == "0/1"){
+	if(     tokensS[6+0] == "0/1"){
 	    geno=1;
 	}else{
-	    if(tokensS[6+0] == "1/1"){
+	    if( tokensS[6+0] == "1/1"){
 		geno=2;
 	    }else{
 		cerr<<"Cannot convert line "<<lineToAdd<<" into a GenoResults object, wrong genotype:"<<tokensS[6+0]<<endl;
