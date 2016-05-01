@@ -1,10 +1,10 @@
 
 CXX      = g++ -g
-LIBGAB   = /home/gabriel/lib/libgab/
+LIBGAB   = ../lib/libgab/
 
-CXXFLAGS = -Wall -lm -O3 -lz -I${LIBGAB} -I${LIBGAB}/gzstream/ -I../bamtools/include/ -I../bamtools/src/  -c
+CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c
 LDFLAGS  = -lz  -lpthread 
-LDLIBS   = ../bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../bamtools/lib/libbamtools.a
+LDLIBS   = ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../lib/bamtools/lib/libbamtools.a
 
 
 all: testComp testCompCont rohan refPlusSegToGeno sitesPlusGeno
@@ -16,39 +16,49 @@ all: testComp testCompCont rohan refPlusSegToGeno sitesPlusGeno
 testComp.o:	testComp.cpp
 	${CXX} ${CXXFLAGS} testComp.cpp
 
-testComp:	testComp.o ${LIBGAB}utils.o  
+testComp:	testComp.o ../lib/libgab/utils.o  
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 testCompCont.o:	testCompCont.cpp
 	${CXX} ${CXXFLAGS} testCompCont.cpp
 
-testCompCont:	testCompCont.o ${LIBGAB}utils.o  
+testCompCont:	testCompCont.o ../lib/libgab/utils.o  
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 refPlusSegToGeno.o:	refPlusSegToGeno.cpp
 	${CXX} ${CXXFLAGS} refPlusSegToGeno.cpp
 
-refPlusSegToGeno:	refPlusSegToGeno.o ${LIBGAB}utils.o   ${LIBGAB}gzstream/libgzstream.a
+refPlusSegToGeno:	refPlusSegToGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 sitesPlusGeno.o:	sitesPlusGeno.cpp
 	${CXX} ${CXXFLAGS} sitesPlusGeno.cpp
 
-sitesPlusGeno:	sitesPlusGeno.o ${LIBGAB}utils.o   ${LIBGAB}gzstream/libgzstream.a
+sitesPlusGeno:	sitesPlusGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 rohan.o:     rohan.cpp
 	${CXX} ${CXXFLAGS} rohan.cpp
 
-rohan:       rohan.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o ../bamtools/lib/libbamtools.a GenomicWindows.o GenomicRange.o ../bamtools/lib/libbamtools.a ${LIBGAB}FastQObj.o ${LIBGAB}FastQParser.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a 
+rohan:       rohan.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o ../lib/bamtools/lib/libbamtools.a GenomicWindows.o GenomicRange.o ../lib/bamtools/lib/libbamtools.a ../lib/libgab/FastQObj.o ../lib/libgab/FastQParser.o ../lib/libgab/utils.o  ../lib/libgab/gzstream/libgzstream.a 
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-../bamtools/src/api/BamAlignment.h:
-	rm -rf ../bamtools/
-	git clone --recursive https://github.com/pezmaster31/bamtools.git ../
+../lib/libgab/utils.h:
+	rm -rfv ../lib/libgab/
+	mkdir ../lib/libgab/
+	git clone --recursive https://github.com/grenaud/libgab.git ../lib/libgab/
 
-../bamtools/lib/libbamtools.a: ../bamtools/src/api/BamAlignment.h
-	cd ../bamtools/ && mkdir -p build/  && cd build/ && cmake .. && make && cd ../..
+
+../lib/libgab/utils.o: ../lib/bamtools/lib/libbamtools.a  ../lib/libgab/utils.h
+	make -C ../lib/libgab/
+
+../lib/bamtools/src/api/BamAlignment.h:
+	rm -rf ../lib/bamtools/
+	mkdir ../lib/bamtools/
+	git clone --recursive https://github.com/pezmaster31/bamtools.git ../lib/bamtools/
+
+../lib/bamtools/lib/libbamtools.a: ../lib/bamtools/src/api/BamAlignment.h
+	cd ../lib/bamtools/ && mkdir -p build/  && cd build/ && cmake .. && make && cd ../..
 
 clean :
 	rm -f testComp.o testComp testCompCont.o testCompCont refPlusSegToGeno.o refPlusSegToGeno sitesPlusGeno.o sitesPlusGeno testPrior.o testPrior rohan.o rohan
