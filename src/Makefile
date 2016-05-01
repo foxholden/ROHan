@@ -9,36 +9,23 @@ LDLIBS   = ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o 
 
 all: testComp testCompCont rohan refPlusSegToGeno sitesPlusGeno
 
-%.o: %.cpp
+%.o: %.cpp ../lib/libgab/utils.o  
 	${CXX} ${CXXFLAGS} $^ -o $@
 
 
-testComp.o:	testComp.cpp
-	${CXX} ${CXXFLAGS} testComp.cpp
-
-testComp:	testComp.o ../lib/libgab/utils.o  
+testComp:	testComp.o 
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-testCompCont.o:	testCompCont.cpp
-	${CXX} ${CXXFLAGS} testCompCont.cpp
 
 testCompCont:	testCompCont.o ../lib/libgab/utils.o  
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-refPlusSegToGeno.o:	refPlusSegToGeno.cpp
-	${CXX} ${CXXFLAGS} refPlusSegToGeno.cpp
 
 refPlusSegToGeno:	refPlusSegToGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-sitesPlusGeno.o:	sitesPlusGeno.cpp
-	${CXX} ${CXXFLAGS} sitesPlusGeno.cpp
-
 sitesPlusGeno:	sitesPlusGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
-
-rohan.o:     rohan.cpp
-	${CXX} ${CXXFLAGS} rohan.cpp
 
 rohan:       rohan.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o ../lib/bamtools/lib/libbamtools.a GenomicWindows.o GenomicRange.o ../lib/bamtools/lib/libbamtools.a ../lib/libgab/FastQObj.o ../lib/libgab/FastQParser.o ../lib/libgab/utils.o  ../lib/libgab/gzstream/libgzstream.a 
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
