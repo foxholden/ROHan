@@ -163,6 +163,11 @@ map<unsigned int, int>       threadID2Rank;
 // } computeLLRes;
 
 
+//! A method to compute the pdf of poisson dist.
+/*!
+  This method computes the probability density function for a poisson dist.
+*/
+
 long double pdfPoisson(const long double l,const long double k ) {
     return expl(k*logl(l)-lgammal(k+1.0)-l);
 }
@@ -191,23 +196,6 @@ void initScores(){
     genoPriority[8] = 6;
     genoPriority[9] = 8;
 
-// long double likeMatchMap        [MAXMAPPINGQUAL];
-// long double likeMismatchMap     [MAXMAPPINGQUAL];
-
-// long double likeMatchProbMap    [MAXMAPPINGQUAL];
-// long double likeMismatchProbMap [MAXMAPPINGQUAL];
-
-//TODO
-    //Computing for quality scores 2 and up
-
-    
-    // for(int i=0;i<2;i++){
-    //     likeMatch[i]          = log1pl(    -1.0 );          
-    //     likeMismatch[i]       = logl  (     1.0 );
-
-    //     likeMatchProb[i]              =       0;
-    //     likeMismatchProb[i]           =     1.0;
-    // }
 
     for(int i=0;i<2;i++){
         likeMatch[i]          = log1pl(    -randomPMatch4Bases );          
@@ -254,6 +242,12 @@ void initScores(){
 
 
 
+//! A method to compute the prob. of seeing an observed base given an original allele
+/*!
+  This method is called by the computeLL to compute the prob. of seeing observed base ob 
+  with error rate q, a of deamination probDeam and original allele al. This method is called 
+  for each base.
+*/
 inline long double computeBaseAl2Obs(const int al,
 				     const int ob,
 				     const int q,
@@ -267,16 +261,6 @@ inline long double computeBaseAl2Obs(const int al,
     }else{
 	dinucal2al =                   al*4+               al;       //genotype is 1, observed is obsBase
     }
-
-    // //TO REMOVE
-    // if(dinucal2al<0){
-    // 	cerr<<"1 "<<al<<"\t"<<al<<endl;
-    // 	exit(1);
-    // }
-    // if(dinucal2al>=16){
-    // 	cerr<<"2 "<<al<<"\t"<<al<<endl;
-    // 	exit(1);
-    // }
 
     if(probDeam->s[dinucal2al] == 1.0){ //simple case, no deamination
 	int dinucIndexal2ob;
@@ -308,7 +292,6 @@ inline long double computeBaseAl2Obs(const int al,
 		dinucal2ald =                   al*4+               alpostdeam;       //genotype is 1, observed is obsBase
 	    }
 	    
-	    //cout<<endl<<"al="<<"ACGT"[al]<<" deam="<<"ACGT"[alpostdeam]<<" ob="<<"ACGT"[ob]<<" "<<dinucal2ald<<" "<<probDeam->s[dinucal2ald]<<endl;
 
 	    if(probDeam->s[dinucal2ald] > 0.0){ //has deamination       	
 		int dinucald2ob = -1;
@@ -323,8 +306,8 @@ inline long double computeBaseAl2Obs(const int al,
 										    + 
 										    likeMismatchProb[ q ]*illuminaErrorsProb.s[dinucald2ob] 
 										    )
-							     +
-							     mismappingProb*randomPMatch4Bases);
+							      +
+							      mismappingProb*randomPMatch4Bases);
 	    }
 	}
 
@@ -334,6 +317,13 @@ inline long double computeBaseAl2Obs(const int al,
     return -1;
 }//end computeBaseAl2Obs
 
+
+
+//! A method to compute the prob. of seeing observed ob for a given genotype al1Current and al1Current
+/*!
+  This method is called by class heteroComputerVisitor : public PileupVisitor, computes the probability of
+  observing the set of bases obsBase with qualities obsQual. 
+*/
 inline long double computeLL(const int                           al1Current    ,
 			     const int                           al2Current    ,		      
 			     const vector<int>                 & obsBase       ,
@@ -361,25 +351,7 @@ inline long double computeLL(const int                           al1Current    ,
 #ifdef DEBUGCOMPUTELL
 	cout<<i<<"\tob="<<obsBase[i]<<"\ta1="<<al1Current<<"\ta2="<<al2Current<<"\talc"<<alCCurrent<<endl;
 #endif
-	// int dinucIndex1toObs;
-	// int dinucIndex2toObs;
-	// int dinucContamtoObs;
 
-
-	// if( isRev[i] ){		    //                    
-	//     dinucIndex1toObs =     complementInt(al1Current)*4+complementInt(obsBase[i]);     //genotype is 1, observed is obsBase
-	//     dinucIndex2toObs =     complementInt(al2Current)*4+complementInt(obsBase[i]);     //genotype is 2, observed is obsBase
-	//     dinucContamtoObs =     complementInt(alCCurrent)*4+complementInt(obsBase[i]);     //genotype is alCCurrent, observed is obsBase
-	// }else{
-	//     dinucIndex1toObs =     al1Current               *4+              obsBase[i];       //genotype is 1, observed is obsBase
-	//     dinucIndex2toObs =     al2Current               *4+              obsBase[i];       //genotype is 2, observed is obsBase
-	//     dinucContamtoObs =     alCCurrent               *4+              obsBase[i];       //genotype is alCCurrent, observed is obsBase
-	// }
-                                                                         
-	// long double probSubDeam1toObs              = probDeam[i]->s[dinucIndex1toObs];
-	// long double probSubDeam2toObs              = probDeam[i]->s[dinucIndex2toObs];
-
-	//contaminant
 
 	llikC = computeBaseAl2Obs(alCCurrent  ,
 				  obsBase[i]  ,
@@ -388,28 +360,10 @@ inline long double computeLL(const int                           al1Current    ,
 				  isRev[i]    ,
 				  mismappingProb[i]);
 	
-	// if(obsBase[i] == alCCurrent){
-	//     llikC    =      (1.0-mismappingProb[i])*(
-	// 					     likeMatchProb[   obsQual[i]]*(1.0) 
-	// 					     + 
-	// 					     likeMismatchProb[obsQual[i]]*0.0//cannot match if a seq error has occurred
-	// 					     )+mismappingProb[i]*randomPMatch4Bases;
-	// }else{
-	//     llikC    =      (1.0-mismappingProb[i])*(
-	// 					     likeMatchProb[   obsQual[i]]*(0.0) //should match if seq error hasn't occurred
-	// 					     + 
-	// 					     likeMismatchProb[obsQual[i]]*illuminaErrorsProb.s[dinucContamtoObs]
-	// 					     )+mismappingProb[i]*randomPMatch4Bases;
-	// }
+
 
 
 	
-	// const vector<bool>                & isRev         ,//false = plus strand, true = reverse		      
-	//     const long double                   contRate      ,
-	//     const int                           alCCurrent ,
-	//     const vector<long double>         & mismappingProb
-
-
 	long double llikAl1t=0;
 	long double llikAl2t=0;
 	
@@ -424,19 +378,6 @@ inline long double computeLL(const int                           al1Current    ,
 				     isRev[i]     ,
 				     mismappingProb[i]);
 
-	//if(obsBase[i] == al1Current){ //matches al1Current
-	// llikAl1t =     (1.0-mismappingProb[i])*(
-	// 					likeMatchProb[obsQual[i]]    * ( probSubDeam1toObs )  
-	// 					+ 
-	// 					likeMismatchProb[obsQual[i]] * illuminaErrorsProb.s[dinucIndex1toObs]
-	// 					)+mismappingProb[i]*randomPMatch4Bases;
-	// }else{ //does not match al1Current but matches al2Current
-	//     llikAl1t =     (1.0-mismappingProb[i])*(
-	// 					    likeMatchProb[obsQual[i]]    * ( probSubDeam1toObs)  
-	// 					    + 
-	// 					    likeMismatchProb[obsQual[i]] * randomPMatch4Bases
-	// 					    )+mismappingProb[i]*randomPMatch4Bases;
-	// }
 
 
 	llikAl2t = computeBaseAl2Obs(al2Current   ,
@@ -446,19 +387,7 @@ inline long double computeLL(const int                           al1Current    ,
 				     isRev[i]     ,
 				     mismappingProb[i]);
 
-	//if(obsBase[i] == al2Current){ //matches al2Current
-	// llikAl2t =     (1.0-mismappingProb[i])*(
-	// 					likeMatchProb[obsQual[i]]    * ( probSubDeam2toObs )  
-	// 					+ 
-	// 					likeMismatchProb[obsQual[i]] * illuminaErrorsProb.s[dinucIndex1toObs]
-	// 					)+mismappingProb[i]*randomPMatch4Bases;
-	// }else{ //does not match al2Current but matches al1Current
-	// 	    llikAl2t =     (1.0-mismappingProb[i])*(
-	// 						    likeMatchProb[obsQual[i]]*(    probSubDeam2toObs)  
-	// 						    + 
-	// 						    likeMismatchProb[obsQual[i]]*randomPMatch4Bases
-	// 						    )+mismappingProb[i]*randomPMatch4Bases;
-	// 	}
+
 
 #ifdef DEBUGCOMPUTELL
 	// cout<<i<<"\tdeam1to2="<<(probSubDeam1toObs)<<endl;
@@ -471,20 +400,7 @@ inline long double computeLL(const int                           al1Current    ,
 
 	long double llikTE   = (llikAl1t + llikAl2t)/2.0 ;   //endogenous likelihood  0.5*al1 + 0.5*al2
 
-	//BEGIN ADDED March 26th
-	//TODO: why doesn't the binomial take care of this: ref_1	1178	G	C	17	1	0/1	-10.537	-9.63209	-129.881	0.904954	-3.30618	
-	//TODO maybe multiply prob by 0.5 for het
-	//Why does the 1 for het and 0.5 for homo work better at high coverage but not at low?
-	// if(al1Current == al2Current){//homozygous
-	//     llikTE  = llikAl1t;    //pick the 1st as they are equal
-	// }else{
-	//     if(llikAl1t>llikAl2t){
-	// 	llikTE  = llikAl1t;//pick the 1st as it is more likely
-	//     }else{
-	// 	llikTE  = llikAl2t;//pick the 2nd as it is more likely
-	//     }
-	// }
-	//END ADDED March 26th
+
 
 	long double llikT   = (1.0-contRate)*(  llikTE ) + (contRate)*llikC  ;	
 	llik               += logl(llikT);
@@ -495,15 +411,14 @@ inline long double computeLL(const int                           al1Current    ,
 #ifdef DEBUGCOMPUTELL
 	cout<<i<<"\tLLa1="<<llikAl1t <<"\tLLa2="<<llikAl2t<<"\tLLC="<<llikC<<"\tLLE="<<llikTE<<"\tLLT="<<llikT<<"\tlogLLT="<<logl(llikT)<<endl;
 #endif
-	// llik1+=logl( llikAl1t );
-	// llik2+=logl( llikAl2t );
+
     }
 	//cout<<"CC\t"<<llikCC<<"\t"<<llikCC1<<"\t"<<llikCC2<<endl;    
 #ifdef DEBUGCOMPUTELL
     cout<<"ll1="<<llik1<<"\tll2="<<llik2<<"\tp1="<<expl(llik1)<<"\tp2="<<expl(llik2)<<endl;
 #endif
 
-
+    //BEGIN BINOMIAL COEFFICIENT
     long double expal1  = ((long double)(obsBase.size())) * ( expl(llik1) / expl(oplusnatl(llik1,llik2))) ;
     int expal_f = floorl(expal1);
     int expal_c =  ceill(expal1);
@@ -513,7 +428,7 @@ inline long double computeLL(const int                           al1Current    ,
 
     long double expal_fr = 1-(expal1-expal_f);
     long double expal_cr = 1-(expal_c-expal1);
-
+    //END BINOMIAL COEFFICIENT
     // if(expal_f == expal_c){
     // 	expal_fr = 1.0;
     // 	expal_cr = 0.0;
@@ -953,9 +868,10 @@ public:
        // 	   }
        // }
 
-      prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)/pdfRateForPoissonCov );
+	//prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)/pdfRateForPoissonCov );
+	prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)  );
 
-      m_dataToWriteOut->push_back(prToAdd);
+	m_dataToWriteOut->push_back(prToAdd);
        
     }//end Visit()
     
@@ -2099,6 +2015,9 @@ int main (int argc, char *argv[]) {
 
     }
 
+    //THORFINN: END OF GENOTYPE LIKELIHOOD COMPUTATIONS
+
+
     //    return 1;
     //////////////////////////////////
     //                              //
@@ -2168,15 +2087,18 @@ int main (int argc, char *argv[]) {
 	}
 	vectorGenoResults[i]->expectedH     = expl(  sumProbHeter - sumProbHoHe );	
 
-	lqual = lqual*expl(vectorGenoResults[i]->llCov);
+	//lqual = lqual*expl(vectorGenoResults[i]->llCov);
 	
 
 	//TODO check if covCorrect mitigates low cov problem
 	
 	
+	//vectorGenoResults[i]->probAccurate =  (  (1.0-expl(vectorGenoResults[i]->lqual) ) ) * ( expl(vectorGenoResults[i]->llCov)  );	
+	//vectorGenoResults[i]->probAccurate =  1.0-expl( (  lqual ) * ( expl(vectorGenoResults[i]->llCov)  ) );
+	vectorGenoResults[i]->probAccurate =  1.0-expl(  lqual ) ;
 	
-	cout<<i<<"\t"<<mostLikeHomozy<<"\t"<<mostLikeHetero<<"\t"<<sumProbHomoz<<"\t"<<sumProbHeter<<"\t"<<sumProbHoHe<<"\t"<<vectorGenoResults[i]->cov<<"\t"<<covCorrect<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\t"<<lqual<<"\t"<<vectorGenoResults[i]->lqual<<"\t"<<expl(vectorGenoResults[i]->llCov)<<"\t"<<vectorGenoResults[i]->probAccurate<<endl;
-	vectorGenoResults[i]->probAccurate =  (  (1.0-expl(vectorGenoResults[i]->lqual) ) );//* expl(vectorGenoResults[i]->llCov)  );
+	//cout<<i<<"\t"<<mostLikeHomozy<<"\t"<<mostLikeHetero<<"\t"<<sumProbHomoz<<"\t"<<sumProbHeter<<"\t"<<sumProbHoHe<<"\t"<<vectorGenoResults[i]->cov<<"\t"<<covCorrect<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\t"<<lqual<<"\t"<<vectorGenoResults[i]->lqual<<"\t"<<expl(vectorGenoResults[i]->llCov)<<"\t"<<vectorGenoResults[i]->probAccurate<<endl;
+
 	//cout<<vectorGenoResults[i]->lqual <<"\t"<< randomLog<<endl;
 
 	//	if( lqual < randomLog){
@@ -2196,7 +2118,7 @@ int main (int argc, char *argv[]) {
 
     }
 
-    return 1;
+    //return 1;
 
     vectorGenoResults = vectorGenoResultsT;
     // for(unsigned int i=0;i<vectorGenoResults.size();i++){
@@ -2309,17 +2231,17 @@ int main (int argc, char *argv[]) {
 	    
 	    long double pcorrect=MAX((vectorGenoResults[i]->probAccurate),probNull);
 	    
-	    llT  = logl( pcorrect
-			 *
-			 ( (1-h )*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-			 +
-			 (1-pcorrect)*
-			 ( (1-hW)*(1-vectorGenoResults[i]->expectedH) + hW*vectorGenoResults[i]->expectedH )
-			 );
+	    llT  = expl(vectorGenoResults[i]->llCov)*logl( pcorrect
+							   *
+							   ( (1-h )*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
+							   +
+							   (1-pcorrect)*
+							   ( (1-hW)*(1-vectorGenoResults[i]->expectedH) + hW*vectorGenoResults[i]->expectedH )
+							   );
 
 	    
     	    llTP = 
-	    	(  pcorrect*(2.0*vectorGenoResults[i]->expectedH-1) )
+	    	expl(vectorGenoResults[i]->llCov)*(  pcorrect*(2.0*vectorGenoResults[i]->expectedH-1) )
 	    	/
 	    	( pcorrect
 	    	  *
@@ -2331,7 +2253,7 @@ int main (int argc, char *argv[]) {
 
 
     	    llTPP = -1.0*
-	    	(  powl( pcorrect,2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
+	    	expl(vectorGenoResults[i]->llCov)*(  powl( pcorrect,2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
 	    	/
 	    	powl( 
 		     pcorrect
@@ -2347,7 +2269,7 @@ int main (int argc, char *argv[]) {
 	    llTW  = llT;
 	    
     	    llTPW = 
-	    	(  (1-pcorrect)*(2.0*vectorGenoResults[i]->expectedH-1) )
+	    	expl(vectorGenoResults[i]->llCov)*(  (1-pcorrect)*(2.0*vectorGenoResults[i]->expectedH-1) )
 	    	/
 	    	( pcorrect
 	    	  *
@@ -2359,7 +2281,7 @@ int main (int argc, char *argv[]) {
 
 
     	    llTPPW = -1.0*
-	    	(  powl( 1-pcorrect,2.0) * powl( (2.0*vectorGenoResults[i]->expectedH-1),2.0 ) )
+	    	expl(vectorGenoResults[i]->llCov)*(  powl( 1-pcorrect,2.0) * powl( (2.0*vectorGenoResults[i]->expectedH-1),2.0 ) )
 	    	/
 	    	powl( 
 		     pcorrect
