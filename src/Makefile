@@ -7,11 +7,10 @@ LDFLAGS  = -lz  -lpthread
 LDLIBS   = ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../lib/bamtools/lib/libbamtools.a
 
 
-all: testComp testCompCont rohan refPlusSegToGeno sitesPlusGeno
+all: testComp testCompCont rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof
 
 %.o: %.cpp ../lib/libgab/utils.o  
 	${CXX} ${CXXFLAGS} $^ -o $@
-
 
 testComp:	testComp.o 
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
@@ -35,6 +34,14 @@ rohan:       rohan.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o mi
 	mkdir ../lib/libgab/
 	git clone --recursive https://github.com/grenaud/libgab.git ../lib/libgab/
 
+ref2DNAprof.o:	ref2DNAprof.cpp
+	${CXX} ${CXXFLAGS} ref2DNAprof.cpp
+
+
+ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
+	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+
 
 ../lib/libgab/utils.o: ../lib/bamtools/lib/libbamtools.a  ../lib/libgab/utils.h
 	make -C ../lib/libgab/
@@ -48,5 +55,6 @@ rohan:       rohan.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o mi
 	cd ../lib/bamtools/ && mkdir -p build/  && cd build/ && cmake .. && make && cd ../..
 
 clean :
-	rm -f testComp.o testComp testCompCont.o testCompCont refPlusSegToGeno.o refPlusSegToGeno sitesPlusGeno.o sitesPlusGeno testPrior.o testPrior rohan.o rohan
+	rm -f testComp.o testComp testCompCont.o testCompCont refPlusSegToGeno.o refPlusSegToGeno sitesPlusGeno.o sitesPlusGeno testPrior.o testPrior rohan.o rohan ref2DNAprof.o ref2DNAprof
+
 
