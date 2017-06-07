@@ -68,6 +68,11 @@ vector<probSubstition> sub3p;
 probSubstition defaultSubMatch;
 probSubstition illuminaErrorsProb;
 
+alleleFrequency dnaDefaultBases;
+vector<alleleFrequency> defaultDNA5p;
+vector<alleleFrequency> defaultDNA3p;
+
+
 long double contrate=0.0;
 long double rateForPoissonCov;
 long double pdfRateForPoissonCov;
@@ -1356,6 +1361,7 @@ int main (int argc, char *argv[]) {
     string deam5pfreqE  = getFullPath(cwdProg+"../deaminationProfile/none.prof");
     string deam3pfreqE  = getFullPath(cwdProg+"../deaminationProfile/none.prof");
     string illuminafreq = getFullPath(cwdProg+"../illuminaProf/null.prof");
+    string dnafreqFile  = getFullPath(cwdProg+"../DNAprof/default_30_20_20_30.freq");
 
     // cout<<deam5pfreqE<<endl;
     // cout<<deam3pfreqE<<endl;
@@ -1414,6 +1420,8 @@ int main (int argc, char *argv[]) {
                               // "\t\t"+"-deam5pc [.prof file]" +"\t\t"+"5p deamination frequency for the contaminant (default: "+deam5pfreqC+")"+"\n"+
                               // "\t\t"+"-deam3pc [.prof file]" +"\t\t"+"3p deamination frequency for the contaminant (default: "+deam3pfreqC+")"+"\n"+			      
 			      "\t\t"+""  +""+"--err\t\t\t"    +"[.prof file]"+"\t\t"    +" Illumina error profile (default: "+illuminafreq+")"+"\n"+
+			      "\t\t"+""  +""+"--base\t\t\t"   +"[.freq file]"+"\t\t"    +" Frequency of DNA bases in the genome (default: "+dnafreqFile+")"+"\n"+
+
                               "");
 
 
@@ -1501,11 +1509,18 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
-	if(string(argv[i]) == "-err"  ){
+	if(string(argv[i]) == "--err"  ){
 	    illuminafreq=string(argv[i+1]);
 	    i++;
 	    continue;
 	}
+	
+	if(string(argv[i]) == "--base"  ){
+	    dnafreqFile=string(argv[i+1]);
+	    i++;
+	    continue;
+	}
+
 
 	cerr<<"Error: unknown option "<<string(argv[i])<<endl;
 	return 1;
@@ -1526,11 +1541,11 @@ int main (int argc, char *argv[]) {
 	return 1;	
     }
 
-    if( contrate<0 || 
-	contrate>1 ){
-	cerr<<"The contamination rate must be between 0 and 1"<<endl;
-	return 1;	
-    }
+    // if( contrate<0 || 
+    // 	contrate>1 ){
+    // 	cerr<<"The contamination rate must be between 0 and 1"<<endl;
+    // 	return 1;	
+    // }
 
     if(outFileSiteLLFlag)
 	if( !strEndsWith(outFileSiteLL,".gz")){
@@ -1706,6 +1721,36 @@ int main (int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////////////////
     //
     // END  DEAMINATION PROFILE
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // BEGIN DNA BASE FREQUENCY
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+
+    readDNABaseFreq( dnafreqFile  ,  dnaDefaultBases );
+    cout<<dnaDefaultBases.f[0]<<endl;
+    cout<<dnaDefaultBases.f[1]<<endl;
+    cout<<dnaDefaultBases.f[2]<<endl;
+    cout<<dnaDefaultBases.f[3]<<endl;
+    for(unsigned int i=0;i<sub5p.size();i++){
+	//defaultDNA5p
+	alleleFrequency toadd;
+	for(int b=0;b<4;b++){
+	    
+	}
+	for(unsigned int i=0;i<sub5p.size();i++){
+    }
+    vector<alleleFrequency> defaultDNA5p;
+    vector<alleleFrequency> defaultDNA3p;
+    
+    return 1;
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // END DNA BASE FREQUENCY
     //
     ////////////////////////////////////////////////////////////////////////
 

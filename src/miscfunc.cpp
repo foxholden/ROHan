@@ -238,95 +238,125 @@ void readNucSubstitionRatesFreq(const string filename,vector<substitutionRates> 
 
 }
 
-
-void readMTConsensus(const string consensusFile,
-		     map<int, PHREDgeno> & pos2phredgeno,
-		     int & sizeGenome,
-		     vector<int> & posOfIndels){
-
+void readDNABaseFreq(const string filename, alleleFrequency & dnaDefaultFreq){
+    
+    igzstream           dnaProfFP;
+    vector<long double> fields;
+    
+    dnaProfFP.open(filename.c_str(), ios::in);
     string line;
-    igzstream consensusFD;
-    consensusFD.open(consensusFile.c_str());
-    if (consensusFD.good()){
-	getline (consensusFD,line);
+    if (dnaProfFP.good()){
+	//probs
 
-	while ( getline (consensusFD,line)){
-	    if (line.empty())
-		continue;
-
-	    vector<string> fields = allTokens(line,'\t');
-	    PHREDgeno toadd;
-	    // cerr<<line<<endl;
-
-
-	    if(fields.size() != 11){
-		cerr << "line "<<line<<"  in file  "<<consensusFile<<" does not have 11 fields"<<endl;
-		exit(1);
-	    }
-	    
-
-	    if(fields[0][fields[0].size()-1] == 'i'){ //skip insertion
-		posOfIndels.push_back( destringify<int>( fields[0]) );
-		continue;
-	    }
-
-	    if(fields[2] == "D"){ //skip deletions
-		posOfIndels.push_back( destringify<int>( fields[0]) );
-		continue;
-	    }	    
-
-	    toadd.consensus = fields[2][0];
-	    for(int nuc=0;nuc<4;nuc++){		
-		toadd.phred[nuc]  = destringify<double>(fields[nuc+7]);		
-		toadd.perror[nuc] = pow(10.0,toadd.phred[nuc]/(-10.0));		
-	    }
-
-	    pos2phredgeno[     destringify<int>( fields[0])   ] = toadd;
-	    sizeGenome =  max( destringify<int>( fields[0]), sizeGenome);
-	    // cout<<destringify<int>( fields[0])<<endl;
-	    
-	}
-	consensusFD.close();
-
+	while ( getline (dnaProfFP,line)){	   
+	    long double f = destringify<long double>(line);	    
+	    fields.push_back(f);
+	}	             	              
+	dnaProfFP.close();
     }else{
-	cerr << "Cannot open consensus file  "<<consensusFile<<""<<endl;
+	cerr << "Unable to open file "<<filename<<endl;
 	exit(1);
     }
+
+    if(fields.size() != 4){
+	cerr<<"File prof "<<filename<<" contains "<<fields.size()<<"lines, should be 4"<<endl;
+	exit(1);
+    }
+
+    for(unsigned int i=0;i<4;i++)
+	dnaDefaultFreq.f[i] = fields[i];
 
 
 }
 
-void readMTAlleleFreq(const string freqFile,	map<int, alleleFrequency> & pos2allelefreq){
-    // map<int, alleleFrequency> pos2allelefreq;
+// void readMTConsensus(const string consensusFile,
+// 		     map<int, PHREDgeno> & pos2phredgeno,
+// 		     int & sizeGenome,
+// 		     vector<int> & posOfIndels){
 
-    string line;
-    igzstream freqAlleleFile;
-    freqAlleleFile.open(freqFile.c_str());
-    if (freqAlleleFile.good()){
+//     string line;
+//     igzstream consensusFD;
+//     consensusFD.open(consensusFile.c_str());
+//     if (consensusFD.good()){
+// 	getline (consensusFD,line);
 
-	while ( getline (freqAlleleFile,line)){
+// 	while ( getline (consensusFD,line)){
+// 	    if (line.empty())
+// 		continue;
 
-	    vector<string> fields = allTokens(line,'\t');
-	    alleleFrequency freqToadd;
+// 	    vector<string> fields = allTokens(line,'\t');
+// 	    PHREDgeno toadd;
+// 	    // cerr<<line<<endl;
+
+
+// 	    if(fields.size() != 11){
+// 		cerr << "line "<<line<<"  in file  "<<consensusFile<<" does not have 11 fields"<<endl;
+// 		exit(1);
+// 	    }
 	    
-	    if(fields.size() != 5){
-		cerr << "line "<<line<<"  in file  "<<freqFile<<" does not have 5 fields"<<endl;
-		exit(1);
-	    }
+
+// 	    if(fields[0][fields[0].size()-1] == 'i'){ //skip insertion
+// 		posOfIndels.push_back( destringify<int>( fields[0]) );
+// 		continue;
+// 	    }
+
+// 	    if(fields[2] == "D"){ //skip deletions
+// 		posOfIndels.push_back( destringify<int>( fields[0]) );
+// 		continue;
+// 	    }	    
+
+// 	    toadd.consensus = fields[2][0];
+// 	    for(int nuc=0;nuc<4;nuc++){		
+// 		toadd.phred[nuc]  = destringify<double>(fields[nuc+7]);		
+// 		toadd.perror[nuc] = pow(10.0,toadd.phred[nuc]/(-10.0));		
+// 	    }
+
+// 	    pos2phredgeno[     destringify<int>( fields[0])   ] = toadd;
+// 	    sizeGenome =  max( destringify<int>( fields[0]), sizeGenome);
+// 	    // cout<<destringify<int>( fields[0])<<endl;
+	    
+// 	}
+// 	consensusFD.close();
+
+//     }else{
+// 	cerr << "Cannot open consensus file  "<<consensusFile<<""<<endl;
+// 	exit(1);
+//     }
+
+
+// }
+
+// void readMTAlleleFreq(const string freqFile,	map<int, alleleFrequency> & pos2allelefreq){
+//     // map<int, alleleFrequency> pos2allelefreq;
+
+//     string line;
+//     igzstream freqAlleleFile;
+//     freqAlleleFile.open(freqFile.c_str());
+//     if (freqAlleleFile.good()){
+
+// 	while ( getline (freqAlleleFile,line)){
+
+// 	    vector<string> fields = allTokens(line,'\t');
+// 	    alleleFrequency freqToadd;
+	    
+// 	    if(fields.size() != 5){
+// 		cerr << "line "<<line<<"  in file  "<<freqFile<<" does not have 5 fields"<<endl;
+// 		exit(1);
+// 	    }
 	   
 
-	    for(int nuc=0;nuc<4;nuc++){
-		freqToadd.f[nuc]=destringify<double>(fields[nuc+1]);
-	    }
+// 	    for(int nuc=0;nuc<4;nuc++){
+// 		freqToadd.f[nuc]=destringify<double>(fields[nuc+1]);
+// 	    }
 
-	    pos2allelefreq[ destringify<int>( fields[0])  ] = freqToadd;
+// 	    pos2allelefreq[ destringify<int>( fields[0])  ] = freqToadd;
 	    	    
-	}
-	freqAlleleFile.close();
+// 	}
+// 	freqAlleleFile.close();
 
-    }else{
-	cerr << "Cannot open allele frequency file  "<<freqFile<<""<<endl;
-	exit(1);
-    }
+//     }else{
+// 	cerr << "Cannot open allele frequency file  "<<freqFile<<""<<endl;
+// 	exit(1);
+//     }
 
-}
+// }

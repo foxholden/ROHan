@@ -181,10 +181,11 @@ typedef struct {
 
 void readNucSubstitionRatesFreq(const string filename,     vector<substitutionRates> & subVec);
 void readNucSubstitionFreq(     const string filename,     vector<probSubstition>    & subVec);
+void readDNABaseFreq(const string filename, alleleFrequency & dnaDefaultFreq);
 
 void readIlluminaError(const string errFile,probSubstition & illuminaErrorsProb);
-void readMTConsensus(const string consensusFile,map<int, PHREDgeno> & pos2phredgeno,int & sizeGenome,vector<int> & posOfIndels);
-void readMTAlleleFreq(const string freqFile,	map<int, alleleFrequency> & pos2allelefreq);
+/* void readMTConsensus(const string consensusFile,map<int, PHREDgeno> & pos2phredgeno,int & sizeGenome,vector<int> & posOfIndels); */
+/* void readMTAlleleFreq(const string freqFile,	map<int, alleleFrequency> & pos2allelefreq); */
 
 
 /* long double computeLL(const int                   al1Current    , */
