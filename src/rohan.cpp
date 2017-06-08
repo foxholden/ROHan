@@ -36,17 +36,23 @@ using namespace BamTools;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-//#define DEBUGHDEAM
-#define DEBUGHCOMPUTE
+#define DEBUGCOV
+//#define DEBUGILLUMINAFREQ
+//#define DEBUGINITSCORES
+//#define DEBUGDEFAULTFREQ
+//#define DEBUGDEAM
+//#define DEBUGHCOMPUTE
 //#define DEBUGCOMPUTELL
 //#define HETVERBOSE
 // #define COVERAGETVERBOSE
 #define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
-#define MAXMAPPINGQUAL 257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
-#define MAXCOV          50     // maximal coverage
+#define MAXLENGTHFRAGMENT 500     // maximal length for fragment
+#define MAXMAPPINGQUAL    257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
+#define MAXCOV             50     // maximal coverage
 
 char offsetQual=33;
+
 long double likeMatch        [MAXMAPPINGQUAL];
 long double likeMismatch     [MAXMAPPINGQUAL];
 
@@ -63,15 +69,20 @@ long double likeMismatchProbMap [MAXMAPPINGQUAL];
 vector< vector<long double> > binomVec (MAXCOV+1,vector<long double>(MAXCOV+1,0)) ;
 unsigned int totalBasesSum;
 unsigned int totalSitesSum;
+
+//Substitution rates due to deamination
 vector<probSubstition> sub5p;
 vector<probSubstition> sub3p;
 probSubstition defaultSubMatch;
 probSubstition illuminaErrorsProb;
 
+//default basepairs frequencies
 alleleFrequency dnaDefaultBases;
 vector<alleleFrequency> defaultDNA5p;
 vector<alleleFrequency> defaultDNA3p;
 
+
+vector<long double> cov2probPoisson;
 
 long double contrate=0.0;
 long double rateForPoissonCov;
@@ -128,7 +139,7 @@ int    timeThreadSleep =    10;
 int    timeSleepWrite  =    1;
 
 bool      readDataDone = false;
-unsigned int sizeChunk =  5000;
+unsigned int sizeChunk =  1000000;
 
 string                                                             bamFileToOpen;
 queue< DataChunk * >                                               queueDataToprocess;
@@ -168,14 +179,13 @@ map<unsigned int, int>       threadID2Rank;
 // } computeLLRes;
 
 
-//! A method to compute the pdf of poisson dist.
-/*!
-  This method computes the probability density function for a poisson dist.
-*/
-
-long double pdfPoisson(const long double l,const long double k ) {
-    return expl(k*logl(l)-lgammal(k+1.0)-l);
-}
+// //! A method to compute the pdf of poisson dist.
+// /*!
+//   This method computes the probability density function for a poisson dist.
+// */
+// long double pdfPoisson(const long double l,const long double k ) {
+//     return expl(k*logl(l)-lgammal(k+1.0)-l);
+// }
 
 
 //! A method to initialize various probability scores to avoid recomputation
@@ -235,8 +245,11 @@ void initScores(){
 	for(int j=0;j<=i;j++){	    
 	    binomVec[i][j] = ( logl(nChoosek(i,j))+logl(powl(0.5,i)) );	     
 	}
+
     }
-#ifdef debugInitscores
+
+#ifdef DEBUGINITSCORES
+    cout<<"q= "<<"QUAL"<<"\t"<<"likeMatch"<<"\t"<<"likeMismatch"<<"\t"<<"likeMatchProb"<<"\t"<<"likeMismatchProb"<<endl;
     for(int i=0;i<MAXMAPPINGQUAL;i++){
 	cout<<"q= "<<i<<"\t"<<likeMatch[i]<<"\t"<<likeMismatch[i]<<"\t"<<likeMatchProb[i]<<"\t"<<likeMismatchProb[i]<<endl;
     }
@@ -244,6 +257,219 @@ void initScores(){
 #endif
 
 }//end initScores
+
+
+
+
+
+//! A method to initialize the deamination probabilities
+/*!
+  This method is called by the main 
+*/
+void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE){
+
+
+    vector<substitutionRates> sub5pT;
+    vector<substitutionRates> sub3pT;
+
+    readNucSubstitionRatesFreq(deam5pfreqE,sub5pT);
+    readNucSubstitionRatesFreq(deam3pfreqE,sub3pT);;
+
+    //5'
+    for(unsigned int i=0;i<sub5pT.size();i++){
+	probSubstition toadd;
+	for(int nuc1=0;nuc1<4;nuc1++){
+	    double probIdentical=1.0;
+
+	    for(int nuc2=0;nuc2<4;nuc2++){
+		int nuc = nuc1*4+nuc2;
+		if(nuc1==nuc2) continue;
+		int ind2 = dimer2indexInt( nuc1,nuc2  );
+		probIdentical = probIdentical-sub5pT[i].s[ ind2 ];
+		toadd.s[nuc]  =               sub5pT[i].s[ ind2 ];
+	    }
+	    
+	    if(probIdentical<0){
+		cerr<<"Error with deamination profile, identity probability is less than 0"<<endl;
+		exit(1);
+	    }
+
+	    int nuc = nuc1*4+nuc1;
+	    toadd.s[nuc] = probIdentical;	    	    	    
+	}
+	sub5p.push_back(toadd);
+    }
+
+    //copying to the rest of the fragment the last position
+    for(unsigned int i=(sub5p.size()-1);i<MAXLENGTHFRAGMENT;i++){     
+	sub5p.push_back( sub5p[sub5p.size()-1] );
+    }
+    
+
+
+    //3'
+    for(unsigned int i=0;i<sub3pT.size();i++){
+	probSubstition toadd;
+	for(int nuc1=0;nuc1<4;nuc1++){
+	    double probIdentical=1.0;
+
+	    for(int nuc2=0;nuc2<4;nuc2++){
+		int nuc = nuc1*4+nuc2;
+		if(nuc1==nuc2) continue;
+		int ind2 = dimer2indexInt( nuc1,nuc2  );
+		probIdentical = probIdentical-sub3pT[i].s[ ind2 ];
+		toadd.s[nuc]  =               sub3pT[i].s[ ind2 ];
+	    }
+	    
+	    if(probIdentical<0){
+		cerr<<"Error with deamination profile, identity probability is less than 0"<<endl;
+		exit(1);
+	    }
+
+	    int nuc = nuc1*4+nuc1;
+	    toadd.s[nuc] = probIdentical;	    	    	    
+	}
+	sub3p.push_back(toadd);
+    }
+
+    //copying to the rest of the fragment the last position
+    for(unsigned int i=(sub3p.size()-1);i<MAXLENGTHFRAGMENT;i++){
+	sub3p.push_back( sub3p[sub3p.size()-1] );
+    }
+
+
+
+#ifdef DEBUGDEAM
+    cerr<<"-- 5' deamination rates --"<<endl;
+    for(unsigned int i=0;i<sub5p.size();i++){
+    	cerr<<"i="<<i<<" - ";
+    	for(int nuc1=0;nuc1<4;nuc1++){
+    	    for(int nuc2=0;nuc2<4;nuc2++){
+    		int nuc = nuc1*4+nuc2;
+    		//cout<<nuc1<<"\t"<<nuc2<<"\t"
+    		cerr<<sub5p[i].s[nuc]<<" ";
+    	    }
+    	    cerr<<" - ";
+    	}
+    	cerr<<endl;
+    }
+
+    cerr<<"-- 3' deamination rates --"<<endl;
+    for(unsigned int i=0;i<sub3p.size();i++){
+    	cerr<<"i="<<i<<" - ";
+    	for(int nuc1=0;nuc1<4;nuc1++){
+    	    for(int nuc2=0;nuc2<4;nuc2++){
+    		int nuc = nuc1*4+nuc2;
+    		//cout<<nuc1<<"\t"<<nuc2<<"\t"
+    		cerr<<sub3p[i].s[nuc]<<" ";
+    	    }
+    	    cerr<<" - ";
+    	}
+    	cerr<<endl;
+    }
+#endif
+
+
+
+
+    //if no deamination, cannot have a mismatch
+    for(int nuc1=0;nuc1<4;nuc1++){
+	for(int nuc2=0;nuc2<4;nuc2++){
+	    int nuc = nuc1*4+nuc2;
+	    if(nuc1==nuc2)
+		defaultSubMatch.s[ nuc ] = 1.0;	
+	    else
+		defaultSubMatch.s[ nuc ] = 0.0;	
+	}
+    }
+
+
+
+}//end initDeamProbabilities
+
+
+
+
+
+
+
+//! A method to initialize the probability of seeing a base if a fragment is mismapped
+/*!
+  This method is called by the main after reading the deamination profiles
+  as deamination will bias this.
+*/
+void initDefaultBaseFreq(const string & dnafreqFile){
+
+    readDNABaseFreq( dnafreqFile  ,  dnaDefaultBases );
+
+    for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
+	//defaultDNA5p
+	alleleFrequency dnaFreq5p_;
+	alleleFrequency dnaFreq3p_;
+
+	for(int b=0;b<4;b++){//original base
+	    dnaFreq5p_.f[b]=0;
+	    dnaFreq3p_.f[b]=0;
+	}
+
+	for(int b1=0;b1<4;b1++){//original base
+
+	    for(int b2=0;b2<4;b2++){
+		int b = b2*4+b1;
+		//cout<<"ACGT"[b1]<<"\t"<<"ACGT"[b2]<<"\t"<<b<<"\t"<<dnaDefaultBases.f[b1]<<"\t"<<sub5p[i].s[b]<<"\t"<<sub3p[i].s[b]<<endl;
+		dnaFreq5p_.f[b1] += dnaDefaultBases.f[b1]*sub5p[i].s[b];
+		dnaFreq3p_.f[b1] += dnaDefaultBases.f[b1]*sub3p[i].s[b];
+	    }
+	}
+	
+	defaultDNA5p.push_back(dnaFreq5p_);
+	defaultDNA3p.push_back(dnaFreq3p_);	
+    }
+
+#ifdef DEBUGDEFAULTFREQ
+
+    cerr<<"-- Defautl base frequencies --"<<endl;
+    cerr<<dnaDefaultBases.f[0]<<"\t"<<dnaDefaultBases.f[1]<<"\t"<<dnaDefaultBases.f[2]<<"\t"<<dnaDefaultBases.f[3]<<endl;
+
+    cerr<<"-- 5' base frequencies --"<<endl;
+
+    for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
+    	cerr<<"i="<<i<<" - ";
+	cerr<<defaultDNA5p[i].f[0]<<"\t"<<defaultDNA5p[i].f[1]<<"\t"<<defaultDNA5p[i].f[2]<<"\t"<<defaultDNA5p[i].f[3]<<endl;
+    }
+
+    cerr<<"-- 3' base frequencies --"<<endl;
+
+    for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
+    	cerr<<"i="<<i<<" - ";
+	cerr<<defaultDNA3p[i].f[0]<<"\t"<<defaultDNA3p[i].f[1]<<"\t"<<defaultDNA3p[i].f[2]<<"\t"<<defaultDNA3p[i].f[3]<<endl;
+    }
+
+
+#endif
+
+
+}//end initDeamProbabilities
+
+
+
+
+
+//! A method to initialize the likelihood of observing data to avoid recomputation
+/*!
+  This method is called by the main after calling initDefaultBaseFreq
+*/
+void initLikelihoodScores(){
+
+    //we need 4 theoretical bases X 4 observed bases X MAXMAPPINGQUAL mapping quality X MAXLENGTHFRAGMENT positions on the fragment X base quality
+
+    vector<diNucleotideProb> baseQualEffect;
+    for(int i=0;i<MAXMAPPINGQUAL;i++){
+	//we know the probability of P(b1->b2) after deamination is 
+    }
+    
+}
+
 
 
 
@@ -874,7 +1100,7 @@ public:
        // }
 
 	//prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)/pdfRateForPoissonCov );
-	prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)  );
+	//prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)  );
 
 	m_dataToWriteOut->push_back(prToAdd);
        
@@ -1140,7 +1366,7 @@ queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsa
 
 //TODO: GC bias for coverage?
 void *mainCoverageComputationThread(void * argc){
-    initScores();
+
     int   rc;
 #ifdef COVERAGETVERBOSE    
     int rankThread=0;
@@ -1341,16 +1567,6 @@ void *mainCoverageComputationThread(void * argc){
 int main (int argc, char *argv[]) {
     setlocale(LC_ALL, "POSIX");
 
-    ////////////////////////////////////
-    // BEGIN Initializing scores      //
-    ////////////////////////////////////
-    initScores();
-
-
-
-    ////////////////////////////////////
-    //    END Initializing scores     //
-    ////////////////////////////////////
 
 
     ////////////////////////////////////
@@ -1389,7 +1605,7 @@ int main (int argc, char *argv[]) {
     bool   genoFileAsInputFlag=false;
 
     
-    const string usage=string("\nThis program will do something beautiful\n\n\t"+
+    const string usage=string("\nThis program co-estimates heterozygosity rates and runs of homozygosity\n\n\t"+
                               string(argv[0])+                        
                               " [options] [fasta file] [bam file]  "+"\n\n"+
 			      "\twhere:\n"+
@@ -1541,11 +1757,6 @@ int main (int argc, char *argv[]) {
 	return 1;	
     }
 
-    // if( contrate<0 || 
-    // 	contrate>1 ){
-    // 	cerr<<"The contamination rate must be between 0 and 1"<<endl;
-    // 	return 1;	
-    // }
 
     if(outFileSiteLLFlag)
 	if( !strEndsWith(outFileSiteLL,".gz")){
@@ -1583,106 +1794,68 @@ int main (int argc, char *argv[]) {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ////////////////////////////////////
+    // BEGIN Initializing scores      //
+    ////////////////////////////////////
+    initScores();
+    ////////////////////////////////////
+    //    END Initializing scores     //
+    ////////////////////////////////////
+
+
+
+
        
+
+
+    ///////////////////////////////////////
+    // BEGIN read Illumina error profile //
+    ///////////////////////////////////////    
+
+
+    readIlluminaError(illuminafreq,illuminaErrorsProb);
+
+#ifdef DEBUGILLUMINAFREQ
+    for(unsigned int i=0;i<16;i++){
+    	cout<<i<<"\t"<<illuminaErrorsProb.s[i]<<endl;	
+    }
+    //return 1;
+#endif
+    ///////////////////////////////////////
+    // END read Illumina error profile //
+    ///////////////////////////////////////    
+
+
 
     ////////////////////////////////////////////////////////////////////////
     //
     // BEGIN DEAMINATION PROFILE
     //
     ////////////////////////////////////////////////////////////////////////
+    
 
-    readIlluminaError(illuminafreq,illuminaErrorsProb);
-
-    // for(unsigned int i=0;i<16;i++){
-    // 	cout<<i<<"\t"<<illuminaErrorsProb.s[i]<<endl;
-    // }
+    initDeamProbabilities(deam5pfreqE,deam3pfreqE);
+    
     // return 1;
-    vector<substitutionRates> sub5pT;
-    vector<substitutionRates> sub3pT;
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // END  DEAMINATION PROFILE
+    //
+    ////////////////////////////////////////////////////////////////////////
 
-    readNucSubstitionRatesFreq(deam5pfreqE,sub5pT);
-    readNucSubstitionRatesFreq(deam3pfreqE,sub3pT);;
-
-    //5'
-    for(unsigned int i=0;i<sub5pT.size();i++){
-	probSubstition toadd;
-	for(int nuc1=0;nuc1<4;nuc1++){
-	    double probIdentical=1.0;
-
-	    for(int nuc2=0;nuc2<4;nuc2++){
-		int nuc = nuc1*4+nuc2;
-		if(nuc1==nuc2) continue;
-		int ind2 = dimer2indexInt( nuc1,nuc2  );
-		probIdentical = probIdentical-sub5pT[i].s[ ind2 ];
-		toadd.s[nuc]  =               sub5pT[i].s[ ind2 ];
-	    }
-	    
-	    if(probIdentical<0){
-		cerr<<"Error with deamination profile, identity probability is less than 0"<<endl;
-		return 1;
-	    }
-
-	    int nuc = nuc1*4+nuc1;
-	    toadd.s[nuc] = probIdentical;	    	    	    
-	}
-	sub5p.push_back(toadd);
-    }
-
-
-    //3'
-    for(unsigned int i=0;i<sub3pT.size();i++){
-	probSubstition toadd;
-	for(int nuc1=0;nuc1<4;nuc1++){
-	    double probIdentical=1.0;
-
-	    for(int nuc2=0;nuc2<4;nuc2++){
-		int nuc = nuc1*4+nuc2;
-		if(nuc1==nuc2) continue;
-		int ind2 = dimer2indexInt( nuc1,nuc2  );
-		probIdentical = probIdentical-sub3pT[i].s[ ind2 ];
-		toadd.s[nuc]  =               sub3pT[i].s[ ind2 ];
-	    }
-	    
-	    if(probIdentical<0){
-		cerr<<"Error with deamination profile, identity probability is less than 0"<<endl;
-		return 1;
-	    }
-
-	    int nuc = nuc1*4+nuc1;
-	    toadd.s[nuc] = probIdentical;	    	    	    
-	}
-	sub3p.push_back(toadd);
-    }
-
-
-
-    // for(unsigned int i=0;i<sub3p.size();i++){
-    // 	cout<<"i="<<i<<" - ";
-    // 	for(int nuc1=0;nuc1<4;nuc1++){
-    // 	    for(int nuc2=0;nuc2<4;nuc2++){
-    // 		int nuc = nuc1*4+nuc2;
-    // 		//cout<<nuc1<<"\t"<<nuc2<<"\t"
-    // 		cout<<sub3p[i].s[nuc]<<" ";
-    // 	    }
-    // 	    cout<<" - ";
-    // 	}
-    // 	cout<<endl;
-    // }
-    // return 1;
-
-
-
-
-
-    for(int nuc1=0;nuc1<4;nuc1++){
-	for(int nuc2=0;nuc2<4;nuc2++){
-	    int nuc = nuc1*4+nuc2;
-	    if(nuc1==nuc2)
-		defaultSubMatch.s[ nuc ] = 1.0;	
-	    else
-		defaultSubMatch.s[ nuc ] = 0.0;	
-	}
-    }
 
 
     // for(int q=0;q<=63;q++){
@@ -1716,13 +1889,9 @@ int main (int argc, char *argv[]) {
     // 	cout<<"\t"<<sum<<endl;
 
     // }
-    
-    // return 1;
-    ////////////////////////////////////////////////////////////////////////
-    //
-    // END  DEAMINATION PROFILE
-    //
-    ////////////////////////////////////////////////////////////////////////
+
+
+
 
     ////////////////////////////////////////////////////////////////////////
     //
@@ -1730,24 +1899,10 @@ int main (int argc, char *argv[]) {
     //
     ////////////////////////////////////////////////////////////////////////
 
+    initDefaultBaseFreq(dnafreqFile);
 
-    readDNABaseFreq( dnafreqFile  ,  dnaDefaultBases );
-    cout<<dnaDefaultBases.f[0]<<endl;
-    cout<<dnaDefaultBases.f[1]<<endl;
-    cout<<dnaDefaultBases.f[2]<<endl;
-    cout<<dnaDefaultBases.f[3]<<endl;
-    for(unsigned int i=0;i<sub5p.size();i++){
-	//defaultDNA5p
-	alleleFrequency toadd;
-	for(int b=0;b<4;b++){
-	    
-	}
-	for(unsigned int i=0;i<sub5p.size();i++){
-    }
-    vector<alleleFrequency> defaultDNA5p;
-    vector<alleleFrequency> defaultDNA3p;
     
-    return 1;
+    //return 1;
     ////////////////////////////////////////////////////////////////////////
     //
     // END DNA BASE FREQUENCY
@@ -1757,6 +1912,37 @@ int main (int argc, char *argv[]) {
 
 
 
+    // alleleFrequency dnaDefaultBases;
+    // vector<alleleFrequency> defaultDNA5p;
+    // vector<alleleFrequency> defaultDNA3p;
+
+    // for(unsigned int i=0;i<sub5p.size();i++){
+    // 	//defaultDNA5p
+    // 	alleleFrequency toadd;
+    // 	for(int b=0;b<4;b++){
+	    
+    // 	}
+    // 	for(unsigned int i=0;i<sub5p.size();i++){
+    // 	}
+    // }
+    // vector<alleleFrequency> defaultDNA5p;
+    // vector<alleleFrequency> defaultDNA3p;
+
+
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // BEGIN COMPUTE P[OBSERVED BASE|THEORITICAL BASE]
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+    initLikelihoodScores();
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // END COMPUTE P[OBSERVED BASE|THEORITICAL BASE]
+    //
+    ////////////////////////////////////////////////////////////////////////
 
 
 
@@ -1797,57 +1983,81 @@ int main (int argc, char *argv[]) {
 
     if(!genoFileAsInputFlag){
 
-    /////////////////////////////
-    // BEGIN  Compute coverage //
-    /////////////////////////////
-    int bpToComputeCoverage = 1000000;
-    int genomicRegionsToUse = bpToComputeCoverage/bpToExtract;
-    if( genomicRegionsToUse > int(queueDataToprocess.size())){
-	genomicRegionsToUse = int(queueDataToprocess.size());
-    }
+	/////////////////////////////
+	// BEGIN  Compute coverage //
+	/////////////////////////////
+	int bpToComputeCoverage = 1000000;
+	int genomicRegionsToUse = bpToComputeCoverage/bpToExtract;
+	if( genomicRegionsToUse > int(queueDataToprocess.size())){
+	    genomicRegionsToUse = int(queueDataToprocess.size());
+	}
 
 
 
-    queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
+	queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
 
 
-    pthread_mutex_init(&mutexQueue,   NULL);
-    pthread_mutex_init(&mutexCounter, NULL);
-    pthread_mutex_init(&mutexRank ,   NULL);
+	pthread_mutex_init(&mutexQueue,   NULL);
+	pthread_mutex_init(&mutexCounter, NULL);
+	pthread_mutex_init(&mutexRank ,   NULL);
 
-    for(int i=0;i<numberOfThreads;i++){
-	rc = pthread_create(&thread[i], NULL, mainCoverageComputationThread, NULL);
-	checkResults("pthread_create()\n", rc);
-    }
+	for(int i=0;i<numberOfThreads;i++){
+	    rc = pthread_create(&thread[i], NULL, mainCoverageComputationThread, NULL);
+	    checkResults("pthread_create()\n", rc);
+	}
 
-    cerr<<"Creating threads for coverage calculation"<<endl;
+	cerr<<"Creating threads for coverage calculation"<<endl;
 
 
-    while(queueDataForCoverage.size()!=0){
-	cerr<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataToprocess.size()<<endl;
-	sleep(timeThreadSleep);
-    }
+	while(queueDataForCoverage.size()!=0){
+	    cerr<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataToprocess.size()<<endl;
+	    sleep(timeThreadSleep);
+	}
     
-    //waiting for threads to finish
-    for (int i=0; i <numberOfThreads; ++i) {	
-	rc = pthread_join(thread[i], NULL);
-	checkResults("pthread_join()\n", rc);
-    }
-    cerr<<"Coverage computations are done"<<endl;
-    pthread_mutex_destroy(&mutexRank);
-    pthread_mutex_destroy(&mutexQueue);
-    pthread_mutex_destroy(&mutexCounter);
+	//waiting for threads to finish
+	for (int i=0; i <numberOfThreads; ++i) {	
+	    rc = pthread_join(thread[i], NULL);
+	    checkResults("pthread_join()\n", rc);
+	}
+	cerr<<"Coverage computations are done"<<endl;
+	pthread_mutex_destroy(&mutexRank);
+	pthread_mutex_destroy(&mutexQueue);
+	pthread_mutex_destroy(&mutexCounter);
 
-    //    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
-    //    pthread_exit(NULL);
+	//    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
+	//    pthread_exit(NULL);
     
-    rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
-    pdfRateForPoissonCov = pdfPoisson( rateForPoissonCov, rateForPoissonCov);
+	rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
+	long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
+	long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
+
+#ifdef DEBUGCOV
+	cout<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
+	cout<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
+#endif
+
+	cov2probPoisson = vector<long double> (MAXCOV,0);
+
+	for(int i=0;i<=MAXCOV;i++){
+	    long double florPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovFloor);
+	    long double ceilPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovCeil);
+	
+	
+	    cov2probPoisson[i] = (1.0-(rateForPoissonCov-rateForPoissonCovFloor))*florPPMF  + (1.0-(rateForPoissonCovCeil-rateForPoissonCov))*ceilPPMF;
+
+#ifdef DEBUGCOV
+	    cerr<<"florPPMF "<<i<<" = "<<florPPMF<<" w= "<<(1.0-(rateForPoissonCov-rateForPoissonCovFloor))<<endl;
+	    cerr<<"ceilPPMF "<<i<<" = "<<ceilPPMF<<" w= "<<(1.0-(rateForPoissonCovCeil-rateForPoissonCov))<<endl;
+	    cerr<<"cov2probPoisson["<<i<<"] = "<<cov2probPoisson[i]<<endl;
+#endif
+
+	}
 
 
-    cerr<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<double(totalBasesSum)/double(totalSitesSum)<<endl;
-    // for(int i=0;i<20;i++){
-    // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
+
+	cerr<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<double(totalBasesSum)/double(totalSitesSum)<<endl;
+	// for(int i=0;i<20;i++){
+	// 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
     // }
 
 
@@ -1855,12 +2065,31 @@ int main (int argc, char *argv[]) {
     // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, 20)/pdfPoisson( 20, 20)<<endl;
     // }
 
-    //return 1;
+    return 1;
 
 
     ////////////////////////////
     // END   Compute coverage //
     ////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     // doneReading=true;    
 
     ///////////////////////
