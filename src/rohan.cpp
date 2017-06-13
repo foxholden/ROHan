@@ -36,9 +36,11 @@ using namespace BamTools;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-#define DEBUGCOV
+//#define DEBUGCOV
 //#define DEBUGILLUMINAFREQ
 //#define DEBUGINITSCORES
+//#define DEBUGINITSCORES
+#define DEBUGINITLIKELIHOODSCORES
 //#define DEBUGDEFAULTFREQ
 //#define DEBUGDEAM
 //#define DEBUGHCOMPUTE
@@ -47,17 +49,25 @@ using namespace BamTools;
 // #define COVERAGETVERBOSE
 #define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
-#define MAXLENGTHFRAGMENT 500     // maximal length for fragment
-#define MAXMAPPINGQUAL    257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
+#define MINLENGTHFRAGMENT     35      // mininam length for fragment
+#define MAXLENGTHFRAGMENT     250     // maximal length for fragment
+
+
+//#define MAXMAPPINGQUAL        257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
+#define MAXMAPPINGQUAL        37     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
+#define MAXBASEQUAL             64      // maximal base quality score, greater qual score do not make a lot of sense
+
+//#define MAXMAPPINGBASEQUAL    64      // maximal base quality score, should be sufficient as mapping qualities are encoded using 8 bits
+
 #define MAXCOV             50     // maximal coverage
 
 char offsetQual=33;
 
-long double likeMatch        [MAXMAPPINGQUAL];
-long double likeMismatch     [MAXMAPPINGQUAL];
+long double likeMatch           [MAXBASEQUAL];
+long double likeMismatch        [MAXBASEQUAL];
 
-long double likeMatchProb    [MAXMAPPINGQUAL];
-long double likeMismatchProb [MAXMAPPINGQUAL];
+long double likeMatchProb       [MAXBASEQUAL];
+long double likeMismatchProb    [MAXBASEQUAL];
 
 long double likeMatchMap        [MAXMAPPINGQUAL];
 long double likeMismatchMap     [MAXMAPPINGQUAL];
@@ -73,13 +83,52 @@ unsigned int totalSitesSum;
 //Substitution rates due to deamination
 vector<probSubstition> sub5p;
 vector<probSubstition> sub3p;
-probSubstition defaultSubMatch;
-probSubstition illuminaErrorsProb;
+
+vector<diNucleotideProb> sub5pDiNuc;
+vector<diNucleotideProb> sub3pDiNuc;
+
+probSubstition   defaultSubMatch;
+diNucleotideProb defaultSubMatchMatrix;
+
+probSubstition   illuminaErrorsProb;
+diNucleotideProb illuminaErrorsProbMatrix;
 
 //default basepairs frequencies
 alleleFrequency dnaDefaultBases;
 vector<alleleFrequency> defaultDNA5p;
 vector<alleleFrequency> defaultDNA3p;
+
+
+// 1D: mapping quality 
+// 2D: length of fragment
+// 3D: base qual
+// 4D: pos fragment
+// 5D: 4X4 matrix
+vector< vector< vector< vector<diNucleotideProb> > > > mpq2Length2BaseQual2Pos2SubMatrix;
+
+// 1D: mapping quality 
+// 2D: pos on fragment
+// 3D: base qual
+vector< vector< vector<diNucleotideProb> > >  mpq2Pos2BaseQual2SubMatrix5p;
+vector< vector< vector<diNucleotideProb> > >  mpq2Pos2BaseQual2SubMatrix3p;
+
+//vector< vector< vector<diNucleotideProb> > > mqp;//FOR EACH FRAGMENT LENGTH
+
+
+
+    // //dummy values
+    // for(int L=0;L<MINLENGTHFRAGMENT;L++){ //for each fragment length
+    // 	vector<diNucleotideProb> baseQualEffect;//FOR EACH QUAL SCORE
+    // 	fragmentLengthEffect.push_back(baseQualEffect);
+    // }
+
+    // //int L=35;//fragment length    
+    // for(int L=MINLENGTHFRAGMENT;L<MAXLENGTHFRAGMENT;L++){ //for each fragment length
+    // 	cerr<<L<<endl;
+
+    // 	vector<diNucleotideProb> baseQualEffect;//FOR EACH QUAL SCORE
+
+
 
 
 vector<long double> cov2probPoisson;
@@ -212,6 +261,7 @@ void initScores(){
     genoPriority[9] = 8;
 
 
+    //BASE QUALs
     for(int i=0;i<2;i++){
         likeMatch[i]          = log1pl(    -randomPMatch4Bases );          
         likeMismatch[i]       = logl  (     randomPMismatch4Bases );
@@ -220,7 +270,7 @@ void initScores(){
         likeMismatchProb[i]           =    randomPMismatch4Bases; //3/4
     }
 
-    for(int i=2;i<MAXMAPPINGQUAL;i++){
+    for(int i=2;i<MAXBASEQUAL;i++){
         likeMatch[i]          = log1pl(    -pow(10.0,i/-10.0) );          
         likeMismatch[i]       = logl  (     pow(10.0,i/-10.0) );
 
@@ -228,7 +278,7 @@ void initScores(){
         likeMismatchProb[i]           =     pow(10.0,i/-10.0);
     }
 
-
+    //mapping QUALs
     for(int i=0;i<MAXMAPPINGQUAL;i++){
         likeMatchMap[i]        = log1pl(    -pow(10.0,i/-10.0) );          
         likeMismatchMap[i]     = logl  (     pow(10.0,i/-10.0) );
@@ -236,7 +286,6 @@ void initScores(){
         likeMatchProbMap[i]           = 1.0-pow(10.0,i/-10.0);
         likeMismatchProbMap[i]        =     pow(10.0,i/-10.0);
     }
-
 
 
     for(int i=1;i<=MAXCOV;i++){
@@ -250,8 +299,12 @@ void initScores(){
 
 #ifdef DEBUGINITSCORES
     cout<<"q= "<<"QUAL"<<"\t"<<"likeMatch"<<"\t"<<"likeMismatch"<<"\t"<<"likeMatchProb"<<"\t"<<"likeMismatchProb"<<endl;
+
+    for(int i=0;i<MAXBASEQUAL;i++){
+	cout<<"q= "<<i<<"\t"<<likeMatch[i]<<"\t"<<likeMismatch[i]<<endl;
+    }
     for(int i=0;i<MAXMAPPINGQUAL;i++){
-	cout<<"q= "<<i<<"\t"<<likeMatch[i]<<"\t"<<likeMismatch[i]<<"\t"<<likeMatchProb[i]<<"\t"<<likeMismatchProb[i]<<endl;
+	cout<<"q= "<<i<<likeMatchProb[i]<<"\t"<<likeMismatchProb[i]<<endl;
     }
     exit(1);
 #endif
@@ -304,7 +357,19 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
     for(unsigned int i=(sub5p.size()-1);i<MAXLENGTHFRAGMENT;i++){     
 	sub5p.push_back( sub5p[sub5p.size()-1] );
     }
-    
+
+    //copying to di-nucleotides
+    for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
+	diNucleotideProb diNuctoadd;
+	for(int nuc1=0;nuc1<4;nuc1++){
+	    double probIdentical=1.0;
+	    for(int nuc2=0;nuc2<4;nuc2++){
+		int nuc = nuc1*4+nuc2;
+		diNuctoadd.p[nuc1][nuc2]=sub5p[i].s[nuc];		
+	    }	
+	}
+	sub5pDiNuc.push_back(diNuctoadd);
+    }
 
 
     //3'
@@ -337,6 +402,18 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 	sub3p.push_back( sub3p[sub3p.size()-1] );
     }
 
+    //copying to di-nucleotides
+    for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
+	diNucleotideProb diNuctoadd;
+	for(int nuc1=0;nuc1<4;nuc1++){
+	    double probIdentical=1.0;
+	    for(int nuc2=0;nuc2<4;nuc2++){
+		int nuc = nuc1*4+nuc2;
+		diNuctoadd.p[nuc1][nuc2]=sub3p[i].s[nuc];		
+	    }	
+	}
+	sub3pDiNuc.push_back(diNuctoadd);
+    }
 
 
 #ifdef DEBUGDEAM
@@ -354,6 +431,25 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
     	cerr<<endl;
     }
 
+    cerr<<"------------------"<<endl;
+
+    for(unsigned int i=0;i<sub5p.size();i++){
+    	cerr<<"i="<<i<<endl<<"\t";
+    	for(int nuc1=0;nuc1<4;nuc1++)
+	    cerr<<"ACGT"[nuc1]<<"\t";
+	cerr<<endl;
+    	for(int nuc1=0;nuc1<4;nuc1++){
+	    cerr<<"ACGT"[nuc1]<<"\t";
+    	    for(int nuc2=0;nuc2<4;nuc2++){
+    		//int nuc = nuc1*4+nuc2;
+    		//cout<<nuc1<<"\t"<<nuc2<<"\t"
+    		cerr<<sub5pDiNuc[i].p[nuc1][nuc2]<<"\t";
+    	    }
+    	    cerr<<endl;
+    	}
+    	cerr<<endl;
+    }
+
     cerr<<"-- 3' deamination rates --"<<endl;
     for(unsigned int i=0;i<sub3p.size();i++){
     	cerr<<"i="<<i<<" - ";
@@ -367,19 +463,43 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
     	}
     	cerr<<endl;
     }
+
+
+    cerr<<"------------------"<<endl;
+
+    for(unsigned int i=0;i<sub3p.size();i++){
+    	cerr<<"i="<<i<<endl<<"\t";
+    	for(int nuc1=0;nuc1<4;nuc1++)
+	    cerr<<"ACGT"[nuc1]<<"\t";
+	cerr<<endl;
+    	for(int nuc1=0;nuc1<4;nuc1++){
+	    cerr<<"ACGT"[nuc1]<<"\t";
+    	    for(int nuc2=0;nuc2<4;nuc2++){
+    		//int nuc = nuc1*4+nuc2;
+    		//cout<<nuc1<<"\t"<<nuc2<<"\t"
+    		cerr<<sub3pDiNuc[i].p[nuc1][nuc2]<<"\t";
+    	    }
+    	    cerr<<endl;
+    	}
+    	cerr<<endl;
+    }
+
 #endif
 
 
 
 
     //if no deamination, cannot have a mismatch
-    for(int nuc1=0;nuc1<4;nuc1++){
-	for(int nuc2=0;nuc2<4;nuc2++){
-	    int nuc = nuc1*4+nuc2;
-	    if(nuc1==nuc2)
-		defaultSubMatch.s[ nuc ] = 1.0;	
-	    else
-		defaultSubMatch.s[ nuc ] = 0.0;	
+    for(int b1=0;b1<4;b1++){
+	for(int b2=0;b2<4;b2++){
+	    int b = b1*4+b2;
+	    if(b1==b2){
+		defaultSubMatch.s[ b ]           = 1.0;	
+		defaultSubMatchMatrix.p[b1][b2]  = 1.0;	
+	    }else{
+		defaultSubMatch.s[ b ]           = 0.0;	
+		defaultSubMatchMatrix.p[b1][b2]  = 0.0;	
+	    }
 	}
     }
 
@@ -461,13 +581,258 @@ void initDefaultBaseFreq(const string & dnafreqFile){
 */
 void initLikelihoodScores(){
 
-    //we need 4 theoretical bases X 4 observed bases X MAXMAPPINGQUAL mapping quality X MAXLENGTHFRAGMENT positions on the fragment X base quality
+    if(0){
+    //mpq2Length2BaseQual2Pos2SubMatrix
+    //for each mapping quality
+    //TODO add the MQ
+    for(int mq=0;mq<MAXMAPPINGQUAL;mq++){ //for each mapping quality 
 
-    vector<diNucleotideProb> baseQualEffect;
-    for(int i=0;i<MAXMAPPINGQUAL;i++){
-	//we know the probability of P(b1->b2) after deamination is 
-    }
+	//#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
+	cerr<<"Pre-computing for mapping quality  = "<<mq<<"/"<<MAXMAPPINGQUAL<<endl;
+	//#endif
     
+	    vector< vector< vector<diNucleotideProb> > > length2BaseQual2Pos2SubMatrix;//FOR EACH FRAGMENT LENGTH
+	
+
+
+	    //dummy values
+	    for(int L=0;L<MINLENGTHFRAGMENT;L++){ //for each fragment length
+		vector< vector<diNucleotideProb> > baseQual2Pos2SubMatrix;//FOR EACH QUAL SCORE
+		length2BaseQual2Pos2SubMatrix.push_back(baseQual2Pos2SubMatrix);
+	    }
+
+	    //int L=35;//fragment length    
+	    for(int L=MINLENGTHFRAGMENT;L<MAXLENGTHFRAGMENT;L++){ //for each fragment length
+
+
+#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
+		cerr<<"L = "<<L<<endl;
+#endif
+
+
+		//we need 4 theoretical bases X 4 observed bases X MAXMAPPINGQUAL mapping quality X MAXLENGTHFRAGMENT positions on the fragment X base quality
+		vector< vector<diNucleotideProb> > baseQual2Pos2SubMatrix;//FOR EACH QUAL SCORE
+
+
+		for(int q=0;q<MAXBASEQUAL;q++){ //for each base quality
+
+		    vector<diNucleotideProb> pos2SubMatrix;//FOR EACH QUAL SCORE
+		    //vector< vector< vector<diNucleotideProb> > > mpq2Length2BaseQual2Pos2SubMatrix;//FOR EACH FRAGMENT LENGTH
+
+
+		    //we know the probability of P(b1->b2) after deamination is vector<diNucleotideProb> sub5pDiNuc; vector<diNucleotideProb> sub3pDiNuc;
+		    for(int l=0;l<L;l++){//for each position
+
+			diNucleotideProb toAddForBaseQual;
+			for(int bTheo=0;bTheo<4;bTheo++){
+			    for(int bObs=0;bObs<4;bObs++){
+				toAddForBaseQual.p[bTheo][bObs]=0.0;
+			    }
+			}
+
+			alleleFrequency *  dnaDefaultBases;	    
+			diNucleotideProb * deamProbToUse;
+
+			if(l<(L/2)){//closer to 5' end
+			    deamProbToUse   = &sub5pDiNuc[    l];		
+			    dnaDefaultBases = &defaultDNA5p[  l];
+			}else{      //closer to 3' end
+			    deamProbToUse   = &sub3pDiNuc[   L-l-1];
+			    dnaDefaultBases = &defaultDNA3p[ L-l-1];
+			}
+		    
+
+			for(int bTheo=0;bTheo<4;bTheo++){
+			    for(int bpstDeam=0;bpstDeam<4;bpstDeam++){			
+				for(int bObs=0;bObs<4;bObs++){			
+
+				    toAddForBaseQual.p[bTheo][bObs] += 
+					likeMatchProbMap[mq]*
+					(
+					    deamProbToUse->p[bTheo][bpstDeam] * (
+						likeMatchProb[q]    *   defaultSubMatchMatrix.p[bpstDeam][bObs]
+						+
+						likeMismatchProb[q] * illuminaErrorsProbMatrix.p[bpstDeam][bObs]
+					    )
+					) + likeMismatchProbMap[mq] * dnaDefaultBases->f[bObs];
+				    
+			       
+
+				}
+			    }
+			}//for each bTheo, bpstDeam and bObs
+
+			pos2SubMatrix.push_back(toAddForBaseQual);
+
+#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
+			cerr<<"mq = "<<mq<<" pos/LENGTH = "<<l<<"/"<<L<<" q = "<<q<<endl;
+			for(int nuc1=0;nuc1<4;nuc1++){
+			    cerr<<"ACGT"[nuc1]<<"\t";
+			    for(int nuc2=0;nuc2<4;nuc2++){
+				cerr<<toAddForBaseQual.p[nuc1][nuc2]<<"\t";
+			    }
+			    cerr<<endl;
+			}
+			cerr<<endl;
+#endif
+	    
+		    }//for position in the fragment
+
+
+		    baseQual2Pos2SubMatrix.push_back(pos2SubMatrix);
+
+		}//for each base quality
+
+		length2BaseQual2Pos2SubMatrix.push_back(baseQual2Pos2SubMatrix);
+	    
+	    }// for each length fragment
+	
+	
+	    mpq2Length2BaseQual2Pos2SubMatrix.push_back(length2BaseQual2Pos2SubMatrix);
+
+    }//for each mapping quality
+
+    }
+
+
+
+
+    // vector< vector< vector<diNucleotideProb> > >  mpq2Pos2BaseQual2SubMatrix5p;
+    // vector< vector< vector<diNucleotideProb> > >  mpq2Pos2BaseQual2SubMatrix3p;
+
+    for(int mq=0;mq<MAXMAPPINGQUAL;mq++){ //for each mapping quality 
+
+	//#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
+	cerr<<"Pre-computing for mapping quality  = "<<mq<<"/"<<MAXMAPPINGQUAL<<endl;
+	//#endif
+    
+	vector< vector<diNucleotideProb> >  pos2BaseQualSubMatrix5p;
+	vector< vector<diNucleotideProb> >  pos2BaseQualSubMatrix3p;
+	
+
+	for(int l=0;l<( (MAXLENGTHFRAGMENT/2) +1);l++){//for each position
+
+
+
+
+	    //we need 4 theoretical bases X 4 observed bases X MAXMAPPINGQUAL mapping quality X MAXLENGTHFRAGMENT positions on the fragment X base quality
+	    vector<diNucleotideProb>  baseQual2SubMatrix5p;//FOR EACH QUAL SCORE
+	    vector<diNucleotideProb>  baseQual2SubMatrix3p;//FOR EACH QUAL SCORE
+
+	    
+	    for(int q=0;q<MAXBASEQUAL;q++){ //for each base quality
+		
+		//vector<diNucleotideProb> pos2SubMatrix;//FOR EACH QUAL SCORE
+		//vector< vector< vector<diNucleotideProb> > > mpq2Length2BaseQual2Pos2SubMatrix;//FOR EACH FRAGMENT LENGTH
+		
+		
+		//we know the probability of P(b1->b2) after deamination is vector<diNucleotideProb> sub5pDiNuc; vector<diNucleotideProb> sub3pDiNuc;
+		
+		diNucleotideProb toAddForBaseQual5p;
+		diNucleotideProb toAddForBaseQual3p;
+		
+		for(int bTheo=0;bTheo<4;bTheo++){
+		    for(int bObs=0;bObs<4;bObs++){
+			toAddForBaseQual5p.p[bTheo][bObs]=0.0;
+			toAddForBaseQual3p.p[bTheo][bObs]=0.0;
+		    }
+		}
+		    
+
+		for(int bTheo=0;bTheo<4;bTheo++){               // each possible theoritical base
+		    for(int bpstDeam=0;bpstDeam<4;bpstDeam++){	// each possible deaminated base		
+			for(int bObs=0;bObs<4;bObs++){	        // each possible observed base
+			    
+			    toAddForBaseQual5p.p[bTheo][bObs] += 
+				// likeMatchProbMap[mq]*
+				// (
+				sub5pDiNuc[    l].p[bTheo][bpstDeam] * (
+				    likeMatchProb[q]    *   defaultSubMatchMatrix.p[bpstDeam][bObs]
+				    +
+				    likeMismatchProb[q] * illuminaErrorsProbMatrix.p[bpstDeam][bObs]
+				);
+			    //) + likeMismatchProbMap[mq] * defaultDNA5p[l].f[bObs];
+
+			    toAddForBaseQual3p.p[bTheo][bObs] += 
+				//likeMatchProbMap[mq]*
+				//(
+				sub3pDiNuc[    l].p[bTheo][bpstDeam] * (
+				    likeMatchProb[q]    *   defaultSubMatchMatrix.p[bpstDeam][bObs]
+				    +
+				    likeMismatchProb[q] * illuminaErrorsProbMatrix.p[bpstDeam][bObs]
+				);
+				//) + likeMismatchProbMap[mq] * defaultDNA3p[l].f[bObs];
+			}
+		    }
+		}//for each bTheo, bpstDeam and bObs
+
+
+
+
+		for(int bTheo=0;bTheo<4;bTheo++){               // each possible theoritical base
+		    for(int bObs=0;bObs<4;bObs++){	        // each possible observed base
+			
+			toAddForBaseQual5p.p[bTheo][bObs] =  likeMatchProbMap[mq]*toAddForBaseQual5p.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNA5p[l].f[bObs];
+			
+			toAddForBaseQual3p.p[bTheo][bObs] =  likeMatchProbMap[mq]*toAddForBaseQual3p.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNA3p[l].f[bObs];
+			}
+		}//for each bTheo, bpstDeam and bObs
+		
+		baseQual2SubMatrix5p.push_back(toAddForBaseQual5p);
+		baseQual2SubMatrix5p.push_back(toAddForBaseQual3p);
+		
+#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
+		cerr<<"mq = "<<mq<<" pos = "<<l<<" q = "<<q<<endl;
+		cerr<<"5'----------"<<endl;
+		for(int nuc1=0;nuc1<4;nuc1++){
+		    cerr<<"ACGT"[nuc1]<<"\t";
+		    for(int nuc2=0;nuc2<4;nuc2++){
+			cerr<<toAddForBaseQual5p.p[nuc1][nuc2]<<"\t";
+		    }
+		    cerr<<endl;
+		}
+		cerr<<endl;
+		cerr<<"3'----------"<<endl;
+		for(int nuc1=0;nuc1<4;nuc1++){
+		    cerr<<"ACGT"[nuc1]<<"\t";
+		    for(int nuc2=0;nuc2<4;nuc2++){
+			cerr<<toAddForBaseQual3p.p[nuc1][nuc2]<<"\t";
+		    }
+		    cerr<<endl;
+		}
+		cerr<<endl;
+#endif
+		    
+	    }//for each base qual
+	    
+	    
+	    pos2BaseQualSubMatrix5p.push_back(baseQual2SubMatrix5p);
+	    pos2BaseQualSubMatrix3p.push_back(baseQual2SubMatrix3p);
+		    
+
+	}//for each position
+
+
+	//length2BaseQual2Pos2SubMatrix.push_back(baseQual2Pos2SubMatrix);
+	mpq2Pos2BaseQual2SubMatrix5p.push_back( pos2BaseQualSubMatrix5p );
+	mpq2Pos2BaseQual2SubMatrix3p.push_back( pos2BaseQualSubMatrix3p );
+
+	// vector< vector< vector<diNucleotideProb> > >  mpq2Pos2BaseQual2SubMatrix3p;
+	
+	    
+    }// for each mapping quality
+	
+    
+    // mpq2Length2BaseQual2Pos2SubMatrix.push_back(length2BaseQual2Pos2SubMatrix);
+
+    //}//for each mapping quality
+
+
+    
+
+
+
+    exit(1);
 }
 
 
@@ -1827,13 +2192,35 @@ int main (int argc, char *argv[]) {
 
 
     readIlluminaError(illuminafreq,illuminaErrorsProb);
+    for(int b1=0;b1<4;b1++){
+	for(int b2=0;b2<4;b2++){
+	    int dinucIndex = b1 *4+ b2;
+	    illuminaErrorsProbMatrix.p[b1][b2] = illuminaErrorsProb.s[dinucIndex];
+	}
+    }
 
 #ifdef DEBUGILLUMINAFREQ
     for(unsigned int i=0;i<16;i++){
     	cout<<i<<"\t"<<illuminaErrorsProb.s[i]<<endl;	
     }
-    //return 1;
+
+    for(int b1=0;b1<4;b1++)
+	cerr<<"ACGT"[b1]<<"\t";
+    cerr<<endl;
+    for(int b1=0;b1<4;b1++){
+	cerr<<"ACGT"[b1]<<"\t";
+	for(int b2=0;b2<4;b2++){
+	    cerr<<illuminaErrorsProbMatrix.p[b1][b2]<<"\t";
+	}
+	cerr<<endl;
+    }
+    cerr<<endl;
+    
+
+
+    return 1;
 #endif
+
     ///////////////////////////////////////
     // END read Illumina error profile //
     ///////////////////////////////////////    
