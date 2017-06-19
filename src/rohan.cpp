@@ -36,7 +36,7 @@ using namespace BamTools;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-//#define DEBUGCOV
+#define DEBUGCOV
 //#define DEBUGILLUMINAFREQ
 //#define DEBUGINITSCORES
 //#define DEBUGINITSCORES
@@ -48,7 +48,7 @@ using namespace BamTools;
 //#define DEBUGHCOMPUTE
 //#define DEBUGCOMPUTELL
 //#define HETVERBOSE
-// #define COVERAGETVERBOSE
+#define COVERAGETVERBOSE
 #define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
 #define MINLENGTHFRAGMENT     35      // mininam length for fragment
@@ -222,9 +222,11 @@ queue< DataChunk * >                                               queueDataForC
 
 priority_queue<DataToWrite *, vector<DataToWrite *>, CompareDataToWrite> queueDataTowrite;
 
-pthread_mutex_t  mutexQueue   = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t  mutexCounter = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t  mutexRank    = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t  mutexQueue           = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t  mutexCounter         = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t  mutexRank            = PTHREAD_MUTEX_INITIALIZER;
+// pthread_mutex_t  mutexCoverageCounter = PTHREAD_MUTEX_INITIALIZER;
+
 
 //GLOBALLY accessed
 map<unsigned int, int>       threadID2Rank;
@@ -2015,13 +2017,42 @@ queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsa
 } // end randomSubQueue
 
 
+
+queue< DataChunk * >  subFirstElemsQueue(const queue< DataChunk * > queueDataToSubsample,unsigned int sizeToReturn){
+
+    if( sizeToReturn > queueDataToSubsample.size()){
+	cerr<<"Cannot subsample the queue to the size required"<<endl;
+	exit(1);
+    }
+
+    queue< DataChunk *  >  toReturn=queueDataToSubsample;
+    vector< DataChunk * >  myvectortemp;
+
+    while(!toReturn.empty()){    
+	DataChunk *dc = toReturn.front();
+ 	toReturn.pop();
+	myvectortemp.push_back(dc);
+    }
+
+    //random_shuffle ( myvectortemp.begin(), myvectortemp.end() );
+    
+    for(unsigned int i=0;i<sizeToReturn;i++){
+	toReturn.push(myvectortemp[i]);
+    }
+
+    return toReturn;
+} // end randomSubQueue
+
+
 //TODO: GC bias for coverage?
 void *mainCoverageComputationThread(void * argc){
 
     int   rc;
+
 #ifdef COVERAGETVERBOSE    
     int rankThread=0;
 #endif
+
     rc = pthread_mutex_lock(&mutexRank);
     checkResults("pthread_mutex_lock()\n", rc);
 
@@ -2142,7 +2173,7 @@ void *mainCoverageComputationThread(void * argc){
    
     coverageComputeVisitor* cv = new coverageComputeVisitor(references,
 							    currentChunk->rangeGen.getStartCoord(),
-							    currentChunk->rangeGen.getEndCoord());
+							    currentChunk->rangeGen.getEndCoord()   );
     PileupEngine pileup;
     pileup.AddVisitor(cv);
 
@@ -2157,6 +2188,7 @@ void *mainCoverageComputationThread(void * argc){
     pileup.Flush();
     reader.Close();
     //fastaReference.Close();
+
 #ifdef COVERAGETVERBOSE    
     cerr<<"Thread #"<<rankThread <<" "<<cv->getTotalBases()<<"\t"<<cv->getTotalSites()<<"\t"<<double(cv->getTotalBases())/double(cv->getTotalSites())<<endl;
 #endif
@@ -2252,8 +2284,11 @@ int main (int argc, char *argv[]) {
     string sampleName        = "sample";
     bool   useVCFoutput      = false;
 
-    string genoFileAsInput    ="";
-    bool   genoFileAsInputFlag=false;
+    double lambdaCov=0;
+    bool   lambdaCovSpecified=false;
+
+    // string genoFileAsInput    ="";
+    // bool   genoFileAsInputFlag=false;
 
     
     const string usage=string("\nThis program co-estimates heterozygosity rates and runs of homozygosity\n\n\t"+
@@ -2273,12 +2308,13 @@ int main (int argc, char *argv[]) {
                               "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t\t"+"Size of windows in bp  (default: "+stringify(sizeChunk)+")"+"\n"+	      
+			      "\t\t"+""  +""+"--lambda"     +"\t\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
 
 
 
-                              "\n\tSample options:\n"+
-                              "\t\t"+""  +""+"--cont"  +"\t\t\t"    +  "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
-                              // "\t\t"+"--phred64" +"\t\t\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
+                              // "\n\tSample options:\n"+
+                              // "\t\t"+""  +""+"--cont"  +"\t\t\t"    +  "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
+                              // // "\t\t"+"--phred64" +"\t\t\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 			      
 			      
                               "\n\tDeamination and error options:\n"+                                   
@@ -2312,12 +2348,12 @@ int main (int argc, char *argv[]) {
         }
 
 
-	if( string(argv[i]) == "--ingeno" ){
-	    genoFileAsInput     = string(argv[i+1]);
-	    genoFileAsInputFlag = true;
-            i++;
-            continue;
-	}
+	// if( string(argv[i]) == "--ingeno" ){
+	//     genoFileAsInput     = string(argv[i+1]);
+	//     genoFileAsInputFlag = true;
+        //     i++;
+        //     continue;
+	// }
 	
         if( string(argv[i]) == "--size"  ){
 	    sizeChunk=destringify<unsigned int>(argv[i+1]);
@@ -2364,6 +2400,14 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
+        if(string(argv[i]) == "--lambda"  ){
+	    lambdaCovSpecified=true;
+            lambdaCov         =destringify<double>(argv[i+1]);
+	    i++;
+            continue;
+        }
+
+
         if(string(argv[i]) == "--deam5p"  ){
             deam5pfreqE=string(argv[i+1]);
             i++;
@@ -2397,6 +2441,8 @@ int main (int argc, char *argv[]) {
     string fastaFile         = string(argv[lastOpt]);
     bamFileToOpen            = string(argv[lastOpt+1]);
     string fastaIndex        = fastaFile+".fai";
+
+    cerr<<"Parsing arguments ...";
 
     if( !isFile(fastaFile) ){
 	cerr<<"The fasta file "<<fastaFile<<" does not exists"<<endl;
@@ -2507,6 +2553,7 @@ int main (int argc, char *argv[]) {
     return 1;
 #endif
 
+    cerr<<"...done"<<endl;
     ///////////////////////////////////////
     // END read Illumina error profile //
     ///////////////////////////////////////    
@@ -2618,56 +2665,60 @@ int main (int argc, char *argv[]) {
     ////////////////////////////////////////////////////////////////////////
 
     cerr<<"..done"<<endl;
-    return 1;
-
-
-    int    bpToExtract       = sizeChunk;
-    
-    pthread_t             thread[numberOfThreads];
-    int                   rc=0;
-
-
-
-    GenomicWindows     rw  (fastaIndex,false);
-    //TODO add genomic ranges in queue
-    vector<GenomicRange> v = rw.getGenomicWindows(bpToExtract,0);
-    if( v.size() == 0 ){    cerr<<"No range found using these chr/loci settings"<<endl; return 1;}
-    
-    unsigned int      rank=0;
-    int          lastRank=-1;
-    unsigned int sizeGenome=0;
-
-    for(unsigned int i=0;i<v.size();i++){
-	//cout<<v[i]<<endl;
-	DataChunk * currentChunk = new DataChunk();
-	
-	currentChunk->rangeGen  = v[i];
-	currentChunk->rank      = rank;
-	lastRank                = rank;
-	//sizeGenome             += v[i].getLength();
- 
-	queueDataToprocess.push(currentChunk);
-	rank++;
-    }
-    readDataDone=true;
     //    return 1;
 
-    vector<GenoResults *> vectorGenoResults;
 
-    if(!genoFileAsInputFlag){
+    cerr<<"Computing average coverage.."<<endl;
+    if( !lambdaCovSpecified ){
+	int    bpToExtract       = sizeChunk;
+    
+	pthread_t             thread[numberOfThreads];
+	int                   rc=0;
+
+
+
+	GenomicWindows     rw  (fastaIndex,false);
+
+
+	vector<GenomicRange> v = rw.getGenomicWindows(bpToExtract,0);
+	if( v.size() == 0 ){    cerr<<"No range found using these chr/loci settings"<<endl; return 1;}
+    
+	unsigned int      rank=0;
+	int          lastRank=-1;
+	unsigned int sizeGenome=0;
+
+	for(unsigned int i=0;i<v.size();i++){
+	    cout<<"genomic region #"<<i<<" "<<v[i]<<endl;
+	    DataChunk * currentChunk = new DataChunk();
+	
+	    currentChunk->rangeGen   = v[i];
+	    currentChunk->rank       = rank;
+	    lastRank                 = rank;
+	    //sizeGenome             += v[i].getLength();
+ 
+	    queueDataToprocess.push(currentChunk);
+	    rank++;
+	}
+	readDataDone=true;
+	//    return 1;
+
+	vector<GenoResults *> vectorGenoResults;
+
+	// if(!genoFileAsInputFlag){
 
 	/////////////////////////////
 	// BEGIN  Compute coverage //
 	/////////////////////////////
-	int bpToComputeCoverage = 1000000;
+	int bpToComputeCoverage = 10000000;
 	int genomicRegionsToUse = bpToComputeCoverage/bpToExtract;
 	if( genomicRegionsToUse > int(queueDataToprocess.size())){
 	    genomicRegionsToUse = int(queueDataToprocess.size());
 	}
+    
 
-
-
-	queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
+	//TODO to renable
+	//queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
+	queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
 
 
 	pthread_mutex_init(&mutexQueue,   NULL);
@@ -2679,7 +2730,7 @@ int main (int argc, char *argv[]) {
 	    checkResults("pthread_create()\n", rc);
 	}
 
-	cerr<<"Creating threads for coverage calculation"<<endl;
+	cerr<<"Creating threads for coverage calculation, need to process="<<queueDataForCoverage.size()<<" out of a total of "<<queueDataToprocess.size()<<endl;
 
 
 	while(queueDataForCoverage.size()!=0){
@@ -2701,36 +2752,40 @@ int main (int argc, char *argv[]) {
 	//    pthread_exit(NULL);
     
 	rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
-	long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
-	long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
+    }else{ //not lambdaCovSpecified
+	//use the rate specified via the command line
+	rateForPoissonCov = lambdaCov;
+    }
 
+    long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
+    long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
+    
 #ifdef DEBUGCOV
-	cout<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
-	cout<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
+    cout<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
+    cout<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
 #endif
 
-	cov2probPoisson = vector<long double> (MAXCOV,0);
+    cov2probPoisson = vector<long double> (MAXCOV,0);
 
-	for(int i=0;i<=MAXCOV;i++){
-	    long double florPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovFloor);
-	    long double ceilPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovCeil);
-	
-	
-	    cov2probPoisson[i] = (1.0-(rateForPoissonCov-rateForPoissonCovFloor))*florPPMF  + (1.0-(rateForPoissonCovCeil-rateForPoissonCov))*ceilPPMF;
+    for(int i=0;i<=MAXCOV;i++){
+	long double florPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovFloor)/poisson_pmfl( rateForPoissonCovFloor, rateForPoissonCovFloor);
+	long double ceilPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovCeil) /poisson_pmfl( rateForPoissonCovCeil,  rateForPoissonCovCeil);
+		
+	cov2probPoisson[i] = (1.0-(rateForPoissonCov-rateForPoissonCovFloor))*florPPMF  + (1.0-(rateForPoissonCovCeil-rateForPoissonCov))*ceilPPMF;
 
 #ifdef DEBUGCOV
-	    cerr<<"florPPMF "<<i<<" = "<<florPPMF<<" w= "<<(1.0-(rateForPoissonCov-rateForPoissonCovFloor))<<endl;
-	    cerr<<"ceilPPMF "<<i<<" = "<<ceilPPMF<<" w= "<<(1.0-(rateForPoissonCovCeil-rateForPoissonCov))<<endl;
-	    cerr<<"cov2probPoisson["<<i<<"] = "<<cov2probPoisson[i]<<endl;
+	cerr<<"florPPMF "<<i<<" = "<<poisson_pmfl( (long double)(i), rateForPoissonCovFloor)<<"/"<<poisson_pmfl( rateForPoissonCovFloor, rateForPoissonCovFloor)<<" "<<florPPMF<<" w= "<<(1.0-(rateForPoissonCov-rateForPoissonCovFloor))<<endl;
+	cerr<<"ceilPPMF "<<i<<" = "<<poisson_pmfl( (long double)(i), rateForPoissonCovCeil) <<"/"<<poisson_pmfl( rateForPoissonCovCeil,  rateForPoissonCovCeil)<<" "<<ceilPPMF<<" w= "<<(1.0-(rateForPoissonCovCeil-rateForPoissonCov))<<endl;
+	cerr<<"cov2probPoisson["<<i<<"] = "<<cov2probPoisson[i]<<endl;
 #endif
 
-	}
+    }
 
 
-
-	cerr<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<double(totalBasesSum)/double(totalSitesSum)<<endl;
-	// for(int i=0;i<20;i++){
-	// 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
+    
+    cerr<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<rateForPoissonCov<<endl;
+    // for(int i=0;i<20;i++){
+    // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
     // }
 
 
@@ -2738,7 +2793,9 @@ int main (int argc, char *argv[]) {
     // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, 20)/pdfPoisson( 20, 20)<<endl;
     // }
 
-    return 1;
+    cerr<<"..done"<<endl;
+
+    // return 1;
 
 
     ////////////////////////////
@@ -2759,7 +2816,7 @@ int main (int argc, char *argv[]) {
 
 
 
-
+#ifdef NODEF
 
 
 
@@ -2938,31 +2995,31 @@ int main (int argc, char *argv[]) {
 	bgzipWriter.Close();
     }
 
-    }else{//if we suply the geno file as input
+    // //}else{//if we suply the geno file as input
 
-	string    lineGENOL;
-	igzstream myFileGENOL;
-	cerr<<"Reading genotypes: "<<genoFileAsInput<<" ...";
-	myFileGENOL.open(genoFileAsInput.c_str(), ios::in);
+    // string    lineGENOL;
+    // igzstream myFileGENOL;
+    // 	cerr<<"Reading genotypes: "<<genoFileAsInput<<" ...";
+    // 	myFileGENOL.open(genoFileAsInput.c_str(), ios::in);
 
-	if (myFileGENOL.good()){
-	    getline (myFileGENOL,lineGENOL);//header
-	    while ( getline (myFileGENOL,lineGENOL)){
-		//cout<<lineGENOL<<endl;
-		GenoResults * toadd =  new GenoResults( lineGENOL );
-		vectorGenoResults.push_back(toadd);
-		sizeGenome++;
-	    }
-	    myFileGENOL.close();
-	}else{
-	    cerr << "Error: unable to open file with genotype likelihoods: "<<genoFileAsInput<<endl;
-	    return 1;
-	}
-	cerr<<"..done"<<endl;
+    // 	if (myFileGENOL.good()){
+    // 	    getline (myFileGENOL,lineGENOL);//header
+    // 	    while ( getline (myFileGENOL,lineGENOL)){
+    // 		//cout<<lineGENOL<<endl;
+    // 		GenoResults * toadd =  new GenoResults( lineGENOL );
+    // 		vectorGenoResults.push_back(toadd);
+    // 		sizeGenome++;
+    // 	    }
+    // 	    myFileGENOL.close();
+    // 	}else{
+    // 	    cerr << "Error: unable to open file with genotype likelihoods: "<<genoFileAsInput<<endl;
+    // 	    return 1;
+    // 	}
+    // 	cerr<<"..done"<<endl;
 
-    }
+    // }
 
-    //THORFINN: END OF GENOTYPE LIKELIHOOD COMPUTATIONS
+    // 
 
 
     //    return 1;
@@ -3322,7 +3379,15 @@ int main (int argc, char *argv[]) {
     ////////////////////////////////
         
 
-    
+
+
+    for(unsigned int i=0;i<vectorGenoResults.size();i++){
+	delete( vectorGenoResults[i] );
+    }
+
+    pthread_exit(NULL);
+
+#endif    
 
 
     //////////////////////////////////
@@ -3338,13 +3403,6 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
-
-
-    for(unsigned int i=0;i<vectorGenoResults.size();i++){
-	delete( vectorGenoResults[i] );
-    }
-
-    pthread_exit(NULL);
 
     
     return 0;
