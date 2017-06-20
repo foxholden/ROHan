@@ -36,7 +36,7 @@ using namespace BamTools;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-#define DEBUGCOV
+//#define DEBUGCOV
 //#define DEBUGILLUMINAFREQ
 //#define DEBUGINITSCORES
 //#define DEBUGINITSCORES
@@ -47,8 +47,8 @@ using namespace BamTools;
 //#define DEBUGDEAM
 //#define DEBUGHCOMPUTE
 //#define DEBUGCOMPUTELL
-//#define HETVERBOSE
-#define COVERAGETVERBOSE
+#define HETVERBOSE
+//#define COVERAGETVERBOSE
 #define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
 #define MINLENGTHFRAGMENT     35      // mininam length for fragment
@@ -157,7 +157,7 @@ vector< vector< mpq2bsq2submatrix * > > length2pos2mpq2bsq2submatrix;
 
 
 
-vector<long double> cov2probPoisson;
+vector<long double> * cov2probPoisson;
 
 long double contrate=0.0;
 long double rateForPoissonCov;
@@ -1203,6 +1203,7 @@ inline long double computeBaseAl2Obs(const int al,
 
 
 
+#ifdef TODELETE
 //! A method to compute the prob. of seeing observed ob for a given genotype al1Current and al1Current
 /*!
   This method is called by class heteroComputerVisitor : public PileupVisitor, computes the probability of
@@ -1339,7 +1340,17 @@ inline long double computeLL(const int                           al1Current    ,
     
     return (binomE2+llik);
 } //end computeLL
+#endif
 
+
+inline void computeLL(vector<positionInformation> * piForGenomicWindow){
+
+    cout<<"computeLL "<<piForGenomicWindow->size()<<endl;
+    // for(int i=0;i<piForGenomicWindow.size();i++){
+	
+    // }
+
+}
 
 class coverageComputeVisitor : public PileupVisitor {
   
@@ -1400,7 +1411,7 @@ private:
 
 
 
-
+#ifdef TODELETE
 class heteroComputerVisitor : public PileupVisitor {
   
 public:
@@ -1771,7 +1782,157 @@ private:
     long double  m_contRate;
     vector<PositionResult *> * m_dataToWriteOut;
 };//heteroComputerVisitor
+#endif
 
+
+
+
+
+class heteroComputerVisitor : public PileupVisitor {
+  
+public:
+    heteroComputerVisitor(const RefVector& references, 
+			  const int refID,
+			  const unsigned int leftCoord,
+			  const unsigned int rightCoord,
+			  vector<PositionResult *> * dataToWriteOut,
+			  const int threadID,
+			  vector<positionInformation> * piForGenomicWindow)
+	: PileupVisitor()
+	, m_references(references)
+	, m_refID(refID)
+	, m_leftCoord(leftCoord)
+	, m_rightCoord(rightCoord)
+	, m_dataToWriteOut( dataToWriteOut)
+	, m_threadID( threadID )
+	, m_numberOfSites( 0 )
+	, totalBases(0)
+	, totalSites(0)   
+	, m_piForGenomicWindow( piForGenomicWindow )
+    { 
+	//cerr<<"heteroComputerVisitor constructor"<<endl;
+    }
+    ~heteroComputerVisitor(void) { }
+  
+    // PileupVisitor interface implementation
+
+    
+    void Visit(const PileupPosition& pileupData) {   
+	
+
+
+	if(pileupData.Position < int(m_leftCoord)   || 
+	   pileupData.Position > int(m_rightCoord) ){
+	    return ;
+	}
+
+	if( (m_numberOfSites%50000)==0 &&
+	    m_numberOfSites != 0 ){
+	    cerr<<"Thread#"<<m_threadID<<" reading: "<<m_references[m_refID].RefName<<":"<<pileupData.Position<<" valid sites:\t"<<thousandSeparator(totalSites)<<endl;
+
+	}
+
+	m_numberOfSites++;
+
+
+	// int                 totalBases=0 ;
+	//int                 counterB  [4];
+	//long double         llBaseDeam[4];
+
+
+	// vector<int>              obsBase      ;
+	// vector<int>              obsQual      ;
+	// vector<int>              mmQual       ; //mismapping probability
+	// vector<bool>             isRevVec;
+	//vector<singleRead> singleReadToAdd;
+	positionInformation piToAdd;
+	piToAdd.posAlign     = pileupData.Position;
+	piToAdd.skipPosition = false;
+
+
+	unsigned int                posAlign = pileupData.Position+1;
+
+	bool foundSites=false;
+	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
+
+	    
+	    if( pileupData.PileupAlignments[i].IsCurrentDeletion   ||
+	    	pileupData.PileupAlignments[i].IsNextInsertion     ||
+	    	pileupData.PileupAlignments[i].IsNextDeletion      ||
+		(pileupData.PileupAlignments[i].DeletionLength>0)  ||
+		(pileupData.PileupAlignments[i].InsertionLength>0) ){		
+		//includeFragment was initialized as false
+	    	continue;
+	    }
+
+
+	    if(i>=MAXCOV){
+		break;
+	    }
+
+	    char  b   =     pileupData.PileupAlignments[i].Alignment.QueryBases[ pileupData.PileupAlignments[i].PositionInAlignment ];
+	    if(!isResolvedDNA(b)){ 
+		continue; 
+	    }//avoid Ns
+
+	    int bIndex = baseResolved2int(b);
+	    int   q    = int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual); 
+	    int   m    = int(pileupData.PileupAlignments[i].Alignment.MapQuality);
+	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
+	  
+	    totalBases++;
+	    foundSites=true;
+
+	    singleRead sr_;
+	    sr_.base=bIndex;
+	    sr_.qual=q;
+	    sr_.mapq=m;
+	    sr_.isrv=isRev;
+
+	    piToAdd.readsVec.push_back(sr_);
+	    // obsBase.push_back( bIndex  );
+	    // obsQual.push_back( q        );
+	    // mmQual.push_back(  m        );
+	    // isRevVec.push_back(isRev);
+
+	    //mmProb.push_back(  likeMismatchProbMap[m]  );
+	    // substitutionRatesPerRead.push_back( probSubMatchToUseEndo );
+	    //	    includeFragment[i]=true;
+
+	}//END FOR EACH READ
+
+	if( foundSites ){
+	    totalSites++;
+	}
+	
+	m_piForGenomicWindow->push_back(piToAdd);
+
+    }//end Visit()
+    
+    unsigned int getTotalSites() const{
+	return totalSites;
+    }
+
+    unsigned int getTotalBases() const{
+	return totalBases;
+    }
+
+private:
+    RefVector m_references;
+    //Fasta * m_fastaReference;
+    unsigned int totalBases;
+    unsigned int totalSites;
+
+    int          m_threadID;
+    int          m_refID;
+    unsigned int m_leftCoord;
+    unsigned int m_rightCoord;
+
+    vector<PositionResult *> * m_dataToWriteOut;
+    unsigned int m_numberOfSites;
+    vector<positionInformation> * m_piForGenomicWindow;
+
+};//heteroComputerVisitor
 
 
 
@@ -1787,16 +1948,26 @@ private:
 
 */				
 void *mainHeteroComputationThread(void * argc){
+    cerr<<"mainHeteroComputationThread started"<<endl;
 
     int   rc;
+
 #ifdef HETVERBOSE    
     int rankThread=0;
 #endif
+
+    cerr<<"mainHeteroComputationThread mutex1"<<endl;
+
     rc = pthread_mutex_lock(&mutexRank);
     checkResults("pthread_mutex_lock()\n", rc);
 
+    cerr<<"mainHeteroComputationThread mutex21 ID="<<(*(int *)pthread_self())<<endl;    
+    cerr<<"mainHeteroComputationThread mutex22 ID="<<(threadID2Rank.size()+1)<<endl;
+    //cerr<<"mainHeteroComputationThread mutex2"<<endl;    
+
     threadID2Rank[*(int *)pthread_self()]  = threadID2Rank.size()+1;
 
+    cerr<<"mainHeteroComputationThread mutex3"<<endl;
 #ifdef HETVERBOSE    
     rankThread = threadID2Rank[*(int *)pthread_self()];
 #endif
@@ -1826,8 +1997,9 @@ void *mainHeteroComputationThread(void * argc){
  	foundData=true;
  	currentChunk = queueDataToprocess.front();
  	queueDataToprocess.pop();
+
 #ifdef HETVERBOSE
- 	cerr<<"Thread #"<<rankThread<<" is reading "<<currentChunk->rank<<endl;
+ 	cerr<<"Thread #"<<rankThread<<" is reading chunk rank#"<<currentChunk->rank<<endl;
 #endif
 	//cout<<"rank "<< &(currentChunk->dataToProcess) <<endl;
     }
@@ -1866,7 +2038,7 @@ void *mainHeteroComputationThread(void * argc){
     //cout<<currentChunk->rangeGen<<endl;
 
 #ifdef HETVERBOSE
-    cerr<<"Thread #"<<rankThread<<" is reading "<<currentChunk->rangeGen<<endl;
+    cerr<<"Thread #"<<rankThread<<" is reading region "<<currentChunk->rangeGen<<endl;
 #endif
 
     //sleep(10);
@@ -1874,6 +2046,10 @@ void *mainHeteroComputationThread(void * argc){
 
     
 
+
+#ifdef HETVERBOSE
+    cerr<<"Thread #"<<rankThread<<" is reading BAM file: "<<bamFileToOpen<<endl;
+#endif
 
     BamReader reader;
     if ( !reader.Open(bamFileToOpen) ) {
@@ -1891,9 +2067,11 @@ void *mainHeteroComputationThread(void * argc){
     // retrieve reference data
     const RefVector  references = reader.GetReferenceData();
     const int        refID      = reader.GetReferenceID( currentChunk->rangeGen.getChrName() );
-    
-    // cerr<<"Thread #"<<rankThread<<" refID "<<refID<<endl;    
-    // cerr<<"Thread #"<<rankThread<<" "<<references[0].RefName<<endl;
+
+#ifdef HETVERBOSE
+    cerr<<"Thread #"<<rankThread<<" refID   "<<refID<<endl;    
+    cerr<<"Thread #"<<rankThread<<" refName "<<references[refID].RefName<<endl;
+#endif
 
     BamRegion bregion (refID, 
 		       currentChunk->rangeGen.getStartCoord(), 
@@ -1902,7 +2080,9 @@ void *mainHeteroComputationThread(void * argc){
 
     bool setRegionRes=reader.SetRegion( bregion   );
 
-    // cerr<<"Thread #"<<rankThread<<" "<<references[0].RefName<<"\t"<<setRegionRes<<endl;
+#ifdef HETVERBOSE
+    cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\tsucces? "<<setRegionRes<<endl;
+#endif
 
     if( refID==-1 ||
        !setRegionRes){
@@ -1915,13 +2095,16 @@ void *mainHeteroComputationThread(void * argc){
     dataToWrite->rangeGen      =  currentChunk->rangeGen;
     dataToWrite->rank          =  currentChunk->rank;
 
+    vector<positionInformation> * piForGenomicWindow = new vector<positionInformation> ();
+
     //dataToWrite->dataToWriteOut=new vector<PositionResult *>();
     heteroComputerVisitor* cv = new heteroComputerVisitor(references,
 							  refID,
 							  currentChunk->rangeGen.getStartCoord(), 
 							  currentChunk->rangeGen.getEndCoord()  ,
-							  contrate,
-							  dataToWrite->vecPositionResults);
+							  dataToWrite->vecPositionResults,
+							  rankThread,
+							  piForGenomicWindow);
 
     
 
@@ -1931,7 +2114,8 @@ void *mainHeteroComputationThread(void * argc){
     BamAlignment al;
     //unsigned int numReads=0;
     while ( reader.GetNextAlignment(al) ) {
-        pileup.AddAlignment(al);
+        //cout<<"mainHeteroComputationThread al.Name="<<al.Name<<endl;
+	pileup.AddAlignment(al);
     }
 
     //clean up
@@ -1939,11 +2123,21 @@ void *mainHeteroComputationThread(void * argc){
     reader.Close();
     //fastaReference.Close();
     
-    //cerr<<"Thread #"<<rankThread <<" "<<cv->getTotalBases()<<"\t"<<cv->getTotalSites()<<"\t"<<double(cv->getTotalBases())/double(cv->getTotalSites())<<endl;
+    cerr<<"Thread #"<<rankThread <<" bases="<<thousandSeparator(cv->getTotalBases())<<"\tsites="<<thousandSeparator(cv->getTotalSites())<<"\t"<<double(cv->getTotalBases())/double(cv->getTotalSites())<<endl;
+
+
+
+
+
 
     delete cv;
 
+
+    computeLL(piForGenomicWindow);
+    delete piForGenomicWindow;
 	
+
+    //call computeLL here
 #ifdef HETVERBOSE
     cerr<<"Thread #"<<rankThread <<" is done with computations"<<endl;
 #endif
@@ -2667,42 +2861,45 @@ int main (int argc, char *argv[]) {
     cerr<<"..done"<<endl;
     //    return 1;
 
-
     cerr<<"Computing average coverage.."<<endl;
-    if( !lambdaCovSpecified ){
-	int    bpToExtract       = sizeChunk;
+
+    int                   rc=0;
+    pthread_t             threadCov[numberOfThreads];
+
+    int    bpToExtract       = sizeChunk;
     
-	pthread_t             thread[numberOfThreads];
-	int                   rc=0;
 
 
 
-	GenomicWindows     rw  (fastaIndex,false);
+    GenomicWindows     rw  (fastaIndex,false);
 
 
-	vector<GenomicRange> v = rw.getGenomicWindows(bpToExtract,0);
-	if( v.size() == 0 ){    cerr<<"No range found using these chr/loci settings"<<endl; return 1;}
+    vector<GenomicRange> v = rw.getGenomicWindows(bpToExtract,0);
+    if( v.size() == 0 ){    cerr<<"No range found using these chr/loci settings"<<endl; return 1;}
     
-	unsigned int      rank=0;
-	int          lastRank=-1;
-	unsigned int sizeGenome=0;
+    unsigned int      rank  = 0;
+    int          lastRank   =-1;
+    unsigned int sizeGenome = 0;
 
-	for(unsigned int i=0;i<v.size();i++){
-	    cout<<"genomic region #"<<i<<" "<<v[i]<<endl;
-	    DataChunk * currentChunk = new DataChunk();
+    for(unsigned int i=0;i<v.size();i++){
+	cout<<"genomic region #"<<i<<" "<<v[i]<<endl;
+	DataChunk * currentChunk = new DataChunk();
 	
-	    currentChunk->rangeGen   = v[i];
-	    currentChunk->rank       = rank;
-	    lastRank                 = rank;
-	    //sizeGenome             += v[i].getLength();
+	currentChunk->rangeGen   = v[i];
+	currentChunk->rank       = rank;
+	lastRank                 = rank;
+	//sizeGenome             += v[i].getLength();
  
-	    queueDataToprocess.push(currentChunk);
-	    rank++;
-	}
-	readDataDone=true;
-	//    return 1;
+	queueDataToprocess.push(currentChunk);
+	rank++;
+    }
+    readDataDone=true;
+    //    return 1;
 
-	vector<GenoResults *> vectorGenoResults;
+    vector<GenoResults *> vectorGenoResults;
+
+
+    if( !lambdaCovSpecified ){
 
 	// if(!genoFileAsInputFlag){
 
@@ -2726,7 +2923,7 @@ int main (int argc, char *argv[]) {
 	pthread_mutex_init(&mutexRank ,   NULL);
 
 	for(int i=0;i<numberOfThreads;i++){
-	    rc = pthread_create(&thread[i], NULL, mainCoverageComputationThread, NULL);
+	    rc = pthread_create(&threadCov[i], NULL, mainCoverageComputationThread, NULL);
 	    checkResults("pthread_create()\n", rc);
 	}
 
@@ -2740,7 +2937,7 @@ int main (int argc, char *argv[]) {
     
 	//waiting for threads to finish
 	for (int i=0; i <numberOfThreads; ++i) {	
-	    rc = pthread_join(thread[i], NULL);
+	    rc = pthread_join(threadCov[i], NULL);
 	    checkResults("pthread_join()\n", rc);
 	}
 	cerr<<"Coverage computations are done"<<endl;
@@ -2749,7 +2946,7 @@ int main (int argc, char *argv[]) {
 	pthread_mutex_destroy(&mutexCounter);
 
 	//    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
-	//    pthread_exit(NULL);
+	pthread_exit(NULL);
     
 	rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
     }else{ //not lambdaCovSpecified
@@ -2765,18 +2962,18 @@ int main (int argc, char *argv[]) {
     cout<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
 #endif
 
-    cov2probPoisson = vector<long double> (MAXCOV,0);
+    cov2probPoisson = new vector<long double> (MAXCOV+1,0);
 
     for(int i=0;i<=MAXCOV;i++){
 	long double florPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovFloor)/poisson_pmfl( rateForPoissonCovFloor, rateForPoissonCovFloor);
 	long double ceilPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovCeil) /poisson_pmfl( rateForPoissonCovCeil,  rateForPoissonCovCeil);
 		
-	cov2probPoisson[i] = (1.0-(rateForPoissonCov-rateForPoissonCovFloor))*florPPMF  + (1.0-(rateForPoissonCovCeil-rateForPoissonCov))*ceilPPMF;
+	cov2probPoisson->at(i) = (1.0-(rateForPoissonCov-rateForPoissonCovFloor))*florPPMF  + (1.0-(rateForPoissonCovCeil-rateForPoissonCov))*ceilPPMF;
 
 #ifdef DEBUGCOV
 	cerr<<"florPPMF "<<i<<" = "<<poisson_pmfl( (long double)(i), rateForPoissonCovFloor)<<"/"<<poisson_pmfl( rateForPoissonCovFloor, rateForPoissonCovFloor)<<" "<<florPPMF<<" w= "<<(1.0-(rateForPoissonCov-rateForPoissonCovFloor))<<endl;
 	cerr<<"ceilPPMF "<<i<<" = "<<poisson_pmfl( (long double)(i), rateForPoissonCovCeil) <<"/"<<poisson_pmfl( rateForPoissonCovCeil,  rateForPoissonCovCeil)<<" "<<ceilPPMF<<" w= "<<(1.0-(rateForPoissonCovCeil-rateForPoissonCov))<<endl;
-	cerr<<"cov2probPoisson["<<i<<"] = "<<cov2probPoisson[i]<<endl;
+	cerr<<"cov2probPoisson["<<i<<"] = "<<cov2probPoisson->at(i)<<endl;
 #endif
 
     }
@@ -2797,6 +2994,7 @@ int main (int argc, char *argv[]) {
 
     // return 1;
 
+    // pthread_exit(NULL);
 
     ////////////////////////////
     // END   Compute coverage //
@@ -2816,7 +3014,6 @@ int main (int argc, char *argv[]) {
 
 
 
-#ifdef NODEF
 
 
 
@@ -2825,15 +3022,21 @@ int main (int argc, char *argv[]) {
     ///////////////////////
     //  Compute hetero   //
     ///////////////////////
+    pthread_t             threadHet[numberOfThreads];
+    threadID2Rank=map<unsigned int, int> ();
+
+
     cerr<<"Creating threads for heterozygosity calculation"<<endl;
     pthread_mutex_init(&mutexQueue,   NULL);
     pthread_mutex_init(&mutexCounter, NULL);
     pthread_mutex_init(&mutexRank ,   NULL);
+    
 
     for(int i=0;i<numberOfThreads;i++){
-	rc = pthread_create(&thread[i], NULL, mainHeteroComputationThread, NULL);
+	rc = pthread_create(&threadHet[i], NULL, mainHeteroComputationThread, NULL);
 	checkResults("pthread_create()\n", rc);
     }
+    //    return 1;
     // 	//threads are running here
 
     // unsigned int originalSize = queueDataToprocess.size();
@@ -2841,8 +3044,8 @@ int main (int argc, char *argv[]) {
     // 	cout<<"# of slices left to process: "<<queueDataToprocess.size()<<"/"<<originalSize<<endl;
     // 	sleep(timeThreadSleep);
     // }
-
-
+    cerr<<"done creating threads "<<endl;
+    cerr<<"outFileSiteLLFlag ="<<outFileSiteLLFlag<<endl;
     ///////////////////
     //Writing data out/
     ///////////////////
@@ -2850,27 +3053,27 @@ int main (int argc, char *argv[]) {
 
     Internal::BgzfStream  bgzipWriter;
 
-    if(outFileSiteLLFlag){
-	bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
-	if(!bgzipWriter.IsOpen()){
-	    cerr<<"Cannot open file "<<outFileSiteLL<<" in bgzip writer"<<endl;
-	    return 1;
-	}
+    // if(outFileSiteLLFlag){
+    // 	bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
+    // 	if(!bgzipWriter.IsOpen()){
+    // 	    cerr<<"Cannot open file "<<outFileSiteLL<<" in bgzip writer"<<endl;
+    // 	    return 1;
+    // 	}
     
 
-	string headerOutFile;
-	if(useVCFoutput){
-	    headerOutFile="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
-	}else{
-	    headerOutFile="#CHROM\tPOS\tA\tC\tG\tT\tGENO\tGENOS\tQualL\tCovL\tAA\tAC\tAG\tAT\tCC\tCG\tCT\tGG\tGT\tTT\n";	
-	}
+    // 	string headerOutFile;
+    // 	if(useVCFoutput){
+    // 	    headerOutFile="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
+    // 	}else{
+    // 	    headerOutFile="#CHROM\tPOS\tA\tC\tG\tT\tGENO\tGENOS\tQualL\tCovL\tAA\tAC\tAG\tAT\tCC\tCG\tCT\tGG\tGT\tTT\n";	
+    // 	}
 
-	bgzipWriter.Write(headerOutFile.c_str(),headerOutFile.size());
-    }
+    // 	bgzipWriter.Write(headerOutFile.c_str(),headerOutFile.size());
+    // }
 
     bool wroteEverything=false;
     int lastWrittenChunk=-1;   
-           
+    cerr<<"test wroteEverything="<<wroteEverything<<endl;
     while(!wroteEverything){
 
 	//threads are running here
@@ -2981,7 +3184,7 @@ int main (int argc, char *argv[]) {
 
     //waiting for threads to finish    
     for (int i=0; i <numberOfThreads; ++i) {
-	rc = pthread_join(thread[i], NULL);
+	rc = pthread_join(threadHet[i], NULL);
 	checkResults("pthread_join()\n", rc);
     }
 
@@ -3028,6 +3231,9 @@ int main (int argc, char *argv[]) {
     // BEGIN COMPUTE HETERO RATE    //
     //                              //
     //////////////////////////////////
+
+
+#ifdef NODEF
 
     long double randomLog = -1.0*log(1000);
     vector<GenoResults *> vectorGenoResultsT;
@@ -3403,7 +3609,7 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
-
+    delete(cov2probPoisson);
     
     return 0;
 }

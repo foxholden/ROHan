@@ -1,5 +1,5 @@
 
-CXX      = g++ -g
+CXX      = g++ #-g -pg
 LIBGAB   = ../lib/libgab/
 
 CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c

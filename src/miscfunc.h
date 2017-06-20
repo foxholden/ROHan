@@ -123,9 +123,9 @@ typedef struct {
     char base;
     int  qual;
     int  mapq;       
-    int dist5p;
-    int dist3p;
-    bool isReversed;
+    /* int dist5p; */
+    /* int dist3p; */
+    bool isrv;
 } singleRead;
 
 //To store contamination likelihood
@@ -139,9 +139,9 @@ typedef struct {
 
 typedef struct { 
     vector<singleRead> readsVec;
-    long double mapqAvg;
-    int cov;
-    char refBase;
+    /* long double mapqAvg; */
+    //int cov;
+    //char refBase;
     int posAlign;
     bool skipPosition;
 } positionInformation;
