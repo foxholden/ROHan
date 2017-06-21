@@ -46,7 +46,7 @@ using namespace BamTools;
 //#define DEBUGDEFAULTFREQ
 //#define DEBUGDEAM
 //#define DEBUGHCOMPUTE
-//#define DEBUGCOMPUTELL
+#define DEBUGCOMPUTELL
 #define HETVERBOSE
 //#define COVERAGETVERBOSE
 #define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
@@ -77,6 +77,7 @@ long double likeMismatchMap     [MAXMAPPINGQUAL+1];
 long double likeMatchProbMap    [MAXMAPPINGQUAL+1];
 long double likeMismatchProbMap [MAXMAPPINGQUAL+1];
 
+long double TStoTVratio;
 
 vector< vector<long double> > binomVec (MAXCOV+1,vector<long double>(MAXCOV+1,0)) ;
 unsigned int totalBasesSum;
@@ -1203,153 +1204,63 @@ inline long double computeBaseAl2Obs(const int al,
 
 
 
-#ifdef TODELETE
-//! A method to compute the prob. of seeing observed ob for a given genotype al1Current and al1Current
-/*!
-  This method is called by class heteroComputerVisitor : public PileupVisitor, computes the probability of
-  observing the set of bases obsBase with qualities obsQual. 
-*/
-inline long double computeLL(const int                           al1Current    ,
-			     const int                           al2Current    ,		      
-			     const vector<int>                 & obsBase       ,
-			     const vector<int>                 & obsQual       ,
-			     // const vector<long double> & probDeam1to2  , //rate of deamination from al1 to al2
-			     // const vector<long double> & probDeam2to1  , //rate of deamination from al2 to al1
-			     const vector<probSubstition *>    & probDeam      , //rate of deamination from al2 to al1
-			     const vector<bool>                & isRev         ,//false = plus strand, true = reverse		      
-			     const long double                   contRate      ,
-			     const int                           alCCurrent ,
-			     const vector<long double>         & mismappingProb
-			     ){
-    //computeLLRes toreturn;
-    long double llik=0;
-    long double llik1=0;
-    long double llik2=0;
-    long double llikC=0;
-    
-#ifdef DEBUGCOMPUTELL
-    cout<<endl<<"al1="<<al1Current<<"\tal2="<<al2Current<<endl;
-#endif
-
-    for(int i=0;i<int(obsBase.size());i++){//iterating over each observed base
-
-#ifdef DEBUGCOMPUTELL
-	cout<<i<<"\tob="<<obsBase[i]<<"\ta1="<<al1Current<<"\ta2="<<al2Current<<"\talc"<<alCCurrent<<endl;
-#endif
-
-
-	llikC = computeBaseAl2Obs(alCCurrent  ,
-				  obsBase[i]  ,
-				  obsQual[i]  ,
-				  &defaultSubMatch,//no deamination for the contaminant
-				  isRev[i]    ,
-				  mismappingProb[i]);
-	
-
-
-
-	
-	long double llikAl1t=0;
-	long double llikAl2t=0;
-	
-	
-
-
-	
-	llikAl1t = computeBaseAl2Obs(al1Current   ,
-				     obsBase[i]   ,
-				     obsQual[i]   ,
-				     probDeam[i]  , //deamination for the endogenous
-				     isRev[i]     ,
-				     mismappingProb[i]);
-
-
-
-	llikAl2t = computeBaseAl2Obs(al2Current   ,
-				     obsBase[i]   ,
-				     obsQual[i]   ,
-				     probDeam[i] , //deamination for the endogenous
-				     isRev[i]     ,
-				     mismappingProb[i]);
-
-
-
-#ifdef DEBUGCOMPUTELL
-	// cout<<i<<"\tdeam1to2="<<(probSubDeam1toObs)<<endl;
-	// cout<<i<<"\tdeam2to1="<<(probSubDeam2toObs)<<endl;
-
-	cout<<i<<"\tlm="<<likeMatchProb[obsQual[i]]<<"\tlmm="<<likeMismatchProb[obsQual[i]]<<"\tlmism="<<mismappingProb[i]<<endl;
-	cout<<i<<"\tla1="<<llikAl1t <<"\tla2="<<llikAl2t<<endl;
-#endif
-	// exit(1);
-
-	long double llikTE   = (llikAl1t + llikAl2t)/2.0 ;   //endogenous likelihood  0.5*al1 + 0.5*al2
-
-
-
-	long double llikT   = (1.0-contRate)*(  llikTE ) + (contRate)*llikC  ;	
-	llik               += logl(llikT);
-
- 	llik1=oplusInitnatl( llik1, logl(llikAl1t) );
-	llik2=oplusInitnatl( llik2, logl(llikAl2t) );
-
-#ifdef DEBUGCOMPUTELL
-	cout<<i<<"\tLLa1="<<llikAl1t <<"\tLLa2="<<llikAl2t<<"\tLLC="<<llikC<<"\tLLE="<<llikTE<<"\tLLT="<<llikT<<"\tlogLLT="<<logl(llikT)<<endl;
-#endif
-
-    }
-	//cout<<"CC\t"<<llikCC<<"\t"<<llikCC1<<"\t"<<llikCC2<<endl;    
-#ifdef DEBUGCOMPUTELL
-    cout<<"ll1="<<llik1<<"\tll2="<<llik2<<"\tp1="<<expl(llik1)<<"\tp2="<<expl(llik2)<<endl;
-#endif
-
-    //BEGIN BINOMIAL COEFFICIENT
-    long double expal1  = ((long double)(obsBase.size())) * ( expl(llik1) / expl(oplusnatl(llik1,llik2))) ;
-    int expal_f = floorl(expal1);
-    int expal_c =  ceill(expal1);
-
-    long double expal_fb= binomVec[int(obsBase.size())][expal_f];
-    long double expal_cb= binomVec[int(obsBase.size())][expal_c];
-
-    long double expal_fr = 1-(expal1-expal_f);
-    long double expal_cr = 1-(expal_c-expal1);
-    //END BINOMIAL COEFFICIENT
-    // if(expal_f == expal_c){
-    // 	expal_fr = 1.0;
-    // 	expal_cr = 0.0;
-    // }
-
-#ifdef DEBUGCOMPUTELL
-    cout<<"expal1="<<expal1<<endl;
-    cout<<"expal_f="<<expal_f<<"\texpal_fb="<<expal_fb<<"\texpal_fr="<<expal_fr<<endl;
-    cout<<"expal_c="<<expal_c<<"\texpal_cb="<<expal_cb<<"\texpal_cr="<<expal_cr<<endl;
-#endif
-
-    //long double expal1=roundl(  sizeAr * ( expl(llik1) / llik1+llik2)) );
-    //long double expal2  = sizeAr-expal1;
-    long double binomE2 = expal_fr*expal_fb+expal_cr*expal_cb;
-    
-#ifdef DEBUGCOMPUTELL
-    cout<<"a1="<<al1Current<<" a2="<<al2Current<<"\tll="<<llik<<"\tE[1]="<<expal1<<"\tE[2]="<<(double(obsBase.size())-expal1)<<endl;
-    cout<<"b="<<binomE2<<"\tb="<<expl(binomE2)<<"\tb+l="<<(binomE2+llik)<<endl;
-#endif
-    
-    // toreturn.ll     = (binomE2+llik);
-    // toreturn.expal1 = expal1;
-    // toreturn.expal2 = expal2;
-    
-    return (binomE2+llik);
-} //end computeLL
-#endif
 
 
 inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
     cout<<"computeLL "<<piForGenomicWindow->size()<<endl;
-    // for(int i=0;i<piForGenomicWindow.size();i++){
-	
-    // }
+    long double h=0.1000;
+    diNucleotideProb priorGenotype;
+    //compute prior genotype matrix
+    
+    for(int ba=0;ba<4;ba++){//ancestral base
 
+	for(int bd=0;bd<4;bd++){//derived base
+	    if(ba == bd){
+		priorGenotype.p[ba][bd]     = dnaDefaultBases.f[ba]*(1.0-h);
+		cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<<(1.0-h)<<endl;
+
+	    }else{//mutation
+		if( (ba%2)==(bd%2) ){//transition
+		    priorGenotype.p[ba][bd] = dnaDefaultBases.f[ba]*( (h) * (TStoTVratio/(TStoTVratio+1.0)) );
+		    cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<< ( (h) * (TStoTVratio/(TStoTVratio+1.0)) )<<endl; 
+		}else{
+		    priorGenotype.p[ba][bd] = dnaDefaultBases.f[ba]*( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0;
+		    cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<< ( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0<<endl; 
+		}
+	    }
+	}
+    }
+	
+
+#ifdef DEBUGCOMPUTELL
+    cerr<<"h="<<h<<endl;
+    cerr<<"\t";
+    for(int ba=0;ba<4;ba++)
+	cerr<<"ACGT"[ba]<<"\t";
+    cerr<<endl;
+    long double sumProb_=0.0;
+    for(int ba=0;ba<4;ba++){
+	cerr<<"ACGT"[ba]<<"\t";
+	for(int bd=0;bd<4;bd++){
+	    cerr<<priorGenotype.p[ba][bd]<<"\t";
+	    sumProb_+=priorGenotype.p[ba][bd];
+	}
+	cerr<<endl;
+    }
+    cerr<<endl;
+    cerr<<"sum = "<<sumProb_<<endl;
+	    
+    exit(1);
+#endif
+
+
+    for(unsigned int p=0;p<piForGenomicWindow->size();p++){
+	cout<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+	//todo
+	
+    }
+    
 }
 
 class coverageComputeVisitor : public PileupVisitor {
@@ -1411,378 +1322,6 @@ private:
 
 
 
-#ifdef TODELETE
-class heteroComputerVisitor : public PileupVisitor {
-  
-public:
-    heteroComputerVisitor(const RefVector& references, 
-			  const int refID,
-			  const unsigned int leftCoord,
-			  const unsigned int rightCoord,
-			  const long double contRate,
-			  vector<PositionResult *> * dataToWriteOut)
-	: PileupVisitor()
-	, m_references(references)
-	, m_refID(refID)
-	, m_leftCoord(leftCoord)
-	, m_rightCoord(rightCoord)
-	, m_contRate(contRate)
-	, m_dataToWriteOut( dataToWriteOut)
-    { 
-    }
-    ~heteroComputerVisitor(void) { }
-  
-    // PileupVisitor interface implementation
-
-    
-    void Visit(const PileupPosition& pileupData) {   
-
-
-	if(pileupData.Position < int(m_leftCoord)   || 
-	   pileupData.Position > int(m_rightCoord) ){
-	    return ;
-	}
-
-	int                 totalBases=0 ;
-	int                 counterB  [4];
-	//long double         llBaseDeam[4];
-	vector<int>              obsBase      ;
-	vector<int>              obsQual      ;
-	vector<long double>      mmProb       ; //mismapping probability
-	vector<probSubstition *> substitutionRatesPerRead;
-	vector<bool>             isRevVec;
-	// vector<probSubstition *> substitutionRatesPerRead    (pileupData.PileupAlignments.size(),NULL );
-	// vector<bool>             isRevVec                    (pileupData.PileupAlignments.size(),false);
-	
-	//reserve
-	//cout<<"init1 "<<obsBase.size()<<"\t"<<substitutionRatesPerRead.size()<<"\t"<<pileupData.PileupAlignments.size()<<endl;
-	//TODO Debub resize
-	// obsBase.resize(pileupData.PileupAlignments.size());
-	// obsQual.resize(pileupData.PileupAlignments.size());
-	// mmProb.resize(pileupData.PileupAlignments.size());
-	// substitutionRatesPerRead.resize(pileupData.PileupAlignments.size());
-	// isRevVec.resize(pileupData.PileupAlignments.size());
-	// cout<<"init2 "<<obsBase.size()<<"\t"<<substitutionRatesPerRead.size()<<"\t"<<pileupData.PileupAlignments.size()<<endl;
-
-
-	unsigned int                posAlign = pileupData.Position+1;
-
-	for(unsigned int i=0;i<4;i++){
-	    counterB[i]   = 0;
-	    //llBaseDeam[i] = 0.0;
-	}
-	//vector<bool> includeFragment (pileupData.PileupAlignments.size(),false);
-
-	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-
-
-	    if( pileupData.PileupAlignments[i].IsCurrentDeletion   ||
-	    	pileupData.PileupAlignments[i].IsNextInsertion     ||
-	    	pileupData.PileupAlignments[i].IsNextDeletion      ||
-		(pileupData.PileupAlignments[i].DeletionLength>0)  ||
-		(pileupData.PileupAlignments[i].InsertionLength>0) ){		
-		//includeFragment was initialized as false
-	    	continue;
-	    }
-
-
-	    if(i>=MAXCOV){
-		break;
-	    }
-
-	    char  b   =     pileupData.PileupAlignments[i].Alignment.QueryBases[ pileupData.PileupAlignments[i].PositionInAlignment ];
-	    if(!isResolvedDNA(b)){ 
-		continue; 
-	    }//avoid Ns
-	    int bIndex = baseResolved2int(b);
-	    int   q    = int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual); 
-	    int   m    = int(pileupData.PileupAlignments[i].Alignment.MapQuality);
-	  
-
-	    // BEGIN DEAMINATION COMPUTATION
-            //zero base distance to the 5p/3p end
-            int dist5p=-1;
-            int dist3p=-1;
-
-	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
-	    //isRevVec[i]=isRev;
-	    
-            if( isRev ){
-                dist5p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
-                dist3p = pileupData.PileupAlignments[i].PositionInAlignment;
-            }else{
-                dist5p = pileupData.PileupAlignments[i].PositionInAlignment;
-                dist3p = pileupData.PileupAlignments[i].Alignment.QueryBases.size() - pileupData.PileupAlignments[i].PositionInAlignment-1;
-            }
-	    
-	    // cout<<"5p="<<dist5p<<" 3p="<<dist3p<<endl;
-
-            // probSubstition * probSubMatchToUseEndo = &defaultSubMatch ;
-            // probSubstition * probSubMatchToUseCont = &defaultSubMatch ;
-            probSubstition * probSubMatchToUseEndo = &defaultSubMatch ;
-            // substitutionRates * probSubMatchToUseCont = &defaultSubMatch ;
-	    
-
-            if(dist5p <= (int(sub5p.size()) -1)){ //out of range
-                probSubMatchToUseEndo = &sub5p[  dist5p ];                      
-            }else{
-		//TODO what to do in between
-		//probSubMatchToUseEndo = &sub5p[  int(sub5p.size()) -1 ];                      
-	    }
-
-            if(dist3p <= (int(sub3p.size()) -1)){ // out of range
-                probSubMatchToUseEndo = &sub3p[  dist3p ];
-            }else{
-		//TODO what to do in between
-		//probSubMatchToUseEndo = &sub3p[ int(sub3p.size()) -1 ];
-	    }
-
-            //we have substitution probabilities for both... take the closest
-            if(dist5p <= (int(sub5p.size()) -1) &&
-               dist3p <= (int(sub3p.size()) -1) ){
-                    
-                if(dist5p < dist3p){
-                    probSubMatchToUseEndo = &sub5p[  dist5p ];
-                }else{
-                    probSubMatchToUseEndo = &sub3p[  dist3p ];
-                }
-                    
-            }
-	    //cout<<"add= "<<i<<"\t"<<bIndex<<"\t"<<probSubMatchToUseEndo<<"\t"<<obsBase.size()<<"\t"<<substitutionRatesPerRead.size()<<endl;
-	    //substitutionRatesPerRead[i] = probSubMatchToUseEndo;
-
-  
-	    //cout<<"pos "<<posAlign<<" "<<bIndex<<" "<<b<<" "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
-	    counterB[ bIndex ]++;
-	    totalBases++;
-
-	    obsBase.push_back(             bIndex   );
-	    obsQual.push_back(                  q   );
-	    mmProb.push_back(  likeMismatchProbMap[m]  );
-	    substitutionRatesPerRead.push_back( probSubMatchToUseEndo );
-	    isRevVec.push_back(isRev);
-	    //	    includeFragment[i]=true;
-
-	}//END FOR EACH READ
-
-	if(totalBases == 0) 
-	    return;
-
-	PositionResult * prToAdd=new PositionResult();
-	prToAdd->refID = m_refID;
-	prToAdd->pos   = posAlign;
-
-	int counterUnique=0;
-	for(int i=0;i<4;i++){
-	    prToAdd->baseC[i] = counterB[i];
-	    if(counterB[i]!=0) 
-		counterUnique++;
-
-	}
-
-
-	if(m_contRate == 0){
-	    int alc=randomInt(0,3);//random cont base
-	    int genoIdx=0;
-	    for(int al1=0;al1<4;al1++){
-		for(int al2=0;al2<4;al2++){
-		    if(al2<al1)
-			continue;
-
-		    //cout<<"ACGT"[al1]<<"\t"<<"ACGT"[al2]<<"\t"<<counterB[al1]<<"\t"<<counterB[al2]<<endl;
-		    
-		    
-		    //TO REMOVE
-		    // if(obsBase.size() != substitutionRatesPerRead.size() ){
-		    // 	cerr<<"problem2 "<<obsBase.size()<<" "<<substitutionRatesPerRead.size()<<endl;
-		    // 	cerr<<prToAdd->refID<<"\t"<<prToAdd->pos<<endl;
-		    // 	exit(1);
-		    // }
-
-		    // for(unsigned int i=0;i<substitutionRatesPerRead.size();i++){
-		    // 	cout<<"ll "<<i<<"\t"<<obsBase[i]<<"\t"<<substitutionRatesPerRead[i]<<endl;
-		    // }
-
-
-		    long double ll=computeLL(al1         ,//al1
-					     al2         ,//al2		      		  
-					     obsBase     ,
-					     obsQual     ,
-					     substitutionRatesPerRead,
-					     isRevVec    ,
-					     m_contRate  ,
-					     alc         ,//cont
-					     mmProb      );
-
-
-		    //cout<<"ACGT"[al1]<<"\t"<<"ACGT"[al2]<<"\t"<<ll<<endl;
-		    prToAdd->ll[genoIdx]=ll;
-		    genoIdx++;
-		}
-	    }
-
-	}else{
-	    for(int genoIdx=0;genoIdx<10;genoIdx++)
-		prToAdd->ll[genoIdx] = 0.0;
-	    long double factorScale = logl( ( (long double)1) / ((long double)counterUnique) );
-
-	    for(int alc=0;alc<4;alc++){//for each contaminant
-		if(counterB[alc]==0) //just concentrate on bases that are there
-		    continue;
-
-				
-		int genoIdx=0;
-		for(int al1=0;al1<4;al1++){
-		    for(int al2=0;al2<4;al2++){
-			if(al2<al1)
-			    continue;
-			
-			
-			
-			long double ll=computeLL(al1         ,//al1
-						 al2         ,//al2		      		  
-						 obsBase     ,
-						 obsQual     ,
-						 substitutionRatesPerRead,
-						 isRevVec    ,
-						 m_contRate  ,
-						 alc         ,//cont
-						 mmProb      );
-						
-			prToAdd->ll[genoIdx]=oplusInitnatl(prToAdd->ll[genoIdx],ll+factorScale);
-
-#ifdef DEBUGCOMPUTELL
-			cout<<"ACGT"[al1]<<"\t"<<"ACGT"[al2]<<"\t""\t"<<"ACGT"[alc]<<"\t"<<ll<<"\t"<<factorScale<<"\t"<<prToAdd->ll[genoIdx]<<endl<<"--------------------"<<endl;
-#endif
-			genoIdx++;
-		    }
-		}
-
-	    }
-	}	
-	
-
-	
-
-
-
-
-
-	//TODO
-
-	// char refB="ACGT"[ref];
-	// char altB="ACGT"[alt];
-	// PositionResult * prToAdd=new PositionResult();
-	// prToAdd->refID = m_refID;
-	// prToAdd->pos   = posAlign;
-	// prToAdd->refB  = refB;
-	// prToAdd->altB  = altB;
-	// prToAdd->refC  = counterB[ref];
-	// prToAdd->altC  = counterB[alt];
-
-
-
-       
-
-
-	//normalize
-	long double llEvidence=prToAdd->ll[0] ;
-	for(int genoIdx=1;genoIdx<10;genoIdx++){
-	    llEvidence = oplusnatl(llEvidence,prToAdd->ll[genoIdx] );
-	    //cout<<genoIdx<<"\t"<<prToAdd->ll[genoIdx]<<"\t"<<llEvidence<<endl;
-	}
-
-	for(int genoIdx=0;genoIdx<10;genoIdx++){
-	    prToAdd->ll[genoIdx] = prToAdd->ll[genoIdx] - llEvidence;
-	    //cout<<genoIdx<<"\t"<<prToAdd->ll[genoIdx]<<"\t"<<llEvidence<<endl;
-	}
-
-	
-	//	exit(1);
-	//TODO
-       // prToAdd->rrll  = oplusnatl( rrllCr+logl(0.5), rrllCa+logl(0.5));
-       // prToAdd->rall  = oplusnatl( rallCr+logl(0.5), rallCa+logl(0.5));
-       // prToAdd->aall  = oplusnatl( aallCr+logl(0.5), aallCa+logl(0.5));
-	vector<long double> arrLL (10,0.0); 
-
-	
-	//for(int g=0;g<10;g++){
-	for(int genoIdx=0;genoIdx<10;genoIdx++){
-	    arrLL[genoIdx] = prToAdd->ll[genoIdx];
-	}
-	// cout<<"-----"<<endl;
-	
-	// arrLL[0]       = prToAdd->rrll;
-	// arrLL[1]       = prToAdd->rall;
-	// arrLL[2]       = prToAdd->aall;
-	sort (arrLL.begin(), arrLL.end() , greater<long double>());
-	
-	// for(int genoIdx=0;genoIdx<10;genoIdx++){
-	//     cout<<genoIdx<<"\t"<<arrLL[genoIdx]<<endl;
-	// }
-
-	prToAdd->lqual = (arrLL[1]-arrLL[0]);//log ratio of most likely to second most likely
-
-	// //1st most likely = 0
-	// //2nd most likely = 1
-
-
-	
-
-	for(int g=0;g<10;g++){
-	    int genoIdx = genoPriority[g];
-	    //cout<<genoIdx<<"\t"<<prToAdd->ll[genoIdx]<<"\t"<<arrLL[0]<<endl;
-	    if( prToAdd->ll[genoIdx] == arrLL[0]){
-		if(genoIdx == 0 ||
-		   genoIdx == 4 ||
-		   genoIdx == 7 ||
-		   genoIdx == 9 ){
-		    prToAdd->geno = 0;     //rr
-		}else{
-		    prToAdd->geno = 1;     //ra
-		}
-
-		prToAdd->genoS[0] = genoIdx2Code[genoIdx][0];
-		prToAdd->genoS[1] = genoIdx2Code[genoIdx][1];
-		//cout<<genoIdx<<"\t"<<prToAdd->geno<<"\t"<<prToAdd->genoS[0]<<prToAdd->genoS[1]<<endl;
-		break;
-	    }
-	}
-	// cout<<prToAdd->geno<<endl;
-
-
-	
-	//prToAdd->lqual = -1;
-       // if(arrLL[2]     == prToAdd->rrll){
-       // 	   prToAdd->geno = 0;     //rr
-       // }else{
-       // 	   if(arrLL[2] == prToAdd->rall){
-       // 	       prToAdd->geno = 1; //ra
-       // 	   }else{
-       // 	       prToAdd->geno = 2; //aa
-       // 	   }
-       // }
-
-	//prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)/pdfRateForPoissonCov );
-	//prToAdd->llCov = logl( pdfPoisson( (long double)totalBases, rateForPoissonCov)  );
-
-	m_dataToWriteOut->push_back(prToAdd);
-       
-    }//end Visit()
-    
-
-private:
-    RefVector m_references;
-    //Fasta * m_fastaReference;
-    // unsigned int totalBases;
-    // unsigned int totalSites;
-    int          m_refID;
-    unsigned int m_leftCoord;
-    unsigned int m_rightCoord;
-    long double  m_contRate;
-    vector<PositionResult *> * m_dataToWriteOut;
-};//heteroComputerVisitor
-#endif
 
 
 
@@ -2481,6 +2020,7 @@ int main (int argc, char *argv[]) {
     double lambdaCov=0;
     bool   lambdaCovSpecified=false;
 
+    TStoTVratio=2.1;
     // string genoFileAsInput    ="";
     // bool   genoFileAsInputFlag=false;
 
@@ -2503,6 +2043,7 @@ int main (int argc, char *argv[]) {
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t\t"+"Size of windows in bp  (default: "+stringify(sizeChunk)+")"+"\n"+	      
 			      "\t\t"+""  +""+"--lambda"     +"\t\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
+			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+	      
 
 
 
@@ -2597,6 +2138,12 @@ int main (int argc, char *argv[]) {
         if(string(argv[i]) == "--lambda"  ){
 	    lambdaCovSpecified=true;
             lambdaCov         =destringify<double>(argv[i+1]);
+	    i++;
+            continue;
+        }
+
+        if(string(argv[i]) == "--tstv"  ){
+            TStoTVratio         =destringify<long double>(argv[i+1]);
 	    i++;
             continue;
         }
@@ -2882,7 +2429,7 @@ int main (int argc, char *argv[]) {
     unsigned int sizeGenome = 0;
 
     for(unsigned int i=0;i<v.size();i++){
-	cout<<"genomic region #"<<i<<" "<<v[i]<<endl;
+	//cout<<"genomic region #"<<i<<" "<<v[i]<<endl;
 	DataChunk * currentChunk = new DataChunk();
 	
 	currentChunk->rangeGen   = v[i];
