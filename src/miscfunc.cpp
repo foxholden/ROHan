@@ -65,7 +65,7 @@ void readIlluminaError(const string errFile,probSubstition & illuminaErrorsProb)
 	for(unsigned int k=0;k<=9;k+=3){	
 
 	    for(unsigned int t=0;t<=2;t++){	
-		tempFreq.s[k+t]=destringify<double>(fields[k+t]);
+		tempFreq.s[k+t]=destringify<long double>(fields[k+t]);
 		//cerr<<freqIlluminaError.s[k+t]<<endl;
 	    }
 
@@ -135,7 +135,7 @@ void readNucSubstitionFreq(const string filename,vector<probSubstition> & subVec
 	    for(unsigned int k=0;k<=9;k+=3){	
 
 		for(unsigned int t=0;t<=2;t++){	
-		    tempFreq.s[k+t]=destringify<double>(fields[k+t]);
+		    tempFreq.s[k+t]=destringify<long double>(fields[k+t]);
 		}
 
 	    }
@@ -145,7 +145,7 @@ void readNucSubstitionFreq(const string filename,vector<probSubstition> & subVec
 	    int indexSecondArray=0;
 
 	    for(int nuc1=0;nuc1<4;nuc1++){
-		double sumMismatchProb=0.0;
+		long double sumMismatchProb=0.0;
 		int indexInArrayMatch=1;
 		for(int nuc2=0;nuc2<4;nuc2++){
 		    if(nuc1==nuc2){ // prob of error is 0 if both nucleotides are identical
@@ -220,7 +220,7 @@ void readNucSubstitionRatesFreq(const string filename,vector<substitutionRates> 
 
 	    for(unsigned int k=0;k<12;k++){	
 		//for(unsigned int t=0;t<=2;t++){	
-		tempFreq.s[k]=destringify<double>(fields[k]);
+		tempFreq.s[k]=destringify<long double>(fields[k]);
 		//}
 	    }
 

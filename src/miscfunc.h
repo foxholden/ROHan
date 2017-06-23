@@ -19,7 +19,7 @@
 using namespace std;
 
 typedef struct { 
-    double s[12];
+    long double s[12];
  } substitutionRates;
 
 
@@ -42,11 +42,11 @@ typedef struct {
 //  15 T->T 
 
 typedef struct { 
-    double s[16];
+    long double s[16];
 } probSubstition;
 
 typedef struct { 
-    double p[4][4];
+    long double p[4][4];
 } diNucleotideProb;
 
 
@@ -203,11 +203,11 @@ void readIlluminaError(const string errFile,probSubstition & illuminaErrorsProb)
 
 // Returns log( exp(x)+exp(y) ), but does so without causing
 // overflow or loss of precision.
-inline double oplusl( long double x, long double y ){
-    return x > y 
-        ? x + log1pl( expl(y-x ) ) 
-        : y + log1pl( expl(x-y ) ) ;
-}
+/* inline double oplusl( long double x, long double y ){ */
+/*     return x > y  */
+/*         ? x + log1pl( expl(y-x ) )  */
+/*         : y + log1pl( expl(x-y ) ) ; */
+/* } */
 
 // Returns log10( pow(10,x)+pow(10,y) ), but does so without causing
 // overflow or loss of precision.
