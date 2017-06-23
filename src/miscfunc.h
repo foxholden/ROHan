@@ -120,11 +120,14 @@ typedef struct {
 
 //To store a single read
 typedef struct { 
-    char base;
-    int  qual;
-    int  mapq;       
+    uint8_t base;
+    uint8_t qual;
+    uint8_t mapq;       
+    uint8_t pos5p;       
+    uint8_t lengthF;             
     /* int dist5p; */
     /* int dist3p; */
+    /* string name; //TO REMOVE */
     bool isrv;
 } singleRead;
 

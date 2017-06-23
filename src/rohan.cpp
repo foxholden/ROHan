@@ -56,7 +56,7 @@ using namespace BamTools;
 
 
 //#define MAXMAPPINGQUAL        257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
-#define MAXMAPPINGQUAL        37     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
+#define MAXMAPPINGQUAL          37     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
 #define MAXBASEQUAL             64      // maximal base quality score, greater qual score do not make a lot of sense
 
 //#define MAXMAPPINGBASEQUAL    64      // maximal base quality score, should be sufficient as mapping qualities are encoded using 8 bits
@@ -126,7 +126,7 @@ vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix5p;
 vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix3p;
 
 // 1D: length of fragment
-// 2D: pos fragment
+// 2D: pos fragment from the 5' end
 vector< vector< mpq2bsq2submatrix * > > length2pos2mpq2bsq2submatrix;
 
 
@@ -907,7 +907,7 @@ void initLikelihoodScores(){
 	mpq2bsq2submatrix  mpq2BaseQualSubMatrix5p;
 	mpq2bsq2submatrix  mpq2BaseQualSubMatrix3p;
 	
-	for(int mq=0;mq<MAXMAPPINGQUAL;mq++){ //for each mapping quality 
+	for(int mq=0;mq<=MAXMAPPINGQUAL;mq++){ //for each mapping quality 
 
 
 
@@ -1085,7 +1085,7 @@ void initLikelihoodScores(){
 	for(int l=0;l<L;l++){//for each pos
 	    // cerr<<"pos "<<l<<"/"<<L<<endl;//<<"\t"<<length2pos2mpq2bsq2submatrix[L][l]->size()<<endl;
 	    
-	    for(int mq=0;mq<MAXMAPPINGQUAL;mq++){ //for each mapping quality 
+	    for(int mq=0;mq<=MAXMAPPINGQUAL;mq++){ //for each mapping quality 
 		//cerr<<"mq="<<mq<<"\t"<<endl;//length2pos2mpq2bsq2submatrix[L][l]->at(mq).size()<<endl;
 
 		for(int q=0;q<=MAXBASEQUAL;q++){ //for each base quality
@@ -1217,15 +1217,15 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
 	for(int bd=0;bd<4;bd++){//derived base
 	    if(ba == bd){
-		priorGenotype.p[ba][bd]     = dnaDefaultBases.f[ba]*(1.0-h);
+		priorGenotype.p[ba][bd]     = dnaDefaultBases.f[ba]  *    (1.0-h);
 		cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<<(1.0-h)<<endl;
 
 	    }else{//mutation
 		if( (ba%2)==(bd%2) ){//transition
-		    priorGenotype.p[ba][bd] = dnaDefaultBases.f[ba]*( (h) * (TStoTVratio/(TStoTVratio+1.0)) );
+		    priorGenotype.p[ba][bd] = dnaDefaultBases.f[ba]  *  ( (h) * (TStoTVratio/(TStoTVratio+1.0)) );
 		    cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<< ( (h) * (TStoTVratio/(TStoTVratio+1.0)) )<<endl; 
 		}else{
-		    priorGenotype.p[ba][bd] = dnaDefaultBases.f[ba]*( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0;
+		    priorGenotype.p[ba][bd] = dnaDefaultBases.f[ba]  * ( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0;
 		    cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<< ( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0<<endl; 
 		}
 	    }
@@ -1251,14 +1251,92 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
     cerr<<endl;
     cerr<<"sum = "<<sumProb_<<endl;
 	    
-    exit(1);
+
 #endif
 
 
     for(unsigned int p=0;p<piForGenomicWindow->size();p++){
-	cout<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
-	//todo
+	cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+	cerr<<"B\tQ\tMQ\t5p\tL"<<endl;
+#ifdef DEBUGCOMPUTELL
+
+	for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){
+	    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
+		<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
+		<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
+		<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
+		<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
+		<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
+		//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
+		<<endl;
+
+	    
+	}
+#endif
+
+
+
+
+	// typedef vector< vector<diNucleotideProb> > mpq2bsq2submatrix;
 	
+	
+	//  // 2D: mapping quality 
+	//  // 3D: base qual
+	// vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix5p;
+	// vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix3p;
+	
+	// // 1D: length of fragment
+	// // 2D: pos fragment from the 5' end
+	// vector< vector< mpq2bsq2submatrix * > > length2pos2mpq2bsq2submatrix;
+	
+	for(int ba=0;ba<4;ba++){
+
+	    for(int bd=0;bd<4;bd++){
+		
+		long double llTotal=0.0;
+#ifdef DEBUGCOMPUTELL
+		cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\tprior="<<priorGenotype.p[ba][bd]<<endl;
+#endif
+
+		for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){ //for each fragment at pos p
+		    //Likelihood it comes from A
+
+#ifdef DEBUGCOMPUTELL
+		    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
+			<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
+			<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
+			<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
+			<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
+			<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
+			//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
+			<<endl;
+		    cerr<<length2pos2mpq2bsq2submatrix[piForGenomicWindow->at(p).readsVec[i].lengthF][piForGenomicWindow->at(p).readsVec[i].pos5p]->size()<<endl; 
+#endif
+		    
+		    long double llA = 0.5* length2pos2mpq2bsq2submatrix
+			[piForGenomicWindow->at(p).readsVec[i].lengthF]
+			[piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+			[piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base];
+
+		    //Likelihood it comes from D
+		    long double llD = 0.5* length2pos2mpq2bsq2submatrix
+			[piForGenomicWindow->at(p).readsVec[i].lengthF]
+			[piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+			[piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base];
+
+		    
+#ifdef DEBUGCOMPUTELL
+		    cerr<<llA<<"\t"<<llD<<endl;
+
+		    
+#endif
+		}
+		    //llTotal = oplusInitnatl( llTotal, (log(lgPrior)+gls[i].gl[iGl]) ); //adding probabilities
+
+		//sumProb_+=priorGenotype.p[ba][bd];
+	    }
+	    cerr<<endl;
+	}
     }
     
 }
@@ -1410,23 +1488,32 @@ public:
 	    }
 
 	    char  b   =     pileupData.PileupAlignments[i].Alignment.QueryBases[ pileupData.PileupAlignments[i].PositionInAlignment ];
-	    if(!isResolvedDNA(b)){ 
+	    if(!isResolvedDNA(b)){ //avoid Ns
 		continue; 
-	    }//avoid Ns
+	    }
 
 	    int bIndex = baseResolved2int(b);
-	    int   q    = int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual); 
-	    int   m    = int(pileupData.PileupAlignments[i].Alignment.MapQuality);
+	    int   q    = MIN( int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual), MAXBASEQUAL);
+	    int   m    = MIN( int(pileupData.PileupAlignments[i].Alignment.MapQuality), MAXMAPPINGQUAL );
 	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
-	  
+	    
+
 	    totalBases++;
 	    foundSites=true;
 
 	    singleRead sr_;
-	    sr_.base=bIndex;
-	    sr_.qual=q;
-	    sr_.mapq=m;
+	    sr_.base    = uint8_t(bIndex);
+	    sr_.qual    = uint8_t(q);
+	    sr_.mapq    = uint8_t(m);
+	    sr_.lengthF = uint8_t(pileupData.PileupAlignments[i].Alignment.Length);
+
+	    if(isRev){
+		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].Alignment.Length-pileupData.PileupAlignments[i].PositionInAlignment-1 ); 
+	    }else{
+		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].PositionInAlignment ); 
+	    }
 	    sr_.isrv=isRev;
+	    //sr_.name=pileupData.PileupAlignments[i].Alignment.Name;//to remove
 
 	    piToAdd.readsVec.push_back(sr_);
 	    // obsBase.push_back( bIndex  );
@@ -1654,7 +1741,12 @@ void *mainHeteroComputationThread(void * argc){
     //unsigned int numReads=0;
     while ( reader.GetNextAlignment(al) ) {
         //cout<<"mainHeteroComputationThread al.Name="<<al.Name<<endl;
-	pileup.AddAlignment(al);
+	
+
+	if(al.Length>=MINLENGTHFRAGMENT &&
+	   al.Length<=MAXLENGTHFRAGMENT ){	   
+	    pileup.AddAlignment(al);
+	}
     }
 
     //clean up
