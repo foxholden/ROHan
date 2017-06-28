@@ -36,6 +36,7 @@ using namespace BamTools;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
+//#define PRECOMPUTELOG
 //#define DEBUGCOV
 //#define DEBUGILLUMINAFREQ
 //#define DEBUGINITSCORES
@@ -46,7 +47,7 @@ using namespace BamTools;
 //#define DEBUGDEFAULTFREQ
 //#define DEBUGDEAM
 //#define DEBUGHCOMPUTE
-#define DEBUGCOMPUTELL
+//#define DEBUGCOMPUTELL
 #define HETVERBOSE
 //#define COVERAGETVERBOSE
 #define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
@@ -178,7 +179,22 @@ long double randomPMatch4Bases    =  1.0-randomPMismatch4Bases;                 
 long double randomPMmToABase      =  ( (long double)(1) ) /  ( (long double)(3) );  // 1/3, prob of a mismatch to given base
 
 string genoIdx2Code10 [10] = {"AA","AC","AG","AT","CC","CG","CT","GG","GT","TT"};
-string genoIdx2Code16 [16] = {"AA","AC","AG","AT","CA","CC","CG","CT","GA","GC","GG","GT","TA","TC","TG","TT"};
+string babdIdx2Code16 [16] = {"AA","AC","AG","AT","CA","CC","CG","CT","GA","GC","GG","GT","TA","TC","TG","TT"};
+//                              0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
+char  geno16_2_geno10 [16] = {  0 ,  1,   2,   3,   1,   4,   5,   6,   2,   5,   7 ,  8 ,  3 ,  6,   8,   9 };
+
+ // genoPriority[0] = 0;//AA
+ //    genoPriority[1] = 4; //CC
+ //    genoPriority[2] = 7; //GG
+ //    genoPriority[3] = 9; //TT
+
+ //    //hetero
+ //    genoPriority[4] = 1; //AC
+ //    genoPriority[5] = 2; //AG
+ //    genoPriority[6] = 3; //AT
+ //    genoPriority[7] = 5; //CA
+ //    genoPriority[8] = 6; //CG
+ //    genoPriority[9] = 8; //CT
 
 // 0	0	0
 // 4	1	1
@@ -611,288 +627,6 @@ void initDefaultBaseFreq(const string & dnafreqFile){
 */
 void initLikelihoodScores(){
 
-#ifdef DELETEME
-    if(0){
-    //mpq2Length2BaseQual2Pos2SubMatrix
-    //for each mapping quality
-    //TODO add the MQ
-    for(int mq=0;mq<MAXMAPPINGQUAL;mq++){ //for each mapping quality 
-
-	//#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
-	cerr<<"Pre-computing for mapping quality  = "<<mq<<"/"<<MAXMAPPINGQUAL<<endl;
-	//#endif
-    
-	    vector< vector< vector<diNucleotideProb> > > length2BaseQual2Pos2SubMatrix;//FOR EACH FRAGMENT LENGTH
-	
-
-
-	    //dummy values
-	    for(int L=0;L<MINLENGTHFRAGMENT;L++){ //for each fragment length
-		vector< vector<diNucleotideProb> > baseQual2Pos2SubMatrix;//FOR EACH QUAL SCORE
-		length2BaseQual2Pos2SubMatrix.push_back(baseQual2Pos2SubMatrix);
-	    }
-
-	    //int L=35;//fragment length    
-	    for(int L=MINLENGTHFRAGMENT;L<MAXLENGTHFRAGMENT;L++){ //for each fragment length
-
-
-#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
-		cerr<<"L = "<<L<<endl;
-#endif
-
-
-		//we need 4 theoretical bases X 4 observed bases X MAXMAPPINGQUAL mapping quality X MAXLENGTHFRAGMENT positions on the fragment X base quality
-		vector< vector<diNucleotideProb> > baseQual2Pos2SubMatrix;//FOR EACH QUAL SCORE
-
-
-		for(int q=0;q<=MAXBASEQUAL;q++){ //for each base quality
-
-		    vector<diNucleotideProb> pos2SubMatrix;//FOR EACH QUAL SCORE
-		    //vector< vector< vector<diNucleotideProb> > > mpq2Length2BaseQual2Pos2SubMatrix;//FOR EACH FRAGMENT LENGTH
-
-
-		    //we know the probability of P(b1->b2) after deamination is vector<diNucleotideProb> sub5pDiNuc; vector<diNucleotideProb> sub3pDiNuc;
-		    for(int l=0;l<L;l++){//for each position
-
-			diNucleotideProb toAddForBaseQual;
-			for(int bTheo=0;bTheo<4;bTheo++){
-			    for(int bObs=0;bObs<4;bObs++){
-				toAddForBaseQual.p[bTheo][bObs]=0.0;
-			    }
-			}
-
-			alleleFrequency *  dnaDefaultBases;	    
-			diNucleotideProb * deamProbToUse;
-
-			if(l<(L/2)){//closer to 5' end
-			    deamProbToUse   = &sub5pDiNuc[    l];		
-			    dnaDefaultBases = &defaultDNA5p[  l];
-			}else{      //closer to 3' end
-			    deamProbToUse   = &sub3pDiNuc[   L-l-1];
-			    dnaDefaultBases = &defaultDNA3p[ L-l-1];
-			}
-		    
-
-			for(int bTheo=0;bTheo<4;bTheo++){
-			    for(int bpstDeam=0;bpstDeam<4;bpstDeam++){			
-				for(int bObs=0;bObs<4;bObs++){			
-
-				    toAddForBaseQual.p[bTheo][bObs] += 
-					likeMatchProbMap[mq]*
-					(
-					    deamProbToUse->p[bTheo][bpstDeam] * (
-						likeMatchProb[q]    *   defaultSubMatchMatrix.p[bpstDeam][bObs]
-						+
-						likeMismatchProb[q] * illuminaErrorsProbMatrix.p[bpstDeam][bObs]
-					    )
-					) + likeMismatchProbMap[mq] * dnaDefaultBases->f[bObs];
-				    
-			       
-
-				}
-			    }
-			}//for each bTheo, bpstDeam and bObs
-
-			pos2SubMatrix.push_back(toAddForBaseQual);
-
-
-#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
-			cerr<<"mq = "<<mq<<" ("<<likeMatchProbMap[mq]<<") pos/LENGTH = "<<l<<"/"<<L<<" q = "<<q<<endl;
-			for(int nuc1=0;nuc1<4;nuc1++){
-			    cerr<<"ACGT"[nuc1]<<"\t";
-			    for(int nuc2=0;nuc2<4;nuc2++){
-				cerr<<toAddForBaseQual.p[nuc1][nuc2]<<"\t";
-			    }
-			    cerr<<endl;
-			}
-			cerr<<endl;
-#endif
-	    
-		    }//for position in the fragment
-
-
-		    baseQual2Pos2SubMatrix.push_back(pos2SubMatrix);
-
-		}//for each base quality
-
-		length2BaseQual2Pos2SubMatrix.push_back(baseQual2Pos2SubMatrix);
-	    
-	    }// for each length fragment
-	
-	
-	    mpq2Length2BaseQual2Pos2SubMatrix.push_back(length2BaseQual2Pos2SubMatrix);
-
-    }//for each mapping quality
-
-    }
-
-
-
-    // vector< vector< vector<diNucleotideProb> > >  mpq2Pos2BaseQual2SubMatrix5p;
-    // vector< vector< vector<diNucleotideProb> > >  mpq2Pos2BaseQual2SubMatrix3p;
-
-    //for(int mq=0;mq<MAXMAPPINGQUAL;mq++){ //for each mapping quality 
-    //for(int mq=36;mq<MAXMAPPINGQUAL;mq++){ //for each mapping quality 
-    for(int mq=0;mq<2;mq++){ //for each mapping quality 
-	
-	//#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
-	cerr<<"Pre-computing for mapping quality  = "<<mq<<"/"<<MAXMAPPINGQUAL<<endl;
-	//#endif
-    
-	vector< vector<diNucleotideProb> >  pos2BaseQualSubMatrix5p;
-	vector< vector<diNucleotideProb> >  pos2BaseQualSubMatrix3p;
-	
-
-	for(int l=0;l<( (MAXLENGTHFRAGMENT/2) +1);l++){//for each position
-
-
-
-
-	    //we need 4 theoretical bases X 4 observed bases X MAXMAPPINGQUAL mapping quality X MAXLENGTHFRAGMENT positions on the fragment X base quality
-	    vector<diNucleotideProb>  baseQual2SubMatrix5p;//FOR EACH QUAL SCORE
-	    vector<diNucleotideProb>  baseQual2SubMatrix3p;//FOR EACH QUAL SCORE
-
-	    
-	    for(int q=0;q<=MAXBASEQUAL;q++){ //for each base quality
-		
-		//vector<diNucleotideProb> pos2SubMatrix;//FOR EACH QUAL SCORE
-		//vector< vector< vector<diNucleotideProb> > > mpq2Length2BaseQual2Pos2SubMatrix;//FOR EACH FRAGMENT LENGTH
-		
-		
-		//we know the probability of P(b1->b2) after deamination is vector<diNucleotideProb> sub5pDiNuc; vector<diNucleotideProb> sub3pDiNuc;
-		
-		diNucleotideProb toAddForBaseQual5p;
-		diNucleotideProb toAddForBaseQual3p;
-
-		diNucleotideProb toAddForBaseQual5p_;
-		diNucleotideProb toAddForBaseQual3p_;
-		
-		for(int bTheo=0;bTheo<4;bTheo++){
-		    for(int bObs=0;bObs<4;bObs++){
-			toAddForBaseQual5p_.p[bTheo][bObs]=0.0;
-			toAddForBaseQual3p_.p[bTheo][bObs]=0.0;
-		    }
-		}
-		    
-
-		for(int bTheo=0;bTheo<4;bTheo++){               // each possible theoritical base
-		    for(int bpstDeam=0;bpstDeam<4;bpstDeam++){	// each possible deaminated base		
-			for(int bObs=0;bObs<4;bObs++){	        // each possible observed base
-			    
-			    toAddForBaseQual5p_.p[bTheo][bObs] +=        
-				sub5pDiNuc[    l].p[bTheo][bpstDeam] * (
-				    likeMatchProb[q]    *   defaultSubMatchMatrix.p[bpstDeam][bObs]
-				    +
-				    likeMismatchProb[q] * illuminaErrorsProbMatrix.p[bpstDeam][bObs]
-				);
-	
-			    toAddForBaseQual3p_.p[bTheo][bObs] += 
-				sub3pDiNuc[    l].p[bTheo][bpstDeam] * (
-				    likeMatchProb[q]    *   defaultSubMatchMatrix.p[bpstDeam][bObs]
-				    +
-				    likeMismatchProb[q] * illuminaErrorsProbMatrix.p[bpstDeam][bObs]
-				);
-			    
-			}
-		    }
-		}//for each bTheo, bpstDeam and bObs
-
-
-
-
-		for(int bTheo=0;bTheo<4;bTheo++){               // each possible theoritical base
-		    for(int bObs=0;bObs<4;bObs++){	        // each possible observed base
-			
-			toAddForBaseQual5p.p[bTheo][bObs] =  likeMatchProbMap[mq]*toAddForBaseQual5p_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNA5p[l].f[bObs];			
-			toAddForBaseQual3p.p[bTheo][bObs] =  likeMatchProbMap[mq]*toAddForBaseQual3p_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNA3p[l].f[bObs];
-
-		    }
-		}//for each bTheo, bpstDeam and bObs
-		
-		baseQual2SubMatrix5p.push_back(toAddForBaseQual5p);
-		baseQual2SubMatrix5p.push_back(toAddForBaseQual3p);
-		
-#ifdef DEBUGINITLIKELIHOODSCORES
-		cerr<<"mq = "<<mq<<" ("<<likeMatchProbMap[mq]<<" "<<likeMismatchProbMap[mq]<<" ) pos = "<<l<<" q = "<<q<<endl;
-		cerr<<"5'----------"<<endl;
-		for(int nuc1=0;nuc1<4;nuc1++){
-		    cerr<<"ACGT"[nuc1]<<"\t";		    
-		    long double s=0;
-		    for(int nuc2=0;nuc2<4;nuc2++){
-			cerr<<toAddForBaseQual5p_.p[nuc1][nuc2]<<"\t";			
-			s+=toAddForBaseQual5p_.p[nuc1][nuc2];
-		    }
-		    cerr<<"\t"<<s<<"\t";
-		    s=0;
-		    
-		    for(int nuc2=0;nuc2<4;nuc2++){
-			cerr<<defaultDNA5p[l].f[nuc2]<<"\t";			
-			s+=defaultDNA5p[l].f[nuc2];
-		    }
-
-		    cerr<<"\t"<<s<<"\t";
-		    s=0;
-		    
-		    for(int nuc2=0;nuc2<4;nuc2++){
-			cerr<<toAddForBaseQual5p.p[nuc1][nuc2]<<"\t";
-			s+=toAddForBaseQual5p.p[nuc1][nuc2];
-		    }
-
-		    cerr<<"\t"<<s<<endl;
-		}
-		cerr<<endl;
-		cerr<<"3'----------"<<endl;
-		for(int nuc1=0;nuc1<4;nuc1++){
-		    cerr<<"ACGT"[nuc1]<<"\t";
-		    long double s=0;
-
-		    for(int nuc2=0;nuc2<4;nuc2++){
-			cerr<<toAddForBaseQual3p_.p[nuc1][nuc2]<<"\t";
-			s+=toAddForBaseQual3p_.p[nuc1][nuc2];
-		    }
-		    cerr<<"\t"<<s<<"\t";
-		    s=0;
-		    
-		    for(int nuc2=0;nuc2<4;nuc2++){
-			cerr<<defaultDNA3p[l].f[nuc2]<<"\t";
-			s+=defaultDNA3p[l].f[nuc2];			
-		    }
-		    cerr<<"\t"<<s<<"\t";
-		    s=0;
-		    
-		    for(int nuc2=0;nuc2<4;nuc2++){
-			cerr<<toAddForBaseQual3p.p[nuc1][nuc2]<<"\t";
-			s+=toAddForBaseQual3p.p[nuc1][nuc2];
-		    }
-		    cerr<<"\t"<<s<<endl;
-		}
-		cerr<<endl;
-#endif
-		    
-	    }//for each base qual
-	    
-	    
-	    pos2BaseQualSubMatrix5p.push_back(baseQual2SubMatrix5p);
-	    pos2BaseQualSubMatrix3p.push_back(baseQual2SubMatrix3p);
-		    
-
-	}//for each position
-
-
-	//length2BaseQual2Pos2SubMatrix.push_back(baseQual2Pos2SubMatrix);
-	mpq2Pos2BaseQual2SubMatrix5p.push_back( pos2BaseQualSubMatrix5p );
-	mpq2Pos2BaseQual2SubMatrix3p.push_back( pos2BaseQualSubMatrix3p );
-
-	// vector< vector< vector<diNucleotideProb> > >  mpq2Pos2BaseQual2SubMatrix3p;
-	
-	    
-    }// for each mapping quality
-	
-    
-    // mpq2Length2BaseQual2Pos2SubMatrix.push_back(length2BaseQual2Pos2SubMatrix);
-
-    //}//for each mapping quality
-#endif
 
 
 
@@ -972,11 +706,18 @@ void initLikelihoodScores(){
 
 
 
-		for(int bTheo=0;bTheo<4;bTheo++){               // each possible theoritical base
+		for(int bTheo=0;bTheo<4;bTheo++){               // each possible theoretical base
 		    for(int bObs=0;bObs<4;bObs++){	        // each possible observed base
 			
+			//0.5 since this is the prior prob of having sampled a given chromosome
+#ifdef PRECOMPUTELOG
+			toAddForBaseQual5p.p[bTheo][bObs] = logl(0.5 * likeMatchProbMap[mq]*toAddForBaseQual5p_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNA5p[l].f[bObs] );			
+			toAddForBaseQual3p.p[bTheo][bObs] = logl(0.5 * likeMatchProbMap[mq]*toAddForBaseQual3p_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNA3p[l].f[bObs] );
+#else
+			// without logl
 			toAddForBaseQual5p.p[bTheo][bObs] =  likeMatchProbMap[mq]*toAddForBaseQual5p_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNA5p[l].f[bObs];			
 			toAddForBaseQual3p.p[bTheo][bObs] =  likeMatchProbMap[mq]*toAddForBaseQual3p_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNA3p[l].f[bObs];
+#endif
 			
 			// cerr<<"doubleloop\tl="<<l<<"\tmq="<<mq<<"\tq="<<q<<"\t"<<toAddForBaseQual5p.p[bTheo][bObs]<<"\t=\t"<<likeMatchProbMap[mq]<<"*"<<toAddForBaseQual5p_.p[bTheo][bObs] <<"+"<< likeMismatchProbMap[mq]<<"*"<< defaultDNA5p[l].f[bObs]<<endl;
 			// cerr<<"doubleloop\tl="<<l<<"\tmq="<<mq<<"\tq="<<q<<"\t"<<toAddForBaseQual3p.p[bTheo][bObs]<<"\t=\t"<<likeMatchProbMap[mq]<<"*"<<toAddForBaseQual3p_.p[bTheo][bObs] <<"+"<< likeMismatchProbMap[mq]<<"*"<< defaultDNA3p[l].f[bObs]<<endl;
@@ -987,7 +728,7 @@ void initLikelihoodScores(){
 		baseQual2SubMatrix5p.push_back(toAddForBaseQual5p);
 		baseQual2SubMatrix3p.push_back(toAddForBaseQual3p);
 		
-#ifdef DEBUGINITLIKELIHOODSCORES//TODO add mqp
+#ifdef DEBUGINITLIKELIHOODSCORES
 		cerr<<"ppos = "<<l<<" mq = "<<mq<<" ("<<likeMatchProbMap[mq]<<" "<<likeMismatchProbMap[mq]<<" )  q = "<<q<<endl;
 		cerr<<"5'----------"<<endl;
 		for(int nuc1=0;nuc1<4;nuc1++){
@@ -1218,7 +959,8 @@ inline long double computeBaseAl2Obs(const int al,
 
 inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
-    cout<<"computeLL "<<piForGenomicWindow->size()<<endl;
+    cerr<<"computeLL "<<piForGenomicWindow->size()<<endl;
+
     long double h=0.1000;
     diNucleotideProb priorGenotype;
     //compute prior genotype matrix
@@ -1246,6 +988,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	
 
 #ifdef DEBUGCOMPUTELL
+
     cerr<<"h="<<h<<endl;
     cerr<<"\t";
     for(int ba=0;ba<4;ba++)
@@ -1267,11 +1010,18 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
     long double loglikelihoodForEveryPositionForEveryBaBd          =0.0;
 
+
     for(unsigned int p=0;p<piForGenomicWindow->size();p++){
-	cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
-	cerr<<"B\tQ\tMQ\t5p\tL"<<endl;
+	
 
 #ifdef DEBUGCOMPUTELL
+
+	if(p>10000 && p<11000){
+	    
+	cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+
+	cerr<<"B\tQ\tMQ\t5p\tL"<<endl;
+
 	for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){
 	    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
 		<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
@@ -1282,6 +1032,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
 		<<endl;	    
 	}
+	}    
 #endif
 
 
@@ -1299,10 +1050,12 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	// // 2D: pos fragment from the 5' end
 	// vector< vector< mpq2bsq2submatrix * > > length2pos2mpq2bsq2submatrix;
 	long double loglikelihoodForEveryBaBd          =0.0;
-	vector<long double> vectorOfloglikelihoodForGivenBaBd (16,0.0) ;
-	long double mostLikelyGeno   =-1.0*numeric_limits<long double>::infinity();
-	int         mostLikelyGenoIdx=-1;
-	int         genoIdx          =0;
+	vector<long double> vectorOfloglikelihoodForGivenBaBd     (16,0.0) ;
+	vector<long double> vectorOfloglikelihoodForGivenGeno     (10,0.0) ;
+
+	long double mostLikelyBaBd   =-1.0*numeric_limits<long double>::infinity();
+	int         mostLikelyBaBdIdx=-1;
+	int         babdIdx          =0;
 
 
 	for(int ba=0;ba<4;ba++){
@@ -1317,6 +1070,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		    //Likelihood it comes from A
 
 #ifdef DEBUGCOMPUTELL
+		    if(p>10000 && p<11000){
 		    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
 			<<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
 			<<"M="<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
@@ -1326,22 +1080,72 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 			//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
 			<<endl;
 		    cerr<<length2pos2mpq2bsq2submatrix[piForGenomicWindow->at(p).readsVec[i].lengthF][piForGenomicWindow->at(p).readsVec[i].pos5p]->size()<<endl; 
+		    }
 #endif
 
-		    //TODO precompute log
+
+#ifdef PRECOMPUTELOG
+		    long double llA = length2pos2mpq2bsq2submatrix
+		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base];
+
+		    //Likelihood it comes from D
+		    long double llD = length2pos2mpq2bsq2submatrix
+		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base];
+#else
+		    
+		    // //without precompute log
 		    long double llA = logl(0.5* length2pos2mpq2bsq2submatrix
-					   [piForGenomicWindow->at(p).readsVec[i].lengthF]
-					   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
-					   [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base]);
+		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base]);
 
 		    //Likelihood it comes from D
 		    long double llD = logl(0.5* length2pos2mpq2bsq2submatrix
-					   [piForGenomicWindow->at(p).readsVec[i].lengthF]
-					   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
-					   [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base]);
+		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base]);
+#endif
+
+		    if(p=100){
+		    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
+			<<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
+			<<"M="<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
+			<<"5="<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
+			<<"L="<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
+			<<"R="<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
+			//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
+			<<endl;
 		    
+#ifdef PRECOMPUTELOG
+			cerr<<setprecision(20)<<"llA "<<llA<<"\tpA "<<expl(llA)<<"\t"<<length2pos2mpq2bsq2submatrix
+		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+			    [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base]<<"\t"<<"\tLLD "<<llD<<"\tpD "<<expl(llD)<<"\t"<<length2pos2mpq2bsq2submatrix
+		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base]<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<endl;
+#else
+			cerr<<setprecision(20)<<"llA "<<llA<<"\tpA "<<expl(llA)<<"\t"<<logl(0.5*length2pos2mpq2bsq2submatrix
+			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+											    [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base])<<"\t"<<"\tLLD "<<llD<<"\tpD "<<expl(llD)<<"\t"<<logl(0.5*length2pos2mpq2bsq2submatrix
+		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+																														 [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base])<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<endl;
+
+#endif
+			exit(1);
+		    }
+
+
 #ifdef DEBUGCOMPUTELL
-		    cerr<<"llA="<<llA<<"\t"<<expl(llA)<<"\tLLD="<<llD<<"\t"<<expl(llD)<<"\t"<<loglikelihoodForGivenBaBd<<endl;		    
+		    //if(p>10000 && p<11000)
+		    if(p=100)
+			cerr<<setprecision(20)<<"llA "<<llA<<"\tpA "<<expl(llA)<<"\tLLD "<<llD<<"\tpD "<<expl(llD)<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<endl;		    
 #endif
 
 		    loglikelihoodForGivenBaBd += oplusnatl( llA, llD); //, adding probs of llA and llD, multiplying probabilities for each site, assuming independence, (\prod_{fragment} P(D|G))
@@ -1353,41 +1157,159 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		loglikelihoodForGivenBaBdTimesPrior = loglikelihoodForGivenBaBd + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
 
 #ifdef DEBUGCOMPUTELL
-		cerr<<"GENO:A="<<"ACGT"[ba]<<"\tD="<<"ACGT"[bd]<<"\tprior="<<expl(priorGenotype.p[ba][bd])<<"\tlike="<<loglikelihoodForGivenBaBd<<"\t"<<loglikelihoodForGivenBaBdTimesPrior<<"\t"<<loglikelihoodForEveryBaBd<<"\t"<<mostLikelyGeno<<"\t"<<mostLikelyGenoIdx<<endl;
+		if(p>10000 && p<11000)
+		    cerr<<"GENO:A="<<"ACGT"[ba]<<"\tD="<<"ACGT"[bd]<<"\tprior "<<expl(priorGenotype.p[ba][bd])<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<"\tllForBaBD*Prior "<<loglikelihoodForGivenBaBdTimesPrior<<"\tllForEveryBaBD "<<loglikelihoodForEveryBaBd<<"\tgenoLike "<<mostLikelyBaBd<<"\tmostLikeG "<<mostLikelyBaBdIdx<<endl;
 #endif
 
 
 		//adding probabilities for each genotype
 		loglikelihoodForEveryBaBd  = oplusInitnatl( loglikelihoodForEveryBaBd , loglikelihoodForGivenBaBdTimesPrior); // \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
 
-		vectorOfloglikelihoodForGivenBaBd[genoIdx] = loglikelihoodForGivenBaBdTimesPrior ;
+		vectorOfloglikelihoodForGivenBaBd[babdIdx] = loglikelihoodForGivenBaBdTimesPrior ;
 
-		if(loglikelihoodForGivenBaBdTimesPrior>mostLikelyGeno){
-		    mostLikelyGeno    = loglikelihoodForGivenBaBdTimesPrior;
-		    mostLikelyGenoIdx = genoIdx;
+		if(loglikelihoodForGivenBaBdTimesPrior>mostLikelyBaBd){
+		    mostLikelyBaBd    = loglikelihoodForGivenBaBdTimesPrior;
+		    mostLikelyBaBdIdx = babdIdx;
 		}
 		
-
-		cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
-		genoIdx++;
+#ifdef DEBUGCOMPUTELL
+		if(p>10000 && p<11000)
+		    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+#endif
+		babdIdx++;
 	    }//END for each derived base
 	}//END for each ancestral base
 
-	
-	cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+#ifdef DEBUGCOMPUTELL	
+	if(p>10000 && p<11000)
+	    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+#endif
 
+	long double loglikelihoodForEveryBaBd_minusBest          =0.0;
+	
 	for(unsigned int g=0;g<16;g++){
-	    cerr<<genoIdx2Code16[g]<<"\t"<<vectorOfloglikelihoodForGivenBaBd[g]<<endl;
+	    if(g!= mostLikelyBaBdIdx)
+		loglikelihoodForEveryBaBd_minusBest = oplusInitnatl( loglikelihoodForEveryBaBd_minusBest , vectorOfloglikelihoodForGivenBaBd[g] ); // \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+	    //cerr<<babdIdx2Code16[g]<<"\t"<<vectorOfloglikelihoodForGivenBaBd[g]<<endl;
 	    //cerr<<vectorToString(vectorOfloglikelihoodForGivenBaBd,"\t")<<endl;
 	}
-
 	
-	exit(1);
+	
+	// if( (mostLikelyBaBdIdx !=  0) && 
+	//     (mostLikelyBaBdIdx !=  5) && 
+	//     (mostLikelyBaBdIdx != 10) && 
+	//     (mostLikelyBaBdIdx != 15) ){
+	//     //exit(1);
+	//     cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+	//     cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+
+	//     for(unsigned int g=0;g<16;g++){
+	// 	cerr<<babdIdx2Code16[g]<<"\t"<<vectorOfloglikelihoodForGivenBaBd[g]<<endl;
+	// 	//cerr<<vectorToString(vectorOfloglikelihoodForGivenBaBd,"\t")<<endl;
+	//     }
+
+	//     cerr<<mostLikelyBaBd<<"\t"<<babdIdx2Code16[mostLikelyBaBdIdx]<<"\t"<<loglikelihoodForEveryBaBd_minusBest <<"\t"<< loglikelihoodForEveryBaBd<<"\t"<<( loglikelihoodForEveryBaBd_minusBest - loglikelihoodForEveryBaBd)<<endl;
+
+	// } 
+
+	//add to 10 genotypes
+	// string babdIdx2Code10 [10] = {"AA","AC","AG","AT","CC","CG","CT","GG","GT","TT"};
+	// string babdIdx2Code16 [16] = {"AA","AC","AG","AT","CA","CC","CG","CT","GA","GC","GG","GT","TA","TC","TG","TT"};
+	//                                 0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
+	//---------------------------------------------
+	// BEGIN convert to 10 genotypes
+	//---------------------------------------------
+	vectorOfloglikelihoodForGivenGeno[0] = vectorOfloglikelihoodForGivenBaBd[ 0];
+	vectorOfloglikelihoodForGivenGeno[4] = vectorOfloglikelihoodForGivenBaBd[ 5];
+	vectorOfloglikelihoodForGivenGeno[7] = vectorOfloglikelihoodForGivenBaBd[10];
+	vectorOfloglikelihoodForGivenGeno[9] = vectorOfloglikelihoodForGivenBaBd[15];
+
+	vectorOfloglikelihoodForGivenGeno[ 1] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[ 1], vectorOfloglikelihoodForGivenBaBd[ 4]);
+	vectorOfloglikelihoodForGivenGeno[ 2] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[ 2], vectorOfloglikelihoodForGivenBaBd[ 8]);
+	vectorOfloglikelihoodForGivenGeno[ 3] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[ 3], vectorOfloglikelihoodForGivenBaBd[12]);
+	vectorOfloglikelihoodForGivenGeno[ 5] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[ 6], vectorOfloglikelihoodForGivenBaBd[ 9]);
+	vectorOfloglikelihoodForGivenGeno[ 6] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[ 7], vectorOfloglikelihoodForGivenBaBd[13]);
+	vectorOfloglikelihoodForGivenGeno[ 8] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[11], vectorOfloglikelihoodForGivenBaBd[14]);
+
+	long double mostLikelyGeno   =-1.0*numeric_limits<long double>::infinity();
+	int         mostLikelyGenoIdx=-1;
+	long double loglikelihoodForEveryGeno          =0.0;
+	long double loglikelihoodForEveryGeno_minusBest=0.0;
+
+	for(unsigned int g=0;g<10;g++){	   
+	    if(vectorOfloglikelihoodForGivenGeno[g] > mostLikelyGeno){
+		mostLikelyGeno    = vectorOfloglikelihoodForGivenGeno[g];
+		mostLikelyGenoIdx = g;
+	    }
+	}
+	
+	for(unsigned int g=0;g<10;g++){
+	    if(g != mostLikelyGenoIdx)
+		loglikelihoodForEveryGeno_minusBest = oplusInitnatl( loglikelihoodForEveryGeno_minusBest , vectorOfloglikelihoodForGivenGeno[g] ); // 
+	    loglikelihoodForEveryGeno               = oplusInitnatl( loglikelihoodForEveryGeno           , vectorOfloglikelihoodForGivenGeno[g] ); // 
+	}
+
+	//---------------------------------------------
+	// END convert to 10 genotypes
+	//---------------------------------------------
+
+
+	if( (mostLikelyGenoIdx !=  0) && 
+	    (mostLikelyGenoIdx !=  4) && 
+	    (mostLikelyGenoIdx !=  7) && 
+	    (mostLikelyGenoIdx !=  9) ){
+
+	    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+	    cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+	    for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){ //for each fragment at pos p
+		
+		cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
+		    <<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
+		    <<"M="<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
+		    <<"5="<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
+		    <<"L="<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
+		    <<"R="<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
+		    //		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
+		    <<endl;		
+	    }
+	    for(unsigned int g=0;g<16;g++){
+		cerr<<babdIdx2Code16[g]<<"\t"<<vectorOfloglikelihoodForGivenBaBd[g]<<endl;
+	    }
+	    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+	    for(unsigned int g=0;g<10;g++){	       
+		cerr<<genoIdx2Code10[g]<<"\t"<<vectorOfloglikelihoodForGivenGeno[g]<<endl;
+	    }
+cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+	    cerr<<mostLikelyBaBd<<"\t"<<babdIdx2Code16[mostLikelyBaBdIdx]<<"\t"<<loglikelihoodForEveryBaBd_minusBest <<"\t"<< loglikelihoodForEveryBaBd<<"\t"<<( loglikelihoodForEveryBaBd_minusBest - loglikelihoodForEveryBaBd)<<endl;
+	    cerr<<mostLikelyGeno<<"\t"<<genoIdx2Code10[mostLikelyGenoIdx]<<"\t"<<loglikelihoodForEveryGeno_minusBest <<"\t"<< loglikelihoodForEveryGeno<<"\t"<<( loglikelihoodForEveryGeno_minusBest - loglikelihoodForEveryGeno)<<endl;
+	    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+
+	    
+	}
+
+	//     //exit(1);
+	//     cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+	//     cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+
+	//     for(unsigned int g=0;g<16;g++){
+	// 	cerr<<babdIdx2Code16[g]<<"\t"<<vectorOfloglikelihoodForGivenBaBd[g]<<endl;
+	// 	//cerr<<vectorToString(vectorOfloglikelihoodForGivenBaBd,"\t")<<endl;
+	//     }
+
+	//     cerr<<mostLikelyBaBd<<"\t"<<babdIdx2Code16[mostLikelyBaBdIdx]<<"\t"<<loglikelihoodForEveryBaBd_minusBest <<"\t"<< loglikelihoodForEveryBaBd<<"\t"<<( loglikelihoodForEveryBaBd_minusBest - loglikelihoodForEveryBaBd)<<endl;
+
+	// } 
+
+
+
+
 	//product for each genomic position
 	
 	loglikelihoodForEveryPositionForEveryBaBd += loglikelihoodForEveryBaBd; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
 	
     }//END for each genomic position
+    exit(1);
+	
 }
 
 class coverageComputeVisitor : public PileupVisitor {
