@@ -44,10 +44,14 @@ using namespace BamTools;
 // #define DEBUGINITLIKELIHOODSCORES
 //#define DEBUGINITLIKELIHOODSCORES2
 
-//#define DEBUGDEFAULTFREQ
-//#define DEBUGDEAM
+#define DEBUGDEFAULTFREQ//print the default base frequency 
+//#define DEBUGDEAM //to print deamination scores
 //#define DEBUGHCOMPUTE
-//#define DEBUGCOMPUTELL
+#define DEBUGCOMPUTELL
+#define DEBUGCOMPUTELLEACHBASE
+
+
+
 #define HETVERBOSE
 //#define COVERAGETVERBOSE
 #define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
@@ -578,13 +582,14 @@ void initDefaultBaseFreq(const string & dnafreqFile){
 	    dnaFreq3p_.f[b]=0;
 	}
 
-	for(int b1=0;b1<4;b1++){//original base
+	for(int b1=0;b1<4;b1++){//    observed base
 
-	    for(int b2=0;b2<4;b2++){
-		int b = b1*4+b2;
-		//cout<<"ACGT"[b1]<<"\t"<<"ACGT"[b2]<<"\t"<<b<<"\t"<<dnaDefaultBases.f[b1]<<"\t"<<sub5p[i].s[b]<<"\t"<<sub3p[i].s[b]<<endl;
-		dnaFreq5p_.f[b1] += dnaDefaultBases.f[b1]*sub5p[i].s[b];
-		dnaFreq3p_.f[b1] += dnaDefaultBases.f[b1]*sub3p[i].s[b];
+	    for(int b2=0;b2<4;b2++){ //original base base
+		int b = b2*4+b1;
+		//cerr<<"pos="<<i<<"\t"<<"ACGT"[b1]<<"\t"<<"ACGT"[b2]<<"\t"<<b<<"\t"<<dnaDefaultBases.f[b1]<<"\t"<<sub5p[i].s[b]<<"\t"<<sub3p[i].s[b]<<endl;
+		dnaFreq5p_.f[b1] += dnaDefaultBases.f[b2]*sub5p[i].s[b];
+		dnaFreq3p_.f[b1] += dnaDefaultBases.f[b2]*sub3p[i].s[b];
+		//cerr<<"\t"<<dnaFreq5p_.f[b1]<<"\t"<<dnaFreq3p_.f[b1]<<endl;
 	    }
 	}
 	
@@ -1097,8 +1102,8 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){ //for each fragment at pos p
 		    //Likelihood it comes from A
 
-#ifdef DEBUGCOMPUTELL
-		    if(p>10000 && p<11000){
+#ifdef DEBUGCOMPUTELLEACHBASE
+		    //if(p>10000 && p<11000){
 		    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
 			<<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
 			<<"M="<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
@@ -1108,7 +1113,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 			//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
 			<<endl;
 		    cerr<<length2pos2mpq2bsq2submatrix[piForGenomicWindow->at(p).readsVec[i].lengthF][piForGenomicWindow->at(p).readsVec[i].pos5p]->size()<<endl; 
-		    }
+		    //}
 #endif
 
 
@@ -1219,10 +1224,10 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 // 		    }
 
 
-#ifdef DEBUGCOMPUTELL
+#ifdef DEBUGCOMPUTELLEACHBASE
 		    //if(p>10000 && p<11000)
-		    if(p==100)
-			cerr<<setprecision(20)<<"llA "<<llA<<"\tpA "<<expl(llA)<<"\tLLD "<<llD<<"\tpD "<<expl(llD)<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<endl;		    
+		    //if(p==100)
+		    cerr<<setprecision(20)<<"llA "<<llA<<"\tpA "<<expl(llA)<<"\tLLD "<<llD<<"\tpD "<<expl(llD)<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<endl;		    
 #endif
 		    
 		    loglikelihoodForGivenBaBd += oplusnatl( llA, llD); //, adding probs of llA and llD, multiplying probabilities for each site, assuming independence, (\prod_{fragment} P(D|G))
@@ -2174,8 +2179,8 @@ int main (int argc, char *argv[]) {
 			      "\n\n"
 			      
                               "\n\tI/O options:\n"+
-			      "\t\t"+"-o"+"\t"+"--out"  + "\t\t"   +    "[outfile]" +"\t\t"+"Output per-site likelihoods in BGZIP (default: none)"+"\n"+
-			      "\t\t"+""  +"\t"+"--name" + "\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
+			      "\t\t"+"-o"+","+"--out"  + "\t\t"   +    "[outfile]" +"\t\t"+"Output per-site likelihoods in BGZIP (default: none)"+"\n"+
+			      "\t\t"+""  +""+"--name" + "\t\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
 			      "\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
 			      //"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
 			      "\n\tComputation options:\n"+
@@ -2183,7 +2188,7 @@ int main (int argc, char *argv[]) {
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t\t"+"Size of windows in bp  (default: "+stringify(sizeChunk)+")"+"\n"+	      
 			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
-			      "\t\t"+""  +""+"--tstv"     +"\t\t\t\t"    + "[tstv]" +"\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+	      
+			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+	      
 
 
 
