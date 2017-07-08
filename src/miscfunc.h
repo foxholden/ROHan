@@ -18,6 +18,7 @@
 
 using namespace std;
 
+
 typedef struct { 
     long double s[12];
  } substitutionRates;

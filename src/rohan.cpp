@@ -7,8 +7,9 @@
 
 //TODO
 // test robustness of deamination
-// test estimate of h across various coverage ok at 10X10,000
-// add mappability track
+// code h estimate
+// HMM
+// add mappability track?
 
 
 
@@ -44,11 +45,12 @@ using namespace BamTools;
 // #define DEBUGINITLIKELIHOODSCORES
 //#define DEBUGINITLIKELIHOODSCORES2
 
-#define DEBUGDEFAULTFREQ//print the default base frequency 
+//#define DEBUGDEFAULTFREQ//print the default base frequency 
 //#define DEBUGDEAM //to print deamination scores
 //#define DEBUGHCOMPUTE
-#define DEBUGCOMPUTELL
-#define DEBUGCOMPUTELLEACHBASE
+#define DEBUGCOMPUTELLGENO
+//#define DEBUGCOMPUTELL
+//#define DEBUGCOMPUTELLEACHBASE
 
 
 
@@ -993,7 +995,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
     cerr<<"computeLL "<<piForGenomicWindow->size()<<endl;
 
-    long double h=0.1000;
+    long double h=0.000735;
     diNucleotideProb priorGenotype;
     //compute prior genotype matrix
     
@@ -1049,7 +1051,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
 #ifdef DEBUGCOMPUTELL
 
-	if(p>10000 && p<11000){
+	//if(p>10000 && p<11000){
 	    
 	cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
 
@@ -1065,7 +1067,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
 		<<endl;	    
 	}
-	}    
+	//}    
 #endif
 
 
@@ -1091,37 +1093,91 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	int         babdIdx          =0;
 
 
-	for(int ba=0;ba<4;ba++){
+	for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){ //for each fragment at pos p
+		    //Likelihood it comes from A
 
-	    for(int bd=0;bd<4;bd++){
+// #ifdef DEBUGCOMPUTELLEACHBASE
+// 	    //if(p>10000 && p<11000){
+// 	    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
+// 		<<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
+// 		<<"M="<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
+// 		<<"5="<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
+// 		<<"L="<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
+// 		<<"R="<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
+// 		//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
+// 		<<endl;
+// 	    //cerr<<length2pos2mpq2bsq2submatrix[piForGenomicWindow->at(p).readsVec[i].lengthF][piForGenomicWindow->at(p).readsVec[i].pos5p]->size()<<endl; 
+// 	    //}
+// #endif
+	}
+
+	for(uint8_t ba=0;ba<4;ba++){//ancestral base
+	    uint8_t ba_c = 3-ba;
+
+	    for(uint8_t bd=0;bd<4;bd++){//derived base
+		uint8_t bd_c = 3-bd;
+
+#ifdef DEBUGCOMPUTELLEACHBASE
+		//if(p>10000 && p<11000)
+		cerr<<endl<<"GENO:A="<<"ACGT"[ba]<<" ("<<"ACGT"[ba_c]<<") \tD="<<"ACGT"[bd]<<" ("<<"ACGT"[bd_c]<<")\tprior "<<expl(priorGenotype.p[ba][bd])<<endl;
+		//cerr<<int(ba)<<"\t"<<int(ba_c)<<endl;
+#endif
 		
 		long double loglikelihoodForGivenBaBdTimesPrior=0.0;
 		long double loglikelihoodForGivenBaBd          =0.0;
 
+
 		
 		for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){ //for each fragment at pos p
 		    //Likelihood it comes from A
-
-#ifdef DEBUGCOMPUTELLEACHBASE
-		    //if(p>10000 && p<11000){
-		    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
-			<<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
-			<<"M="<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
-			<<"5="<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
-			<<"L="<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
-			<<"R="<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
-			//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
-			<<endl;
-		    cerr<<length2pos2mpq2bsq2submatrix[piForGenomicWindow->at(p).readsVec[i].lengthF][piForGenomicWindow->at(p).readsVec[i].pos5p]->size()<<endl; 
-		    //}
-#endif
+		    //char bObs=piForGenomicWindow->at(p).readsVec[i].base;
+		    
+// #ifdef DEBUGCOMPUTELLEACHBASE
+// 		    //if(p>10000 && p<11000){
+// 		    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
+// 			<<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
+// 			<<"M="<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
+// 			<<"5="<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
+// 			<<"L="<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
+// 			<<"R="<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
+// 			//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
+// 			<<endl;
+// 		    cerr<<length2pos2mpq2bsq2submatrix[piForGenomicWindow->at(p).readsVec[i].lengthF][piForGenomicWindow->at(p).readsVec[i].pos5p]->size()<<endl; 
+// 		    //}
+// #endif
 
 
 #ifdef PRECOMPUTELOG
-		    long double llA = length2pos2mpq2bsq2submatrix
-		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
-		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
-		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base];
+		    long double llA; //Likelihood it comes from A
+		    long double llD; //Likelihood it comes from D
+
+		    if(piForGenomicWindow->at(p).readsVec[i].isrv){
+			llA = length2pos2mpq2bsq2submatrix
+			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+			    [piForGenomicWindow->at(p).readsVec[i].qual].p[ba_c][piForGenomicWindow->at(p).readsVec[i].base];
+
+			llD = length2pos2mpq2bsq2submatrix
+			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+			    [piForGenomicWindow->at(p).readsVec[i].qual].p[bd_c][piForGenomicWindow->at(p).readsVec[i].base];
+
+
+		    }else{
+
+			llA = length2pos2mpq2bsq2submatrix
+			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+			    [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base];
+
+			llD = length2pos2mpq2bsq2submatrix
+			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+			    [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base];
+
+
+		    }
+			
 
 		    // cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
 		    // 	<<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
@@ -1131,12 +1187,6 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		    // 	<<"R="<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
 		    // 	//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
 		    // 	<<endl;
-
-		    //Likelihood it comes from D
-		    long double llD = length2pos2mpq2bsq2submatrix
-		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
-		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
-		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base];
 
 		    // if(ba==0 && bd==0){
 		    // cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
@@ -1227,7 +1277,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 #ifdef DEBUGCOMPUTELLEACHBASE
 		    //if(p>10000 && p<11000)
 		    //if(p==100)
-		    cerr<<setprecision(20)<<"llA "<<llA<<"\tpA "<<expl(llA)<<"\tLLD "<<llD<<"\tpD "<<expl(llD)<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<endl;		    
+		    cerr<<setprecision(20)<<"llA "<<llA<<"\t2*pA "<<2*expl(llA)<<"\tLLD "<<llD<<"\t2*pD "<<2*expl(llD)<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<endl;		    
 #endif
 		    
 		    loglikelihoodForGivenBaBd += oplusnatl( llA, llD); //, adding probs of llA and llD, multiplying probabilities for each site, assuming independence, (\prod_{fragment} P(D|G))
@@ -1238,9 +1288,9 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		//  product of (\prod_{fragment} P(D|G)) times the prior P(G) for the genotype
 		loglikelihoodForGivenBaBdTimesPrior = loglikelihoodForGivenBaBd + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
 
-#ifdef DEBUGCOMPUTELL
-		if(p>10000 && p<11000)
-		    cerr<<"GENO:A="<<"ACGT"[ba]<<"\tD="<<"ACGT"[bd]<<"\tprior "<<expl(priorGenotype.p[ba][bd])<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<"\tllForBaBD*Prior "<<loglikelihoodForGivenBaBdTimesPrior<<"\tllForEveryBaBD "<<loglikelihoodForEveryBaBd<<"\tgenoLike "<<mostLikelyBaBd<<"\tmostLikeG "<<mostLikelyBaBdIdx<<endl;
+#ifdef DEBUGCOMPUTELLEACHBASE
+		//if(p>10000 && p<11000)
+		cerr<<"GENO:A="<<"ACGT"[ba]<<"\tD="<<"ACGT"[bd]<<"\tprior "<<expl(priorGenotype.p[ba][bd])<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<"\tllForBaBD*Prior "<<loglikelihoodForGivenBaBdTimesPrior<<"\tllForEveryBaBD "<<loglikelihoodForEveryBaBd<<"\tgenoLike "<<mostLikelyBaBd<<"\tmostLikeG "<<mostLikelyBaBdIdx<<endl;
 #endif
 
 
@@ -1255,21 +1305,21 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		}
 		
 #ifdef DEBUGCOMPUTELL
-		if(p>10000 && p<11000)
-		    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+		//if(p>10000 && p<11000)
+		cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
 #endif
 		babdIdx++;
 	    }//END for each derived base
 	}//END for each ancestral base
 
 #ifdef DEBUGCOMPUTELL	
-	if(p>10000 && p<11000)
-	    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+	//if(p>10000 && p<11000)
+	cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
 #endif
 
 	long double loglikelihoodForEveryBaBd_minusBest          =0.0;
 	
-	for(unsigned int g=0;g<16;g++){
+	for(int g=0;g<16;g++){
 	    if(g!= mostLikelyBaBdIdx)
 		loglikelihoodForEveryBaBd_minusBest = oplusInitnatl( loglikelihoodForEveryBaBd_minusBest , vectorOfloglikelihoodForGivenBaBd[g] ); // \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
 	    //cerr<<babdIdx2Code16[g]<<"\t"<<vectorOfloglikelihoodForGivenBaBd[g]<<endl;
@@ -1325,7 +1375,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	    }
 	}
 	
-	for(unsigned int g=0;g<10;g++){
+	for(int g=0;g<10;g++){
 	    if(g != mostLikelyGenoIdx)
 		loglikelihoodForEveryGeno_minusBest = oplusInitnatl( loglikelihoodForEveryGeno_minusBest , vectorOfloglikelihoodForGivenGeno[g] ); // 
 	    loglikelihoodForEveryGeno               = oplusInitnatl( loglikelihoodForEveryGeno           , vectorOfloglikelihoodForGivenGeno[g] ); // 
@@ -1341,11 +1391,13 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	    (mostLikelyGenoIdx !=  7) && 
 	    (mostLikelyGenoIdx !=  9) ){
 
+#ifdef DEBUGCOMPUTELLGENO
 	    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
 	    cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
 	    for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){ //for each fragment at pos p
-		
-		cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
+	    
+		cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"<<
+		    "ACGT"[piForGenomicWindow->at(p).readsVec[i].isrv?(3-piForGenomicWindow->at(p).readsVec[i].base):piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
 		    <<"Q="<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
 		    <<"M="<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
 		    <<"5="<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
@@ -1361,13 +1413,15 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	    for(unsigned int g=0;g<10;g++){	       
 		cerr<<genoIdx2Code10[g]<<"\t"<<vectorOfloglikelihoodForGivenGeno[g]<<endl;
 	    }
-cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
-	    cerr<<mostLikelyBaBd<<"\t"<<babdIdx2Code16[mostLikelyBaBdIdx]<<"\t"<<loglikelihoodForEveryBaBd_minusBest <<"\t"<< loglikelihoodForEveryBaBd<<"\t"<<( loglikelihoodForEveryBaBd_minusBest - loglikelihoodForEveryBaBd)<<endl;
-	    cerr<<mostLikelyGeno<<"\t"<<genoIdx2Code10[mostLikelyGenoIdx]<<"\t"<<loglikelihoodForEveryGeno_minusBest <<"\t"<< loglikelihoodForEveryGeno<<"\t"<<( loglikelihoodForEveryGeno_minusBest - loglikelihoodForEveryGeno)<<endl;
+	    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+	    
+	    cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\tmostLikelyBaBd\t"<<mostLikelyBaBd<<"\t"<<babdIdx2Code16[mostLikelyBaBdIdx]<<"\t"<<loglikelihoodForEveryBaBd_minusBest <<"\t"<< loglikelihoodForEveryBaBd<<"\t"<<( loglikelihoodForEveryBaBd_minusBest - loglikelihoodForEveryBaBd)<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+	    cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\tmostLikelyGeno\t"<<mostLikelyGeno<<"\t"<<genoIdx2Code10[mostLikelyGenoIdx]<<"\t"<<loglikelihoodForEveryGeno_minusBest <<"\t"<< loglikelihoodForEveryGeno<<"\t"<<( loglikelihoodForEveryGeno_minusBest - loglikelihoodForEveryGeno)<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
 	    cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
 
-	    
-	}
+#endif
+	}//end for each geno
+	
 	//exit(1);
 	//     //exit(1);
 	//     cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
@@ -1562,6 +1616,7 @@ public:
 
 	    if(isRev){
 		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].Alignment.Length-pileupData.PileupAlignments[i].PositionInAlignment-1 ); 
+		sr_.base = 3 - sr_.base;//complement
 	    }else{
 		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].PositionInAlignment ); 
 	    }
