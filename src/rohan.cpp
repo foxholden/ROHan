@@ -48,7 +48,7 @@ using namespace BamTools;
 //#define DEBUGDEFAULTFREQ//print the default base frequency 
 //#define DEBUGDEAM //to print deamination scores
 //#define DEBUGHCOMPUTE
-#define DEBUGCOMPUTELLGENO
+//#define DEBUGCOMPUTELLGENO
 //#define DEBUGCOMPUTELL
 //#define DEBUGCOMPUTELLEACHBASE
 
@@ -995,7 +995,8 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
     cerr<<"computeLL "<<piForGenomicWindow->size()<<endl;
 
-    long double h=0.000735;
+    //long double h=0.000735;
+    long double h=0.010000;
     diNucleotideProb priorGenotype;
     //compute prior genotype matrix
     
@@ -1110,6 +1111,9 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 // 	    //}
 // #endif
 	}
+
+
+
 
 	for(uint8_t ba=0;ba<4;ba++){//ancestral base
 	    uint8_t ba_c = 3-ba;
@@ -1287,7 +1291,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		//TODO, pre compute the log the prior
 		//  product of (\prod_{fragment} P(D|G)) times the prior P(G) for the genotype
 		loglikelihoodForGivenBaBdTimesPrior = loglikelihoodForGivenBaBd + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
-
+		
 #ifdef DEBUGCOMPUTELLEACHBASE
 		//if(p>10000 && p<11000)
 		cerr<<"GENO:A="<<"ACGT"[ba]<<"\tD="<<"ACGT"[bd]<<"\tprior "<<expl(priorGenotype.p[ba][bd])<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<"\tllForBaBD*Prior "<<loglikelihoodForGivenBaBdTimesPrior<<"\tllForEveryBaBD "<<loglikelihoodForEveryBaBd<<"\tgenoLike "<<mostLikelyBaBd<<"\tmostLikeG "<<mostLikelyBaBdIdx<<endl;
@@ -1317,6 +1321,12 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
 #endif
 
+
+	//
+	// BEGIN GENOTYPING
+	//
+
+	//Compute likelihood of all minus best BABD
 	long double loglikelihoodForEveryBaBd_minusBest          =0.0;
 	
 	for(int g=0;g<16;g++){
@@ -1351,11 +1361,13 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	//---------------------------------------------
 	// BEGIN convert to 10 genotypes
 	//---------------------------------------------
+	//homo
 	vectorOfloglikelihoodForGivenGeno[0] = vectorOfloglikelihoodForGivenBaBd[ 0];
 	vectorOfloglikelihoodForGivenGeno[4] = vectorOfloglikelihoodForGivenBaBd[ 5];
 	vectorOfloglikelihoodForGivenGeno[7] = vectorOfloglikelihoodForGivenBaBd[10];
 	vectorOfloglikelihoodForGivenGeno[9] = vectorOfloglikelihoodForGivenBaBd[15];
 
+	//hetero
 	vectorOfloglikelihoodForGivenGeno[ 1] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[ 1], vectorOfloglikelihoodForGivenBaBd[ 4]);
 	vectorOfloglikelihoodForGivenGeno[ 2] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[ 2], vectorOfloglikelihoodForGivenBaBd[ 8]);
 	vectorOfloglikelihoodForGivenGeno[ 3] = oplusnatl(vectorOfloglikelihoodForGivenBaBd[ 3], vectorOfloglikelihoodForGivenBaBd[12]);
@@ -1421,7 +1433,11 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
 #endif
 	}//end for each geno
-	
+
+
+	//
+	// END GENOTYPING
+	//
 	//exit(1);
 	//     //exit(1);
 	//     cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
@@ -1444,6 +1460,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	loglikelihoodForEveryPositionForEveryBaBd += loglikelihoodForEveryBaBd; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
 	
     }//END for each genomic position
+    cout<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<endl;
     exit(1);
 	
 }
