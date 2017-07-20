@@ -47,6 +47,10 @@ typedef struct {
 } probSubstition;
 
 typedef struct { 
+    long double gl[16];
+} babdlikelihood;
+
+typedef struct { 
     long double p[4][4];
 } diNucleotideProb;
 
