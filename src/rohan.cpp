@@ -998,7 +998,8 @@ inline void computePriorMatrix(long double h,
 			       diNucleotideProb * priorGenotype,
 			       // diNucleotideProb * priorGenotypeProb,
 			       // diNucleotideProb * priorGenotypeProbD,
-			       diNucleotideProb * priorGenotypeD1){
+			       diNucleotideProb * priorGenotypeD1,
+			       diNucleotideProb * priorGenotypeD2){
     for(int ba=0;ba<4;ba++){//ancestral base
 
 	for(int bd=0;bd<4;bd++){//derived base
@@ -1010,12 +1011,10 @@ inline void computePriorMatrix(long double h,
 		// priorGenotypeProb->p[ba][bd]   =      dnaDefaultBases.f[ba]   *        (1.0-h);
 		// priorGenotypeProbD->p[ba][bd]  =      dnaDefaultBases.f[ba]   *        (   -1.0);		    
 		//priorGenotypeD1->p[ba][bd]     = 1/( (h-1.0)*( (dnaDefaultBases.f[ba])  +  logl(1.0-h) ));
-		priorGenotypeD1->p[ba][bd]     = 1/( (h-1) ); //d/dh(log(1 - h)) = 1/(h - 1)
+		priorGenotypeD1->p[ba][bd]     = 1/( (h-1) );               // d/dh(log(1 - h)) = 1/(h - 1)
+		priorGenotypeD2->p[ba][bd]     = -1.0/( powl( (1-h),2) ); // d^2/dh^2(log(1 - h)) = -1/(1 - h)^2
 
-
-			
-
-		    
+		
 		//cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<<(1.0-h)<<endl;
 	    }else{//mutation
 		if( (ba%2)==(bd%2) ){//transition
@@ -1027,8 +1026,9 @@ inline void computePriorMatrix(long double h,
 
 		    priorGenotype->p[ba][bd]         = logl(dnaDefaultBases.f[ba])  +   logl( (h) * (TStoTVratio/(TStoTVratio+1.0))     );
 		    priorGenotypeD1->p[ba][bd]       = 1/(  h );// (d)/(dh)( log(c h) ) = 1/h
+		    priorGenotypeD2->p[ba][bd]       = -1.0/(  powl(h,2) ); //d^2/dh^2(log(h)) = -1/h^2
 
-
+		    
 		    //cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<< ( (h) * (TStoTVratio/(TStoTVratio+1.0)) )<<endl; 
 		}else{//transversion
 		    //priorGenotype->p[ba][bd] = dnaDefaultBases.f[ba]  * (( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0);
@@ -1038,6 +1038,7 @@ inline void computePriorMatrix(long double h,
 		    // priorGenotypeProbD->p[ba][bd] =      dnaDefaultBases.f[ba]   *       ( 1.0 * ((        1.0/(TStoTVratio+1.0)) /2.0));
 
 		    priorGenotypeD1->p[ba][bd]   = 1/h; // (d)/(dh)( log(c h) ) = 1/h
+		    priorGenotypeD2->p[ba][bd]   = -1.0/( powl(h,2) ); // d^2/dh^2(log(h)) = -1/h^2
 			
 		    //cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<< ( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0<<endl; 
 		}
@@ -1307,7 +1308,8 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 			   &priorGenotype,
 			   // &priorGenotypeProb,
 			   // &priorGenotypeProbD,
-			   &priorGenotypeD1);
+			   &priorGenotypeD1,
+			   &priorGenotypeD2);
 
 	
 	// cerr<<setprecision(20)<<"TEST3 "<<"\tL2P="<<length2pos2mpq2bsq2submatrix[113][12]->at(37)[38].p[0][3]<<"\t"<<length2pos2mpq2bsq2submatrix[113][12]->at(37)[18].p[0][3]<<"\t"<<expl(length2pos2mpq2bsq2submatrix[113][12]->at(37)[38].p[0][3])<<"\t"<<expl(length2pos2mpq2bsq2submatrix[113][12]->at(37)[18].p[0][3])<<"\t"<<logl(0.5*length2pos2mpq2bsq2submatrix[113][12]->at(37)[38].p[0][3])<<"\t"<<logl(0.5*length2pos2mpq2bsq2submatrix[113][12]->at(37)[18].p[0][3])<<endl ;
@@ -1395,8 +1397,11 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
 	    // long double sumProbForPriors             =0.0; //the derivative of the GL should be 0, just the prior
 	    // long double sumDerProbForPriors          =0.0; //the derivative of the GL should be 0, just the prior
-	    long double sumNumerator   = 0.0;
-	    long double sumDenominator = 0.0;
+	    //if the function is log( f(x) )
+
+	    long double internalFunctionD2   = 0.0; // f''(x)
+	    long double internalFunctionD1   = 0.0; // f'(x)
+	    long double internalFunction     = 0.0; // f(x)
 
 	    for(uint8_t ba=0;ba<4;ba++){//ancestral base
 		uint8_t ba_c = 3-ba;
@@ -1412,7 +1417,8 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		
 		    long double loglikelihoodForGivenBaBdTimesPrior  =0.0;
 		    long double loglikelihoodForGivenBaBdTimesPriorD1=0.0;
-
+		    long double loglikelihoodForGivenBaBdTimesPriorD2=0.0;
+		    
 		    long double loglikelihoodForGivenBaBd          =0.0;
 
 			       	      
@@ -1420,6 +1426,7 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		    //loglikelihoodForGivenBaBdTimesPrior = loglikelihoodForGivenBaBd + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
 		    loglikelihoodForGivenBaBdTimesPrior   = vectorBaBdLikelihood[p].gl[babdIdx] + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
 		    loglikelihoodForGivenBaBdTimesPriorD1 = 0                                   + priorGenotypeD1.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
+		    loglikelihoodForGivenBaBdTimesPriorD2 = 0                                   + priorGenotypeD2.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
 		
 #ifdef DEBUGCOMPUTELLEACHBASE
 		    //if(p>10000 && p<11000)
@@ -1429,9 +1436,18 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
 		    //adding probabilities for each genotype
 		    loglikelihoodForEveryBaBd  = oplusInitnatl( loglikelihoodForEveryBaBd , loglikelihoodForGivenBaBdTimesPrior); // \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+		    
+		    
+		    //(d^2)/(d^2h) (exp(f(h))) =  e^(f(h))f'(h) * f'(h) + e^(f(h)) f''(h) 
+		    internalFunctionD2  += 
+			expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD1*loglikelihoodForGivenBaBdTimesPriorD1 
+			+ 
+			expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD2;  
 
-		    sumNumerator   += expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD1; 
-		    sumDenominator += expl( loglikelihoodForGivenBaBdTimesPrior );
+		    //(d)/(dh)(exp(f(h))) =  e^(f(h)) *f'(h)
+		    internalFunctionD1  += expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD1;  
+
+		    internalFunction    += expl( loglikelihoodForGivenBaBdTimesPrior );
 
 		    
 		    // sumProbForPriors          += priorGenotypeProb.p[ba][bd];
@@ -1452,13 +1468,20 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 		}//END for each derived base
 	    }//END for each ancestral base
 
-	    //The derivative for the log( exp(p1) + exp(p2) +...exp(10) ) is
+	    //The derivative for the log( exp(p1) + exp(p2) +...exp(p10) ) is
 	    //
 	    //             der( exp(p1) + exp(p2) +...exp(p10) )
 	    //             -----------------------------------
 	    //                ( exp(p1) + exp(p2) +...exp(p10) )
-	    loglikelihoodForEveryBaBdD1 +=  ( sumNumerator / sumDenominator);  
+	    loglikelihoodForEveryBaBdD1 +=  ( internalFunctionD1 / internalFunction );  
+	    //loglikelihoodForEveryBaBdD1 +=  ( sumNumerator / sumDenominator);  
 	    //loglikelihoodForEveryBaBdD1 +=  ( sumDerProbForPriors/sumProbForPriors);  
+	    
+	    //If the function is log( f(x) ) where f(x) (called internalFunction) is the likelihood function then
+	    //  d/dx log( f(x) ) = f'(x) / f(x)
+	    //  and 
+	    //  d^2/d^2x log( f(x) ) = [f''(x) f(x) + f'(x) ] / [ f(x) ]^2
+	    loglikelihoodForEveryBaBdD2 +=  ( internalFunctionD2 * internalFunction - powl(internalFunctionD1,2) ) / powl( internalFunction , 2 );
 
 #ifdef DEBUGCOMPUTELL	
 	    //if(p>10000 && p<11000)
@@ -1488,8 +1511,12 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	    loglikelihoodForEveryPositionForEveryBaBdD2 += loglikelihoodForEveryBaBdD2; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
 	
 	}//END for each genomic position
-	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<endl;
+
+        long double errb = 1.96/sqrt(-1.0*loglikelihoodForEveryPositionForEveryBaBdD2);
+
+	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
     }//end for each h
+    //TODO add gradient descent
     exit(1);
 	
 }
