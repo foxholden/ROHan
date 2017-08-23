@@ -1285,8 +1285,20 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
     cerr<<"computeLL done pre-computing computing "<<endl;
 
+    //max iterations
+    int sitesPer1M=randomInt(1,1000);
+    long double h = double(sitesPer1M)/double(1000000);
+    
+    //for(long double h=0.000001;h<0.001000;h+=0.0000250){
+    //while(1){
+    long double lambda   = 0.0000000001;
+    //long double lambdaHW  = 0.0000000001;
 
-    for(long double h=0.000001;h<0.001000;h+=0.0000250){
+    int iterationsMax     = 10000;
+    int iterationsGrad    = 1;
+
+    while( iterationsGrad<iterationsMax){
+
 
 	//for(long double h=0.000001;h<0.001000;h+=0.000100){
 	//long double h=0.00000001;
@@ -1492,9 +1504,11 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	    //////////////////////////////////////////////////////
 	    // BEGIN GENOTYPING
 	    //////////////////////////////////////////////////////
+	    if(false){
 	    genotypePositions(	mostLikelyBaBdIdx                 ,
 				&vectorOfloglikelihoodForGivenBaBd,
 				&vectorOfloglikelihoodForGivenGeno);
+	    }
 	    ////////////////////////////////////////////////////
 	    // END GENOTYPING
 	    ////////////////////////////////////////////////////
@@ -1514,7 +1528,10 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 
         long double errb = 1.96/sqrt(-1.0*loglikelihoodForEveryPositionForEveryBaBdD2);
 
-	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
+	long double hnew = h + lambda*loglikelihoodForEveryPositionForEveryBaBdD1;
+	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\t"<<hnew<<endl;
+	h=hnew;
+	iterationsGrad++;	
     }//end for each h
     //TODO add gradient descent
     exit(1);
