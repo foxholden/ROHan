@@ -20,6 +20,14 @@ using namespace std;
 
 
 typedef struct { 
+    long double h;
+    long double hLow;
+    long double hHigh;
+    bool hasConverged;
+ } hResults;
+
+
+typedef struct { 
     long double s[12];
  } substitutionRates;
 

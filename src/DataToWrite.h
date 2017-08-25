@@ -17,13 +17,14 @@ using namespace std;
 #include "PositionResult.h"
 
 class DataToWrite{
-private:
+ private:
     
-    public:
+ public:
     vector<PositionResult *>  * vecPositionResults;
     GenomicRange rangeGen;
     int rank;
-    
+    hResults hetEstResults;
+
     DataToWrite();
     DataToWrite(const DataToWrite & other);
     ~DataToWrite();

@@ -1266,10 +1266,10 @@ inline void genotypePositions(const int         mostLikelyBaBdIdx,
 
 }
 
-inline void computeLL(vector<positionInformation> * piForGenomicWindow){
+inline hResults computeLL(vector<positionInformation> * piForGenomicWindow){
 
     cerr<<"computeLL, starting pre-computations size of window: "<<piForGenomicWindow->size()<<endl;
-
+    hResults hresToReturn;
 
 
     /////////////////////////////////////////
@@ -1286,20 +1286,49 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
     cerr<<"computeLL done pre-computing computing "<<endl;
 
     //max iterations
-    int sitesPer1M=randomInt(1,1000);
-    long double h = double(sitesPer1M)/double(1000000);
-    
+    int sitesPer1M=randomInt(1,1000);// between 1 and 1000 sites per million
+    long double theta     = double(sitesPer1M)/double(1000000); //theta
+    long double theta_t_1 = theta;
+
+    long double h=theta;
+    long double hLastIteration=LDBL_MAX;
+    long double hPrecision=0.0000001;
+    long double errb;
+
+    bool hasConverged=false;
+    bool lastIteration=false;
+    long double mu ;
+
     //for(long double h=0.000001;h<0.001000;h+=0.0000250){
     //while(1){
     long double lambda   = 0.0000000001;
     //long double lambdaHW  = 0.0000000001;
 
-    int iterationsMax     = 10000;
+    int iterationsMax     = 100;
     int iterationsGrad    = 1;
 
     while( iterationsGrad<iterationsMax){
+	if(iterationsGrad == (iterationsMax-1)){
+	    //cerr<<"Did not converge"<<endl;
 
+	    lastIteration=true;
+	}
+	mu = 1.0 - double(3.0)/(5+double(iterationsGrad));
 
+	if(hLastIteration != LDBL_MAX){
+	    //hLastIteration
+	    if(abs(hLastIteration-h)<hPrecision){
+		lastIteration=true;
+	    }
+	    hLastIteration=h;
+	}else{//not initialized hLastIteration
+	    if(iterationsGrad==1){
+		//do nothing
+	    }else{
+		hLastIteration=h;
+	    }
+	}
+	h = (1.0+mu) * theta -  mu*theta_t_1;
 	//for(long double h=0.000001;h<0.001000;h+=0.000100){
 	//long double h=0.00000001;
 	//long double h=0.000824;
@@ -1504,10 +1533,10 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	    //////////////////////////////////////////////////////
 	    // BEGIN GENOTYPING
 	    //////////////////////////////////////////////////////
-	    if(false){
-	    genotypePositions(	mostLikelyBaBdIdx                 ,
-				&vectorOfloglikelihoodForGivenBaBd,
-				&vectorOfloglikelihoodForGivenGeno);
+	    if(lastIteration){//do it at the last iteration		
+		genotypePositions(	mostLikelyBaBdIdx                 ,
+					&vectorOfloglikelihoodForGivenBaBd,
+					&vectorOfloglikelihoodForGivenGeno);
 	    }
 	    ////////////////////////////////////////////////////
 	    // END GENOTYPING
@@ -1526,16 +1555,35 @@ inline void computeLL(vector<positionInformation> * piForGenomicWindow){
 	
 	}//END for each genomic position
 
-        long double errb = 1.96/sqrt(-1.0*loglikelihoodForEveryPositionForEveryBaBdD2);
+        errb = 1.96/sqrt(-1.0*loglikelihoodForEveryPositionForEveryBaBdD2);
 
-	long double hnew = h + lambda*loglikelihoodForEveryPositionForEveryBaBdD1;
-	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\t"<<hnew<<endl;
-	h=hnew;
+	if(lastIteration){
+	    hasConverged=true;
+	    //cerr<<"last iteration, producing genotypes"<<endl;
+	    break;
+	}
+	
+	//cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\t"<<hnew<<endl;
+
+	// long double hnew = h + lambda*loglikelihoodForEveryPositionForEveryBaBdD1;
+	// h=hnew;
+	theta_t_1 = theta;
+	theta  = h + lambda*loglikelihoodForEveryPositionForEveryBaBdD1;
+	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\t"<<theta<<"\t"<<theta_t_1<<"\t"<<mu<<"\t"<<hLastIteration<<endl;
+
 	iterationsGrad++;	
     }//end for each h
-    //TODO add gradient descent
-    exit(1);
-	
+
+    hresToReturn.h            = h;
+    hresToReturn.hLow         = h-errb;
+    hresToReturn.hHigh        = h+errb;
+    hresToReturn.hasConverged = hasConverged;
+
+
+
+
+    return hresToReturn;
+    
 }
 
 class coverageComputeVisitor : public PileupVisitor {
@@ -1962,9 +2010,11 @@ void *mainHeteroComputationThread(void * argc){
     delete cv;
 
 
-    computeLL(piForGenomicWindow);
+    dataToWrite->hetEstResults = computeLL(piForGenomicWindow);
+
     delete piForGenomicWindow;
 	
+
 
     //call computeLL here
 #ifdef HETVERBOSE
@@ -2301,8 +2351,8 @@ int main (int argc, char *argv[]) {
 
 
     int    numberOfThreads   = 1;
-    string outFileSiteLL;
-    bool   outFileSiteLLFlag=false;
+    string outFilePrefix;
+    bool   outFilePrefixFlag=false;
 
     string sampleName        = "sample";
     bool   useVCFoutput      = false;
@@ -2324,7 +2374,7 @@ int main (int argc, char *argv[]) {
 			      "\n\n"
 			      
                               "\n\tI/O options:\n"+
-			      "\t\t"+"-o"+","+"--out"  + "\t\t"   +    "[outfile]" +"\t\t"+"Output per-site likelihoods in BGZIP (default: none)"+"\n"+
+			      "\t\t"+"-o"+","+"--out"  + "\t\t"   +    "[out prefix]" +"\t\t"+"Output prefix  (default: none)"+"\n"+
 			      "\t\t"+""  +""+"--name" + "\t\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
 			      "\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
 			      //"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
@@ -2413,8 +2463,8 @@ int main (int argc, char *argv[]) {
 
         if( string(argv[i]) == "-o"    ||
 	    string(argv[i]) == "--out" ){
-            outFileSiteLL=string(argv[i+1]);
-	    outFileSiteLLFlag=true;
+            outFilePrefix=string(argv[i+1]);
+	    outFilePrefixFlag=true;
             i++;
             continue;
         }
@@ -2468,6 +2518,12 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
 
+    if(!outFilePrefixFlag){
+	cerr<<"The output file has to be defined"<<endl;
+	return 1;	
+    }// else{
+
+    // }
 
     string fastaFile         = string(argv[lastOpt]);
     bamFileToOpen            = string(argv[lastOpt+1]);
@@ -2486,12 +2542,12 @@ int main (int argc, char *argv[]) {
     }
 
 
-    if(outFileSiteLLFlag)
-	if( !strEndsWith(outFileSiteLL,".gz")){
-	    cerr<<"The output file "<<outFileSiteLL<<" must end with .gz"<<endl;
-	    return 1;	
-	}
+    //    if(outFilePrefixFlag)
 
+	// if( !strEndsWith(outFilePrefix,".gz")){
+	//     cerr<<"The output file "<<outFilePrefix<<" must end with .gz"<<endl;
+	//     return 1;	
+	// }
 
 
 
@@ -2883,14 +2939,30 @@ int main (int argc, char *argv[]) {
     // 	sleep(timeThreadSleep);
     // }
     cerr<<"done creating threads "<<endl;
-    cerr<<"outFileSiteLLFlag ="<<outFileSiteLLFlag<<endl;
+    cerr<<"outFilePrefixFlag ="<<outFilePrefixFlag<<endl;
     ///////////////////
     //Writing data out/
     ///////////////////
+    // sleep(1000000000000);
+    // return 1;
+    //writing h estimates
 
 
-    Internal::BgzfStream  bgzipWriter;
+    Internal::BgzfStream  bgzipWriterGL;
+    Internal::BgzfStream  bgzipWriterHest;
 
+    bgzipWriterHest.Open(outFilePrefix+".hEst.gz", IBamIODevice::WriteOnly);
+    if(!bgzipWriterHest.IsOpen()){
+	cerr<<"Cannot open file "<<(outFileSiteLL+".hEst.gz")<<" in bgzip writer"<<endl;
+	return 1;
+    }
+
+    bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
+    if(!bgzipWriterGL.IsOpen()){
+	cerr<<"Cannot open file "<<(outFileSiteLL+".vcf.gz")<<" in bgzip writer"<<endl;
+	return 1;
+    }
+    
     // if(outFileSiteLLFlag){
     // 	bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
     // 	if(!bgzipWriter.IsOpen()){
