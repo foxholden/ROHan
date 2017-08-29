@@ -184,6 +184,9 @@ long double pdfRateForPoissonCov;
 //         : y + log1pl( expl( x-y ) )  ;
 // }
 
+//for gradient descent
+long double alpha=1.0e-9;
+long double beta =0.5;
 
 long double randomPMismatch4Bases =  ( (long double)(3) ) /  ( (long double)(4) );  // 3/4
 long double randomPMatch4Bases    =  1.0-randomPMismatch4Bases;                     // 1/4
@@ -1150,9 +1153,11 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 }
 
 
-inline void genotypePositions(const int         mostLikelyBaBdIdx,
-			      vector<long double> * vectorOfloglikelihoodForGivenBaBd,
-			      vector<long double> * vectorOfloglikelihoodForGivenGeno){
+inline void genotypePositions(const int                   mostLikelyBaBdIdx,
+			      vector<long double>       * vectorOfloglikelihoodForGivenBaBd,
+			      vector<long double>       * vectorOfloglikelihoodForGivenGeno,
+			      PositionResult * pr){
+
 
     //Compute likelihood of all minus best BABD
     long double loglikelihoodForEveryBaBd_minusBest          =0.0;
@@ -1210,6 +1215,8 @@ inline void genotypePositions(const int         mostLikelyBaBdIdx,
     long double loglikelihoodForEveryGeno_minusBest=0.0;
 
     for(unsigned int g=0;g<10;g++){	   
+	//
+	pr->ll[g] = vectorOfloglikelihoodForGivenGeno->at(g); 
 	if(vectorOfloglikelihoodForGivenGeno->at(g) > mostLikelyGeno){
 	    mostLikelyGeno    = vectorOfloglikelihoodForGivenGeno->at(g);
 	    mostLikelyGenoIdx = g;
@@ -1266,7 +1273,8 @@ inline void genotypePositions(const int         mostLikelyBaBdIdx,
 
 }
 
-inline hResults computeLL(vector<positionInformation> * piForGenomicWindow){
+inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
+			  vector<PositionResult *>    * dataToWriteOut){
 
     cerr<<"computeLL, starting pre-computations size of window: "<<piForGenomicWindow->size()<<endl;
     hResults hresToReturn;
@@ -1287,48 +1295,35 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow){
 
     //max iterations
     int sitesPer1M=randomInt(1,1000);// between 1 and 1000 sites per million
-    long double theta     = double(sitesPer1M)/double(1000000); //theta
-    long double theta_t_1 = theta;
+    // long double theta     = double(sitesPer1M)/double(1000000); //theta
+    // long double theta_t_1 = theta;
+    long double hp;
+    long double h=double(sitesPer1M)/double(1000000);
+    long double z=h;
 
-    long double h=theta;
-    long double hLastIteration=LDBL_MAX;
-    long double hPrecision=0.0000001;
+    //long double hLastIteration=LDBL_MAX;
+    //long double hPrecision=0.0000001;
     long double errb;
+    long double loglikelihoodForEveryPositionForEveryBaBdP=LDBL_MAX;
 
     bool hasConverged=false;
     bool lastIteration=false;
-    long double mu ;
+    // long double mu ;
 
-    //for(long double h=0.000001;h<0.001000;h+=0.0000250){
-    //while(1){
-    long double lambda   = 0.0000000001;
+    // //for(long double h=0.000001;h<0.001000;h+=0.0000250){
+    // //while(1){
+    // long double lambda   = 0.0000000001;
     //long double lambdaHW  = 0.0000000001;
 
     int iterationsMax     = 100;
     int iterationsGrad    = 1;
 
     while( iterationsGrad<iterationsMax){
-	if(iterationsGrad == (iterationsMax-1)){
-	    //cerr<<"Did not converge"<<endl;
 
-	    lastIteration=true;
-	}
-	mu = 1.0 - double(3.0)/(5+double(iterationsGrad));
+	//mu = 1.0 - double(3.0)/(5+double(iterationsGrad));
 
-	if(hLastIteration != LDBL_MAX){
-	    //hLastIteration
-	    if(abs(hLastIteration-h)<hPrecision){
-		lastIteration=true;
-	    }
-	    hLastIteration=h;
-	}else{//not initialized hLastIteration
-	    if(iterationsGrad==1){
-		//do nothing
-	    }else{
-		hLastIteration=h;
-	    }
-	}
-	h = (1.0+mu) * theta -  mu*theta_t_1;
+
+	//h = (1.0+mu) * theta -  mu*theta_t_1;
 	//for(long double h=0.000001;h<0.001000;h+=0.000100){
 	//long double h=0.00000001;
 	//long double h=0.000824;
@@ -1445,10 +1440,14 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow){
 	    long double internalFunction     = 0.0; // f(x)
 
 	    for(uint8_t ba=0;ba<4;ba++){//ancestral base
+#ifdef DEBUGCOMPUTELLEACHBASE
 		uint8_t ba_c = 3-ba;
-
+#endif
 		for(uint8_t bd=0;bd<4;bd++){//derived base
+		    
+#ifdef DEBUGCOMPUTELLEACHBASE
 		    uint8_t bd_c = 3-bd;
+#endif
 
 #ifdef DEBUGCOMPUTELLEACHBASE
 		    //if(p>10000 && p<11000)
@@ -1460,7 +1459,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow){
 		    long double loglikelihoodForGivenBaBdTimesPriorD1=0.0;
 		    long double loglikelihoodForGivenBaBdTimesPriorD2=0.0;
 		    
-		    long double loglikelihoodForGivenBaBd          =0.0;
+		    // long double loglikelihoodForGivenBaBd          =0.0;
 
 			       	      
 		    //  product of (\prod_{fragment} P(D|G)) times the prior P(G) for the genotype
@@ -1534,9 +1533,14 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow){
 	    // BEGIN GENOTYPING
 	    //////////////////////////////////////////////////////
 	    if(lastIteration){//do it at the last iteration		
-		genotypePositions(	mostLikelyBaBdIdx                 ,
-					&vectorOfloglikelihoodForGivenBaBd,
-					&vectorOfloglikelihoodForGivenGeno);
+		PositionResult * pr=new PositionResult();
+		pr->pos = piForGenomicWindow->at(p).posAlign;
+		genotypePositions( mostLikelyBaBdIdx                 ,
+				   &vectorOfloglikelihoodForGivenBaBd,
+				   &vectorOfloglikelihoodForGivenGeno,
+				   pr);
+		//dataToWriteOut
+		dataToWriteOut->push_back(pr);
 	    }
 	    ////////////////////////////////////////////////////
 	    // END GENOTYPING
@@ -1557,22 +1561,64 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow){
 
         errb = 1.96/sqrt(-1.0*loglikelihoodForEveryPositionForEveryBaBdD2);
 
-	if(lastIteration){
-	    hasConverged=true;
-	    //cerr<<"last iteration, producing genotypes"<<endl;
-	    break;
-	}
 	
 	//cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\t"<<hnew<<endl;
 
 	// long double hnew = h + lambda*loglikelihoodForEveryPositionForEveryBaBdD1;
 	// h=hnew;
-	theta_t_1 = theta;
-	theta  = h + lambda*loglikelihoodForEveryPositionForEveryBaBdD1;
-	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\t"<<theta<<"\t"<<theta_t_1<<"\t"<<mu<<"\t"<<hLastIteration<<endl;
+	// theta_t_1 = theta;
+	// theta  = h + lambda*loglikelihoodForEveryPositionForEveryBaBdD1;
+	
+	z = beta*z + loglikelihoodForEveryPositionForEveryBaBdD1;
+	long double hnew = h + alpha*z;
+
+	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\te="<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\thnew="<<hnew<<"\tz="<<z<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdP<<"\t"<<hp<<"\t"<<alpha<<"\t"<<beta<<endl;
+
+	if(lastIteration){//was set at the previous loop
+	    break;
+	}
+	//if(abs(hnew-h)<hPrecision){
+	if(fabsl(loglikelihoodForEveryPositionForEveryBaBdD1)<100){
+	    cerr<<"CONVERGED"<<endl;
+	    lastIteration=true;
+	    hasConverged =true;
+	    //break;
+	}
+
+	if(loglikelihoodForEveryPositionForEveryBaBdP == LDBL_MAX){
+	    loglikelihoodForEveryPositionForEveryBaBdP = loglikelihoodForEveryPositionForEveryBaBd;
+	    hp = h;
+	    h  = hnew;
+	}else{
+	
+	    // if( loglikelihoodForEveryPositionForEveryBaBdP > loglikelihoodForEveryPositionForEveryBaBd){
+	    // 	//reject move, this is dumb because we end up re-calculating the same iteration as before
+
+	    // 	h =  hp;
+	    // 	//is 0.5 for large values of the first derivative
+	    // 	//is 0.7 at 1000
+	    // 	long double factorAlpha = 0.5+1/(expl(fabsl(loglikelihoodForEveryPositionForEveryBaBdD1)/1000)+1);
+	    // 	cout<<"reject move , reverting h to "<<hp<<"\t"<<alpha<<"\t"<<factorAlpha<<endl;
+	    // 	alpha =  alpha * factorAlpha;
+	    // 	continue;
+	    // }else{
+		loglikelihoodForEveryPositionForEveryBaBdP = loglikelihoodForEveryPositionForEveryBaBd;
+		hp = h;
+		h  = hnew;
+		//}
+	}
+
+	if(iterationsGrad == (iterationsMax-2)){
+	    cerr<<"Did not converge"<<endl;
+	    hasConverged =false;
+	    lastIteration=true;
+	    //break;
+	}
+
+	//cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\t"<<theta<<"\t"<<theta_t_1<<"\t"<<mu<<"\t"<<hLastIteration<<endl;
 
 	iterationsGrad++;	
-    }//end for each h
+    }//end iteration
 
     hresToReturn.h            = h;
     hresToReturn.hLow         = h-errb;
@@ -1657,7 +1703,7 @@ public:
 			  const int refID,
 			  const unsigned int leftCoord,
 			  const unsigned int rightCoord,
-			  vector<PositionResult *> * dataToWriteOut,
+			  //vector<PositionResult *> * dataToWriteOut,
 			  const int threadID,
 			  vector<positionInformation> * piForGenomicWindow)
 	: PileupVisitor()
@@ -1665,7 +1711,7 @@ public:
 	, m_refID(refID)
 	, m_leftCoord(leftCoord)
 	, m_rightCoord(rightCoord)
-	, m_dataToWriteOut( dataToWriteOut)
+	  //, m_dataToWriteOut( dataToWriteOut)
 	, m_threadID( threadID )
 	, m_numberOfSites( 0 )
 	, totalBases(0)
@@ -1708,11 +1754,12 @@ public:
 	// vector<bool>             isRevVec;
 	//vector<singleRead> singleReadToAdd;
 	positionInformation piToAdd;
-	piToAdd.posAlign     = pileupData.Position;
+
 	piToAdd.skipPosition = false;
 
 
 	unsigned int                posAlign = pileupData.Position+1;
+	piToAdd.posAlign                     = posAlign;
 
 	bool foundSites=false;
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
@@ -1800,7 +1847,7 @@ private:
     unsigned int m_leftCoord;
     unsigned int m_rightCoord;
 
-    vector<PositionResult *> * m_dataToWriteOut;
+    //vector<PositionResult *> * m_dataToWriteOut;
     unsigned int m_numberOfSites;
     vector<positionInformation> * m_piForGenomicWindow;
 
@@ -1974,7 +2021,7 @@ void *mainHeteroComputationThread(void * argc){
 							  refID,
 							  currentChunk->rangeGen.getStartCoord(), 
 							  currentChunk->rangeGen.getEndCoord()  ,
-							  dataToWrite->vecPositionResults,
+							  //dataToWrite->vecPositionResults,
 							  rankThread,
 							  piForGenomicWindow);
 
@@ -2010,8 +2057,9 @@ void *mainHeteroComputationThread(void * argc){
     delete cv;
 
 
-    dataToWrite->hetEstResults = computeLL(piForGenomicWindow);
-
+    dataToWrite->hetEstResults = computeLL(piForGenomicWindow,
+					   dataToWrite->vecPositionResults);
+    
     delete piForGenomicWindow;
 	
 
@@ -2456,6 +2504,18 @@ int main (int argc, char *argv[]) {
 
         if( string(argv[i]) == "--cont"  ){
             contrate=destringify<long double>(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if( string(argv[i]) == "--alpha"  ){
+            alpha=destringify<long double>(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if( string(argv[i]) == "--beta"  ){
+            beta=destringify<long double>(argv[i+1]);
             i++;
             continue;
         }
@@ -2934,10 +2994,10 @@ int main (int argc, char *argv[]) {
     // 	//threads are running here
 
     // unsigned int originalSize = queueDataToprocess.size();
-    // while(queueDataToprocess.size()!=0){
-    // 	cout<<"# of slices left to process: "<<queueDataToprocess.size()<<"/"<<originalSize<<endl;
-    // 	sleep(timeThreadSleep);
-    // }
+     // while(queueDataToprocess.size()!=0){
+     // 	 cout<<"# of slices left to process: "<<queueDataToprocess.size()<<"/"<<originalSize<<endl;
+     // 	 sleep(timeThreadSleep);
+     // }
     cerr<<"done creating threads "<<endl;
     cerr<<"outFilePrefixFlag ="<<outFilePrefixFlag<<endl;
     ///////////////////
@@ -2953,13 +3013,13 @@ int main (int argc, char *argv[]) {
 
     bgzipWriterHest.Open(outFilePrefix+".hEst.gz", IBamIODevice::WriteOnly);
     if(!bgzipWriterHest.IsOpen()){
-	cerr<<"Cannot open file "<<(outFileSiteLL+".hEst.gz")<<" in bgzip writer"<<endl;
+	cerr<<"Cannot open file "<<(outFilePrefix+".hEst.gz")<<" in bgzip writer"<<endl;
 	return 1;
     }
 
     bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
     if(!bgzipWriterGL.IsOpen()){
-	cerr<<"Cannot open file "<<(outFileSiteLL+".vcf.gz")<<" in bgzip writer"<<endl;
+	cerr<<"Cannot open file "<<(outFilePrefix+".vcf.gz")<<" in bgzip writer"<<endl;
 	return 1;
     }
     
@@ -2981,6 +3041,7 @@ int main (int argc, char *argv[]) {
     // 	bgzipWriter.Write(headerOutFile.c_str(),headerOutFile.size());
     // }
 
+    //#ifdef LATER
     bool wroteEverything=false;
     int lastWrittenChunk=-1;   
     cerr<<"test wroteEverything="<<wroteEverything<<endl;
@@ -3001,9 +3062,20 @@ int main (int argc, char *argv[]) {
 		checkResults("pthread_mutex_unlock()\n", rc);
 
 		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<dataToWrite->vecPositionResults->size()<<" records"<<endl;
+
+		string strToWrite=dataToWrite->rangeGen.asBed()+"\t";
+		if(dataToWrite->hetEstResults.hasConverged){
+		    strToWrite+=stringify(dataToWrite->hetEstResults.h)+"\t"+stringify(dataToWrite->hetEstResults.hLow)+"\t"+stringify(dataToWrite->hetEstResults.hHigh)+"\n";
+		}else{
+		    strToWrite+="NA\tNA\tNA\n";
+		}
+		cout<<"writing "<<strToWrite<<endl;
+		bgzipWriterHest.Write(strToWrite.c_str(), strToWrite.size());
+
+#ifdef LATER
 		sizeGenome+=dataToWrite->vecPositionResults->size();
 		    
-		string strToWrite="";
+		strToWrite="";
 		for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
 		    //cout<<i<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(references)<<endl;
 		    strToWrite += dataToWrite->vecPositionResults->at(i)->toString(references);
@@ -3024,7 +3096,7 @@ int main (int argc, char *argv[]) {
 			if(outFileSiteLLFlag){ bgzipWriter.Write(strToWrite.c_str(), strToWrite.size()); }
 		    }
 		}
-		    
+#endif		    
 		
 		wroteData=true;		
 		lastWrittenChunk=dataToWrite->rank;
@@ -3047,465 +3119,12 @@ int main (int argc, char *argv[]) {
 	if(!wroteData)
 	    sleep(timeSleepWrite);
     }
-
+    //#endif
     ///////////////////////
     //end Writing data out/
     ///////////////////////
-
-    //return 1;
-
-    // 	rc = pthread_mutex_lock(&mutexCounter);
-    // 	checkResults("pthread_mutex_lock()\n", rc);
-    // 	bool wroteData=false;
-    // 	if(!queueDataTowrite.empty()){
-	
-    // 	    DataChunk *  dataToWrite= queueDataTowrite.top();
-
-    // 	    if( lastWrittenChunk == (dataToWrite->rank-1) ){
-    // 		queueDataTowrite.pop();
-    // 		cout<<"writing "<<dataToWrite->rank<<endl;
-    // 		//writing dataToWrite
-    // 		for(unsigned int i=0;i<dataToWrite->dataToProcess.size();i++){
-    // 		    outfile<< dataToWrite->dataToProcess[i].ids 
-    // 			   << endl  
-    // 			   << dataToWrite->dataToProcess[i].seqs << endl
-    // 			   << "+" <<endl 
-    // 			   << dataToWrite->dataToProcess[i].qual << endl;
-    // 		}
-		
-    // 		wroteData=true;		
-    // 		lastWrittenChunk=dataToWrite->rank;
-		
-    // 		if(dataToWrite->rank == lastRank)
-    // 		    wroteEverything=true;	
-    // 		delete dataToWrite;
-    // 	    }else{
-		
-    // 	    }
-
-    // 	}
-
-    // 	rc = pthread_mutex_unlock(&mutexCounter);
-    // 	checkResults("pthread_mutex_unlock()\n", rc);
-
-    // 	if(!wroteData)
-    // 	    sleep(timeThreadSleep);
-    // }
-
-    //waiting for threads to finish    
-    for (int i=0; i <numberOfThreads; ++i) {
-	rc = pthread_join(threadHet[i], NULL);
-	checkResults("pthread_join()\n", rc);
-    }
-
-    cerr<<"Heterozygosity computations are done"<<endl;
-    pthread_mutex_destroy(&mutexRank);
-    pthread_mutex_destroy(&mutexQueue);
-    pthread_mutex_destroy(&mutexCounter);
-
-
-    if(outFileSiteLLFlag){
-	bgzipWriter.Close();
-    }
-
-    // //}else{//if we suply the geno file as input
-
-    // string    lineGENOL;
-    // igzstream myFileGENOL;
-    // 	cerr<<"Reading genotypes: "<<genoFileAsInput<<" ...";
-    // 	myFileGENOL.open(genoFileAsInput.c_str(), ios::in);
-
-    // 	if (myFileGENOL.good()){
-    // 	    getline (myFileGENOL,lineGENOL);//header
-    // 	    while ( getline (myFileGENOL,lineGENOL)){
-    // 		//cout<<lineGENOL<<endl;
-    // 		GenoResults * toadd =  new GenoResults( lineGENOL );
-    // 		vectorGenoResults.push_back(toadd);
-    // 		sizeGenome++;
-    // 	    }
-    // 	    myFileGENOL.close();
-    // 	}else{
-    // 	    cerr << "Error: unable to open file with genotype likelihoods: "<<genoFileAsInput<<endl;
-    // 	    return 1;
-    // 	}
-    // 	cerr<<"..done"<<endl;
-
-    // }
-
-    // 
-
-
-    //    return 1;
-    //////////////////////////////////
-    //                              //
-    // BEGIN COMPUTE HETERO RATE    //
-    //                              //
-    //////////////////////////////////
-
-
-#ifdef NODEF
-
-    long double randomLog = -1.0*log(1000);
-    vector<GenoResults *> vectorGenoResultsT;
-
-    for(unsigned int i=0;i<vectorGenoResults.size();i++){
-	// if(i == 796868){
-	//cout<<*(vectorGenoResults[i])<<endl;
-	// }
-	long double sumProbHomoz=0;
-	long double sumProbHeter=0;
-	long double mostLikeHomozy =  -1.0*numeric_limits<long double>::infinity();
-	long double mostLikeHetero =  -1.0*numeric_limits<long double>::infinity();
-
-
-
-	for(int g=0;g<4;g++){
-	    sumProbHomoz = oplusInitnatl( sumProbHomoz , vectorGenoResults[i]->ll[ genoPriority[g] ] );//+logl( ( 1/( (long double)4))) );
-
-	    if( mostLikeHomozy < vectorGenoResults[i]->ll[ genoPriority[g] ]){
-		mostLikeHomozy = vectorGenoResults[i]->ll[ genoPriority[g] ];
-	    }
-
-	}
-	sumProbHomoz = sumProbHomoz + logl( ((long double)1)/((long double)4) );
-
-	for(int g=4;g<10;g++){
-	    sumProbHeter = oplusInitnatl( sumProbHeter , vectorGenoResults[i]->ll[ genoPriority[g] ] );//+logl( ( 1/( (long double)6))) );
-
-	    if( mostLikeHetero  < vectorGenoResults[i]->ll[ genoPriority[g] ]){
-		mostLikeHetero  = vectorGenoResults[i]->ll[ genoPriority[g] ];
-	    }
-
-	}
-	sumProbHeter = sumProbHeter + logl( ((long double)1)/((long double)6) );
-	//  = oplusnatl( vectorGenoResults[i]->rrll , vectorGenoResults[i]->aall );
-	// long double sumProbHeter = oplusnatl( vectorGenoResults[i]->rall , vectorGenoResults[i]->rall );//twice
-	
-	long double minSumProb   = MIN( sumProbHomoz, sumProbHeter);
-
-	long double sumProbAll   = oplusnatl( sumProbHomoz , sumProbHeter );
-	
-
-	long double confidence = minSumProb-sumProbAll;
-
-	//confidence = MIN(0,confidence+randomLog);
-
-
-	//confidence=1-expl(confidence);
-	long double covCorrect = (logl(2)) * vectorGenoResults[i]->cov; //multiply by 2 = log(2)
-	long double sumProbHoHe = oplusnatl( sumProbHomoz,sumProbHeter);
-	long double lqual=-1.0*numeric_limits<long double>::infinity();
-
-	if(mostLikeHomozy>mostLikeHetero){//if is homozygous, check if scaling the het changes
-	    // long double mostLikeHeteroC         = MIN( mostLikeHetero+covCorrect , mostLikeHomozy);//takes care of coverage =1,2	   
-	    lqual                               = (mostLikeHetero-mostLikeHomozy)/1.0;
-	}else{//most likely is hetero
-	    
-	    //lqual                               = (mostLikeHomozy-mostLikeHetero)/2.0;
-	    lqual                               = (mostLikeHomozy-mostLikeHetero)/1.0;
-	    //lqual                               = (mostLikeHomozy-mostLikeHetero)/1.8;
-	}
-	vectorGenoResults[i]->expectedH     = expl(  sumProbHeter - sumProbHoHe );	
-
-	//lqual = lqual*expl(vectorGenoResults[i]->llCov);
-	
-
-	//TODO check if covCorrect mitigates low cov problem
-	
-	
-	//vectorGenoResults[i]->probAccurate =  (  (1.0-expl(vectorGenoResults[i]->lqual) ) ) * ( expl(vectorGenoResults[i]->llCov)  );	
-	//vectorGenoResults[i]->probAccurate =  1.0-expl( (  lqual ) * ( expl(vectorGenoResults[i]->llCov)  ) );
-	vectorGenoResults[i]->probAccurate =  1.0-expl(  lqual ) ;
-	
-	//cout<<i<<"\t"<<mostLikeHomozy<<"\t"<<mostLikeHetero<<"\t"<<sumProbHomoz<<"\t"<<sumProbHeter<<"\t"<<sumProbHoHe<<"\t"<<vectorGenoResults[i]->cov<<"\t"<<covCorrect<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\t"<<lqual<<"\t"<<vectorGenoResults[i]->lqual<<"\t"<<expl(vectorGenoResults[i]->llCov)<<"\t"<<vectorGenoResults[i]->probAccurate<<endl;
-
-	//cout<<vectorGenoResults[i]->lqual <<"\t"<< randomLog<<endl;
-
-	//	if( lqual < randomLog){
-	vectorGenoResultsT.push_back( vectorGenoResults[i] );
-	// } else {
-	//     delete vectorGenoResults[i];
-	// }
-	//scale for coverage 2xhomo
-	//cout<<"passed"<<endl;
-	
-	
-	//cout<<fixed<<i<<"\th="<<vectorGenoResults[i]->expectedH<<"\t"<<"\t"<<sumProbHomoz<<"\t"<<sumProbAll<<"\thom\t"<<sumProbHomoz<<"\tHet\t"<<sumProbHeter<<endl;
-	// if(i == 796868){
-	//cout<<fixed<<i<<"\th=\t"<<vectorGenoResults[i]->expectedH<<"\tp[q]=\t"<<(1.0-expl(vectorGenoResults[i]->lqual ) ) <<"\tcov=\t"<<expl(vectorGenoResults[i]->llCov)<<"\tconf\t"<<confidence<<"\tP[acc]\t"<<vectorGenoResults[i]->probAccurate<<"\t"<<"\t"<<sumProbAll<<"\thom="<<sumProbHomoz<<"\tHet="<<sumProbHeter<<"\t"<<randomLog<<endl;
-	//     return 1;
-	// }
-
-    }
-
-    //return 1;
-
-    vectorGenoResults = vectorGenoResultsT;
-    // for(unsigned int i=0;i<vectorGenoResults.size();i++){
-
-    // 	// if(i == 796868){
-    // 	//cout<<*(vectorGenoResults[i])<<endl;
-    // 	// }
-    // 	long double sumProbHomoz=0;
-    // 	long double sumProbHeter=0;
-    // 	long double mostLikeHomozy =  -1.0*numeric_limits<long double>::infinity();
-    // 	long double mostLikeHetero =  -1.0*numeric_limits<long double>::infinity();
-
-
-
-    // 	for(int g=0;g<4;g++){
-    // 	    sumProbHomoz = oplusInitnatl( sumProbHomoz , vectorGenoResults[i]->ll[ genoPriority[g] ]+logl( ( 1/( (long double)4))) );
-
-    // 	    if( mostLikeHomozy < vectorGenoResults[i]->ll[ genoPriority[g] ]){
-    // 		mostLikeHomozy = vectorGenoResults[i]->ll[ genoPriority[g] ];
-    // 	    }
-
-    // 	}
-
-
-    // 	for(int g=4;g<10;g++){
-    // 	    sumProbHeter = oplusInitnatl( sumProbHeter , vectorGenoResults[i]->ll[ genoPriority[g] ]+logl( ( 1/( (long double)6))) );
-
-    // 	    if( mostLikeHetero  < vectorGenoResults[i]->ll[ genoPriority[g] ]){
-    // 		mostLikeHetero  = vectorGenoResults[i]->ll[ genoPriority[g] ];
-    // 	    }
-
-    // 	}
-    // 	//  = oplusnatl( vectorGenoResults[i]->rrll , vectorGenoResults[i]->aall );
-    // 	// long double sumProbHeter = oplusnatl( vectorGenoResults[i]->rall , vectorGenoResults[i]->rall );//twice
-	
-    // 	long double minSumProb   = MIN( sumProbHomoz, sumProbHeter);
-
-    // 	long double sumProbAll   = oplusnatl( sumProbHomoz , sumProbHeter );
-	
-
-    // 	long double confidence = minSumProb-sumProbAll;
-
-    // 	//confidence = MIN(0,confidence+randomLog);
-
-
-    // 	//confidence=1-expl(confidence);
-    // 	long double covCorrect = (logl(2)) * vectorGenoResults[i]->cov; //multiply by 2 = log(2)
-    // 	long double sumProbHoHe;
-    // 	long double lqual=-1.0*numeric_limits<long double>::infinity();
-    // 	if(mostLikeHomozy>mostLikeHetero){//if is homozygous, check if scaling the het changes
-    // 	    long double mostLikeHeteroC         = MIN( mostLikeHetero+covCorrect , mostLikeHomozy);//takes care of coverage =1,2
-    // 	    sumProbHoHe                         = oplusnatl( mostLikeHomozy,mostLikeHeteroC);
-    // 	    vectorGenoResults[i]->expectedH     = expl(  mostLikeHeteroC - sumProbHoHe );
-    // 	    lqual                               = (mostLikeHetero-mostLikeHomozy)/1.0;
-    // 	}else{//most likely is hetero
-    // 	    sumProbHoHe                         = oplusnatl( mostLikeHomozy,mostLikeHetero);
-    // 	    vectorGenoResults[i]->expectedH     = expl(  mostLikeHetero - sumProbHoHe );
-    // 	    lqual                               = (mostLikeHomozy-mostLikeHetero)/2.0;
-    // 	}
-
-	
-	
-    // 	cout<<mostLikeHomozy<<"\t"<<mostLikeHetero<<"\t"<<sumProbHoHe<<"\t"<<vectorGenoResults[i]->cov<<"\t"<<covCorrect<<"\t"<<vectorGenoResults[i]->expectedH<<"\t"<<lqual<<"\t"<<vectorGenoResults[i]->lqual<<"\t"<<expl(vectorGenoResults[i]->llCov)<<"\t"<<vectorGenoResults[i]->probAccurate<<endl;
-    // }
-
-
-#ifdef DEBUGHCOMPUTE
-    long double h         = 1/ (long double)(randomInt(1000,20000));
-    long double he        = 1/ (long double)(randomInt(1000,20000));
-
-    long double hW        = 1/ (long double)(randomInt(1000,20000));
-    long double hWe       = 1/ (long double)(randomInt(1000,20000));
-
-    long double h_old     = 10000;
-    long double hAccu     = 0.00000005;
-
-    long double lambdaH   = 0.0000000001;
-    long double lambdaHW  = 0.0000000001;
-
-    int iterationsMax     = 10000;
-    int iterationsGrad    = 1;
-
-    while( iterationsGrad<iterationsMax){
-
-	// if(h>=1){
-	//     h=1-espilon;
-	// }
-	long double probNull = 0.000001;
-	long double ll    = 0.0;
-	long double llP   = 0.0;
-	long double llPP  = 0.0;
-
-	long double llW   = 0.0;
-	long double llPW  = 0.0;
-	long double llPPW = 0.0;
-
-
-	for(unsigned int i=0;i<vectorGenoResults.size();i++){
-
-
-	    long double llT;
-	    long double llTP;
-	    long double llTPP;
-
-	    long double llTW;
-	    long double llTPW;
-	    long double llTPPW;
-
-
-	    
-	    long double pcorrect=MAX((vectorGenoResults[i]->probAccurate),probNull);
-	    
-	    llT  = expl(vectorGenoResults[i]->llCov)*logl( pcorrect
-							   *
-							   ( (1-h )*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-							   +
-							   (1-pcorrect)*
-							   ( (1-hW)*(1-vectorGenoResults[i]->expectedH) + hW*vectorGenoResults[i]->expectedH )
-							   );
-
-	    
-    	    llTP = 
-	    	expl(vectorGenoResults[i]->llCov)*(  pcorrect*(2.0*vectorGenoResults[i]->expectedH-1) )
-	    	/
-	    	( pcorrect
-	    	  *
-	    	  ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-		  +
-		  (1-pcorrect)*
-		  ( (1-hW)*(1-vectorGenoResults[i]->expectedH) + hW*vectorGenoResults[i]->expectedH )
-	    	  );
-
-
-    	    llTPP = -1.0*
-	    	expl(vectorGenoResults[i]->llCov)*(  powl( pcorrect,2.0) * powl((2.0*vectorGenoResults[i]->expectedH-1),2.0) )
-	    	/
-	    	powl( 
-		     pcorrect
-		     *
-		     ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-		     +
-		     (1-pcorrect)*
-		     ( (1-hW)*(1-vectorGenoResults[i]->expectedH) + hW*vectorGenoResults[i]->expectedH )
-		      ,2.0);
-
-
-
-	    llTW  = llT;
-	    
-    	    llTPW = 
-	    	expl(vectorGenoResults[i]->llCov)*(  (1-pcorrect)*(2.0*vectorGenoResults[i]->expectedH-1) )
-	    	/
-	    	( pcorrect
-	    	  *
-	    	  ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-		  +
-		  (1-pcorrect)*
-		  ( (1-hW)*(1-vectorGenoResults[i]->expectedH) + hW*vectorGenoResults[i]->expectedH )
-	    	  );
-
-
-    	    llTPPW = -1.0*
-	    	expl(vectorGenoResults[i]->llCov)*(  powl( 1-pcorrect,2.0) * powl( (2.0*vectorGenoResults[i]->expectedH-1),2.0 ) )
-	    	/
-	    	powl( 
-		     pcorrect
-		     *
-		     ( (1-h)*(1-vectorGenoResults[i]->expectedH) + h*vectorGenoResults[i]->expectedH )
-		     +
-		     (1-pcorrect)*
-		     ( (1-hW)*(1-vectorGenoResults[i]->expectedH) + hW*vectorGenoResults[i]->expectedH )
-		      ,2.0);
-
-
-
-
-
-	    // cout<<i<<"\tp[acc]="<<vectorGenoResults[i]->probAccurate<<"\t"<<(1-vectorGenoResults[i]->probAccurate)<<"\t"<<MAX((1-vectorGenoResults[i]->probAccurate),probNull)<<"\th= "<<h<<"\t"<<vectorGenoResults[i]->expectedH<<"\tllT= "<<llT<<"\t"<<llTP<<"\t"<<llTPP<<"\tll= "<<ll<<"\t"<<llP<<"\t"<<llPP<<"\tllW= "<<llW<<"\t"<<llPW<<"\t"<<llPPW<<endl;
-
-	    
-	    ll   += llT;
-	    llP  += llTP;
-	    llPP += llTPP;
-
-
-	    llW   += llTW;
-	    llPW  += llTPW;
-	    llPPW += llTPPW;
-
-	}//for each item vector
-	
-	he  = 1.96/sqrtl( -1.0*llPP  );
-	hWe = 1.96/sqrtl( -1.0*llPPW );
-
-	cout<<fixed<<
-	    "h= "<<h<<"\t"  <<(1-h)<<"\t"<<ll <<"\t"<<llP <<"\t"<<llPP <<"\t"<<he <<"\t"<<(h-he)  <<"\t"<<(h+he)<<"\t"<<
-	    "hw= "<<hW<<"\t"<<(1-hW)<<"\t"<<llW<<"\t"<<llPW<<"\t"<<llPPW<<"\t"<<hWe<<"\t"<<(hW-hWe)<<"\t"<<(hW+hWe)<<
-	    endl;
-	//cout<<h<<"\t"<<(1-h)<<"\t"<<ll<<"\t"<<llP<<"\t"<<llPP<<endl;	
-
-
-	long double hnew  = h        + lambdaH*llP;
-	
-	while( (hnew>=1) || (hnew<=0) ){
-	    //cout<<setprecision(14)<<"lambdaH1\t"<<lambdaH<<"\t"<<h<<"\t"<<hnew<<"\t"<<llP<<endl;
-	    lambdaH       = lambdaH/2.0;
-	    hnew          = h        + lambdaH*llP;
-	    //cout<<"lambdaH2\t"<<lambdaH<<"\t"<<h<<"\t"<<hnew<<"\t"<<llP<<endl;
-	}
-	
-	long double hwNew = hW       + lambdaHW*llPW;
-	while( (hwNew>=1) || (hwNew<=0) ){
-	    //cout<<"lambdaHW1\t"<<lambdaHW<<"\t"<<hW<<"\t"<<hwNew<<"\t"<<llPW<<endl;
-	    lambdaHW      = lambdaHW/2.0;
-	    hwNew         = hW       + lambdaHW*llPW;
-	    //cout<<"lambdaHW2\t"<<lambdaHW<<"\t"<<hW<<"\t"<<hwNew<<"\t"<<llPW<<endl;
-	}
-	
-        h_old    = h;
-	h        = hnew;
-	hW       = hwNew;
-
-	long double hDiff = fabsl(h_old - h);
-        if(hDiff<hAccu){
-            break;
-        }
-	
-
-	iterationsGrad++;
-    }//end loop of iterations
-
-
-    long double hmin = (h-he);
-    long double hmax = (h+he);
-    if(hmin<0){
-	hmax=hmax-hmin;
-	hmin=0;
-	//h=he/2;
-    }
-
-
-    // if(hmin<0){
-    // 	hmin=0;
-    // 	hmax=he;
-    // 	h=he/2;
-    // }
-
-    cout<<"hetrate\t"<<h<<"\t"<<(hmin)<<"\t"<<(hmax)<<endl;
-#endif    
-    ////////////////////////////////
-    //                            //
-    //  end COMPUTE HETERO RATE   //
-    //                            //
-    ////////////////////////////////
-        
-
-
-
-    for(unsigned int i=0;i<vectorGenoResults.size();i++){
-	delete( vectorGenoResults[i] );
-    }
-
-    pthread_exit(NULL);
-
-#endif    
-
-
+    bgzipWriterHest.Close();
+    
     //////////////////////////////////
     //                              //
     // BEGIN HMM                    //

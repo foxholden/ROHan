@@ -21,9 +21,9 @@ using namespace std;
 using namespace BamTools;
 
 class PositionResult{
-private:
+ private:
     
-    public:
+ public:
 
     int          refID;
     unsigned int pos ;
