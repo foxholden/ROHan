@@ -23,6 +23,7 @@ typedef struct {
     long double h;
     long double hLow;
     long double hHigh;
+    unsigned int sites;
     bool hasConverged;
  } hResults;
 

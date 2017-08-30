@@ -6,13 +6,6 @@
 //#include <random>
 
 //TODO
-// code h estimate
-//   
-//   test at different h prior 0.01	-1.65138e+07
-//                           0.000824	-1.65085e+07
-//                           1e-08	-1.65141e+07
-//   check if first derivative works
-//   move genotyping after h estimate
 
 // HMM
 // add mappability track?
@@ -255,9 +248,15 @@ queue< DataChunk * >                                               queueDataForC
 
 priority_queue<DataToWrite *, vector<DataToWrite *>, CompareDataToWrite> queueDataTowrite;
 
-pthread_mutex_t  mutexQueue           = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t  mutexCounter         = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t  mutexRank            = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_mutex_t  mutexQueueToRead           = PTHREAD_MUTEX_INITIALIZER;
+
+// also used for coverage counter
+pthread_mutex_t  mutexQueueToWrite          = PTHREAD_MUTEX_INITIALIZER; 
+pthread_mutex_t  mutexRank                  = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t  mutexCERR                  = PTHREAD_MUTEX_INITIALIZER;
+
+
 // pthread_mutex_t  mutexCoverageCounter = PTHREAD_MUTEX_INITIALIZER;
 
 
@@ -372,7 +371,7 @@ void initScores(){
     }
 #endif
 
-}//end initScores
+}//END initScores()
 
 
 
@@ -916,7 +915,8 @@ void initLikelihoodScores(){
     //cerr<<"done "<<endl;
 
     //exit(1);
-}
+
+}// END initLikelihoodScores()
 
 
 
@@ -997,6 +997,8 @@ inline long double computeBaseAl2Obs(const int al,
 }//end computeBaseAl2Obs
 
 
+
+
 inline void computePriorMatrix(long double h,
 			       diNucleotideProb * priorGenotype,
 			       // diNucleotideProb * priorGenotypeProb,
@@ -1049,7 +1051,10 @@ inline void computePriorMatrix(long double h,
 	}
     }
 
-}
+}//END computePriorMatrix
+
+
+
 
 
 inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGenomicWindow, 
@@ -1150,7 +1155,10 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 	vectorBaBdLikelihood->push_back(  bblikeForGivenPos );
     }//END for each genomic position
 
-}
+}//preComputeBaBdLikelihood
+
+
+
 
 
 inline void genotypePositions(const int                   mostLikelyBaBdIdx,
@@ -1271,15 +1279,42 @@ inline void genotypePositions(const int                   mostLikelyBaBdIdx,
     }//end for each geno
 
 
-}
+} //genotypePositions
+
+
+
+
+
+
 
 inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
-			  vector<PositionResult *>    * dataToWriteOut){
+			  vector<PositionResult *>    * dataToWriteOut,
+			  const int threadID){
 
-    cerr<<"computeLL, starting pre-computations size of window: "<<piForGenomicWindow->size()<<endl;
+
+    int rc;
+
+    rc = pthread_mutex_lock(&mutexCERR);
+    checkResults("pthread_mutex_lock()\n", rc);
+
+    cerr<<"Thread#"<<threadID<<" starting pre-computations size of window: "<<thousandSeparator(piForGenomicWindow->size())<<endl;
+
+    rc = pthread_mutex_unlock(&mutexCERR);
+    checkResults("pthread_mutex_unlock()\n", rc);
+
     hResults hresToReturn;
+    hresToReturn.sites = piForGenomicWindow->size();
 
+    if(piForGenomicWindow->size() == 0){
+	hresToReturn.h            = 0;
+	hresToReturn.hLow         = 0;
+	hresToReturn.hHigh        = 0;
+	hresToReturn.hasConverged = false;
+	
+	return hresToReturn;
+    }
 
+    
     /////////////////////////////////////////
     //BEGIN pre-computing babdlikelihood
     /////////////////////////////////////////
@@ -1291,7 +1326,13 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     //END pre-computing babdlikelihood
     /////////////////////////////////////////
 
-    cerr<<"computeLL done pre-computing computing "<<endl;
+    rc = pthread_mutex_lock(&mutexCERR);
+    checkResults("pthread_mutex_lock()\n", rc);
+
+    cerr<<"Thread#"<<threadID<<" done pre-computing computing "<<endl;
+
+    rc = pthread_mutex_unlock(&mutexCERR);
+    checkResults("pthread_mutex_unlock()\n", rc);
 
     //max iterations
     int sitesPer1M=randomInt(1,1000);// between 1 and 1000 sites per million
@@ -1300,6 +1341,9 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     long double hp;
     long double h=double(sitesPer1M)/double(1000000);
     long double z=h;
+
+    long double alpha_ = alpha;
+    long double beta_  = beta;
 
     //long double hLastIteration=LDBL_MAX;
     //long double hPrecision=0.0000001;
@@ -1569,17 +1613,31 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	// theta_t_1 = theta;
 	// theta  = h + lambda*loglikelihoodForEveryPositionForEveryBaBdD1;
 	
-	z = beta*z + loglikelihoodForEveryPositionForEveryBaBdD1;
-	long double hnew = h + alpha*z;
+	z = beta_*z + loglikelihoodForEveryPositionForEveryBaBdD1;
+	long double hnew = h + alpha_*z;
 
-	cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\te="<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\thnew="<<hnew<<"\tz="<<z<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdP<<"\t"<<hp<<"\t"<<alpha<<"\t"<<beta<<endl;
+	rc = pthread_mutex_lock(&mutexCERR);
+	checkResults("pthread_mutex_lock()\n", rc);
+
+	cerr<<"Thread#"<<threadID<<setprecision(14)<<"\t"<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\te="<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\thnew="<<hnew<<"\tz="<<z<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdP<<"\t"<<hp<<"\t"<<alpha_<<"\t"<<beta_<<endl;
+
+	rc = pthread_mutex_unlock(&mutexCERR);
+	checkResults("pthread_mutex_unlock()\n", rc);
 
 	if(lastIteration){//was set at the previous loop
 	    break;
 	}
 	//if(abs(hnew-h)<hPrecision){
 	if(fabsl(loglikelihoodForEveryPositionForEveryBaBdD1)<100){
-	    cerr<<"CONVERGED"<<endl;
+
+	    rc = pthread_mutex_lock(&mutexCERR);
+	    checkResults("pthread_mutex_lock()\n", rc);
+
+	    cerr<<"Thread#"<<threadID<<" converged "<<endl;
+
+	    rc = pthread_mutex_unlock(&mutexCERR);
+	    checkResults("pthread_mutex_unlock()\n", rc);
+
 	    lastIteration=true;
 	    hasConverged =true;
 	    //break;
@@ -1602,14 +1660,31 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    // 	alpha =  alpha * factorAlpha;
 	    // 	continue;
 	    // }else{
-		loglikelihoodForEveryPositionForEveryBaBdP = loglikelihoodForEveryPositionForEveryBaBd;
-		hp = h;
-		h  = hnew;
-		//}
+	    loglikelihoodForEveryPositionForEveryBaBdP = loglikelihoodForEveryPositionForEveryBaBd;
+	    hp = h;
+	    h  = hnew;
+	    //}
 	}
 
+	if(h<0){
+            h     = 1.0e-11;
+	    alpha_ = alpha_/2.0;
+	}
+
+	if(h>1){
+	    h     = 1-1.0e-11;
+	    alpha_ = alpha_/2.0;                        
+        }
+                  
 	if(iterationsGrad == (iterationsMax-2)){
-	    cerr<<"Did not converge"<<endl;
+	    rc = pthread_mutex_lock(&mutexCERR);
+	    checkResults("pthread_mutex_lock()\n", rc);
+
+	    cerr<<"Thread#"<<threadID<<" did not converge"<<endl;
+
+	    rc = pthread_mutex_unlock(&mutexCERR);
+	    checkResults("pthread_mutex_unlock()\n", rc);
+
 	    hasConverged =false;
 	    lastIteration=true;
 	    //break;
@@ -1630,67 +1705,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 
     return hresToReturn;
     
-}
-
-class coverageComputeVisitor : public PileupVisitor {
-  
-public:
-    coverageComputeVisitor(const RefVector& references,unsigned int leftCoord, unsigned int rightCoord)
-	: PileupVisitor()
-	, m_references(references)
-	, m_leftCoord(leftCoord)
-	, m_rightCoord(rightCoord)
-    { 
-	totalBases=0;
-	totalSites=0;
-	
-    }
-    ~coverageComputeVisitor(void) {}
-  
-    // PileupVisitor interface implementation
-
-    
-    void Visit(const PileupPosition& pileupData) {   
-	//bool foundOneFragment=false;
-	if(pileupData.Position < int(m_leftCoord)   || 
-	   pileupData.Position > int(m_rightCoord) ){
-	    return ;
-	}
-	//cout<<m_leftCoord<<"\t"<<m_rightCoord<<"\t"<<pileupData.Position<<endl;
-
-	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
-	    	pileupData.PileupAlignments[i].IsNextInsertion ){
-	    	continue;
-	    }
-	    //foundOneFragment=true;		  
-	    totalBases++;
-	}
-
-	//if(foundOneFragment)
-	totalSites++;
-    }
-    
-    unsigned int getTotalBases() const{
-    	return totalBases;
-    }
-
-    unsigned int getTotalSites() const{
-    	return totalSites;
-    }
-
-private:
-    RefVector m_references;
-    //Fasta * m_fastaReference;
-    unsigned int totalBases;
-    unsigned int totalSites;
-    unsigned int m_leftCoord;
-    unsigned int m_rightCoord;
-    
-};//end coverageComputeVisitor
-
-
-
+}//end computeLL()
 
 
 
@@ -1736,7 +1751,13 @@ public:
 
 	if( (m_numberOfSites%50000)==0 &&
 	    m_numberOfSites != 0 ){
+	    int rc = pthread_mutex_lock(&mutexCERR);
+	    checkResults("pthread_mutex_lock()\n", rc);
+
 	    cerr<<"Thread#"<<m_threadID<<" reading: "<<m_references[m_refID].RefName<<":"<<pileupData.Position<<" valid sites:\t"<<thousandSeparator(totalSites)<<endl;
+
+	    rc = pthread_mutex_unlock(&mutexCERR);
+	    checkResults("pthread_mutex_unlock()\n", rc);
 
 	}
 
@@ -1871,9 +1892,9 @@ void *mainHeteroComputationThread(void * argc){
 
     int   rc;
 
-#ifdef HETVERBOSE    
+    //#ifdef HETVERBOSE    
     int rankThread=0;
-#endif
+    //#endif
 
     cerr<<"mainHeteroComputationThread mutex1"<<endl;
 
@@ -1887,9 +1908,9 @@ void *mainHeteroComputationThread(void * argc){
     threadID2Rank[*(int *)pthread_self()]  = threadID2Rank.size()+1;
 
     cerr<<"mainHeteroComputationThread mutex3"<<endl;
-#ifdef HETVERBOSE    
+    //#ifdef HETVERBOSE    
     rankThread = threadID2Rank[*(int *)pthread_self()];
-#endif
+    //#endif
     
     rc = pthread_mutex_unlock(&mutexRank);
     checkResults("pthread_mutex_unlock()\n", rc);
@@ -1899,14 +1920,20 @@ void *mainHeteroComputationThread(void * argc){
     //check stack
 
     
-    rc = pthread_mutex_lock(&mutexQueue);
+    rc = pthread_mutex_lock(&mutexQueueToRead);
     checkResults("pthread_mutex_lock()\n", rc);
 
 
     bool foundData=false;
     
 #ifdef HETVERBOSE
+    rc = pthread_mutex_lock(&mutexCERR);
+    checkResults("pthread_mutex_lock()\n", rc);
+
     cerr<<"Thread #"<<rankThread <<" started and is requesting data"<<endl;
+
+    rc = pthread_mutex_unlock(&mutexCERR);
+    checkResults("pthread_mutex_unlock()\n", rc);
 #endif
 
     DataChunk    * currentChunk;
@@ -1918,7 +1945,14 @@ void *mainHeteroComputationThread(void * argc){
  	queueDataToprocess.pop();
 
 #ifdef HETVERBOSE
+	rc = pthread_mutex_lock(&mutexCERR);
+	checkResults("pthread_mutex_lock()\n", rc);
+
  	cerr<<"Thread #"<<rankThread<<" is reading chunk rank#"<<currentChunk->rank<<endl;
+
+	rc = pthread_mutex_unlock(&mutexCERR);
+	checkResults("pthread_mutex_unlock()\n", rc);
+
 #endif
 	//cout<<"rank "<< &(currentChunk->dataToProcess) <<endl;
     }
@@ -1927,7 +1961,7 @@ void *mainHeteroComputationThread(void * argc){
   
 
     if(!foundData){
-	rc = pthread_mutex_unlock(&mutexQueue);
+	rc = pthread_mutex_unlock(&mutexQueueToRead);
 	checkResults("pthread_mutex_unlock()\n", rc);
 
 
@@ -1946,7 +1980,7 @@ void *mainHeteroComputationThread(void * argc){
 
     }else{
 	//release stack
-	rc = pthread_mutex_unlock(&mutexQueue);
+	rc = pthread_mutex_unlock(&mutexQueueToRead);
 	checkResults("pthread_mutex_unlock()\n", rc);
     }
 
@@ -2000,7 +2034,14 @@ void *mainHeteroComputationThread(void * argc){
     bool setRegionRes=reader.SetRegion( bregion   );
 
 #ifdef HETVERBOSE
-    cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\tsucces? "<<setRegionRes<<endl;
+    rc = pthread_mutex_lock(&mutexCERR);
+    checkResults("pthread_mutex_lock()\n", rc);
+
+    cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
+
+    rc = pthread_mutex_unlock(&mutexCERR);
+    checkResults("pthread_mutex_unlock()\n", rc);
+
 #endif
 
     if( refID==-1 ||
@@ -2017,7 +2058,7 @@ void *mainHeteroComputationThread(void * argc){
     vector<positionInformation> * piForGenomicWindow = new vector<positionInformation> ();
 
     //dataToWrite->dataToWriteOut=new vector<PositionResult *>();
-    heteroComputerVisitor* cv = new heteroComputerVisitor(references,
+    heteroComputerVisitor* hv = new heteroComputerVisitor(references,
 							  refID,
 							  currentChunk->rangeGen.getStartCoord(), 
 							  currentChunk->rangeGen.getEndCoord()  ,
@@ -2028,7 +2069,7 @@ void *mainHeteroComputationThread(void * argc){
     
 
     PileupEngine pileup;
-    pileup.AddVisitor(cv);
+    pileup.AddVisitor(hv);
 
     BamAlignment al;
     //unsigned int numReads=0;
@@ -2046,19 +2087,26 @@ void *mainHeteroComputationThread(void * argc){
     pileup.Flush();
     reader.Close();
     //fastaReference.Close();
-    
-    cerr<<"Thread #"<<rankThread <<" bases="<<thousandSeparator(cv->getTotalBases())<<"\tsites="<<thousandSeparator(cv->getTotalSites())<<"\t"<<double(cv->getTotalBases())/double(cv->getTotalSites())<<endl;
+
+    rc = pthread_mutex_lock(&mutexCERR);
+    checkResults("pthread_mutex_lock()\n", rc);
+	
+
+    cerr<<"Thread #"<<rankThread <<" bases="<<thousandSeparator(hv->getTotalBases())<<"\tsites="<<thousandSeparator(hv->getTotalSites())<<"\t"<<double(hv->getTotalBases())/double(hv->getTotalSites())<<endl;
+
+    rc = pthread_mutex_unlock(&mutexCERR);
+    checkResults("pthread_mutex_unlock()\n", rc);
 
 
 
 
 
-
-    delete cv;
+    delete hv;
 
 
     dataToWrite->hetEstResults = computeLL(piForGenomicWindow,
-					   dataToWrite->vecPositionResults);
+					   dataToWrite->vecPositionResults,
+					   rankThread);
     
     delete piForGenomicWindow;
 	
@@ -2075,7 +2123,7 @@ void *mainHeteroComputationThread(void * argc){
 	
 
     //COUNTERS
-    rc = pthread_mutex_lock(&mutexCounter);
+    rc = pthread_mutex_lock(&mutexQueueToWrite);
     checkResults("pthread_mutex_lock()\n", rc);
     
 
@@ -2088,7 +2136,7 @@ void *mainHeteroComputationThread(void * argc){
 
     queueDataTowrite.push(dataToWrite);
 
-    rc = pthread_mutex_unlock(&mutexCounter);
+    rc = pthread_mutex_unlock(&mutexQueueToWrite);
     checkResults("pthread_mutex_unlock()\n", rc);
 
 #ifdef HETVERBOSE
@@ -2165,6 +2213,82 @@ queue< DataChunk * >  subFirstElemsQueue(const queue< DataChunk * > queueDataToS
 } // end randomSubQueue
 
 
+
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+//                                                                  //
+//                                                                  //
+//                  BEGIN COVERAGE COMPUTATION                      //
+//                                                                  //
+//                                                                  //
+//////////////////////////////////////////////////////////////////////
+
+class coverageComputeVisitor : public PileupVisitor {
+  
+public:
+    coverageComputeVisitor(const RefVector& references,unsigned int leftCoord, unsigned int rightCoord)
+	: PileupVisitor()
+	, m_references(references)
+	, m_leftCoord(leftCoord)
+	, m_rightCoord(rightCoord)
+    { 
+	totalBases=0;
+	totalSites=0;
+	
+    }
+    ~coverageComputeVisitor(void) {}
+  
+    // PileupVisitor interface implementation
+
+    
+    void Visit(const PileupPosition& pileupData) {   
+	//bool foundOneFragment=false;
+	if(pileupData.Position < int(m_leftCoord)   || 
+	   pileupData.Position > int(m_rightCoord) ){
+	    return ;
+	}
+	//cout<<m_leftCoord<<"\t"<<m_rightCoord<<"\t"<<pileupData.Position<<endl;
+
+	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
+	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
+	    	pileupData.PileupAlignments[i].IsNextInsertion ){
+	    	continue;
+	    }
+	    //foundOneFragment=true;		  
+	    totalBases++;
+	}
+
+	//if(foundOneFragment)
+	totalSites++;
+    }
+    
+    unsigned int getTotalBases() const{
+    	return totalBases;
+    }
+
+    unsigned int getTotalSites() const{
+    	return totalSites;
+    }
+
+private:
+    RefVector m_references;
+    //Fasta * m_fastaReference;
+    unsigned int totalBases;
+    unsigned int totalSites;
+    unsigned int m_leftCoord;
+    unsigned int m_rightCoord;
+    
+};//end coverageComputeVisitor
+
+
+
 //TODO: GC bias for coverage?
 void *mainCoverageComputationThread(void * argc){
 
@@ -2190,7 +2314,7 @@ void *mainCoverageComputationThread(void * argc){
     //check stack
 
     
-    rc = pthread_mutex_lock(&mutexQueue);
+    rc = pthread_mutex_lock(&mutexQueueToRead);
     checkResults("pthread_mutex_lock()\n", rc);
 
 
@@ -2216,7 +2340,7 @@ void *mainCoverageComputationThread(void * argc){
   
 
     if(!foundData){
-	rc = pthread_mutex_unlock(&mutexQueue);
+	rc = pthread_mutex_unlock(&mutexQueueToRead);
 	checkResults("pthread_mutex_unlock()\n", rc);
 
 
@@ -2235,7 +2359,7 @@ void *mainCoverageComputationThread(void * argc){
 
     }else{
 	//release stack
-	rc = pthread_mutex_unlock(&mutexQueue);
+	rc = pthread_mutex_unlock(&mutexQueueToRead);
 	checkResults("pthread_mutex_unlock()\n", rc);
     }
 
@@ -2329,14 +2453,14 @@ void *mainCoverageComputationThread(void * argc){
 	
 
     //COUNTERS
-    rc = pthread_mutex_lock(&mutexCounter);
+    rc = pthread_mutex_lock(&mutexQueueToWrite);
     checkResults("pthread_mutex_lock()\n", rc);
     
 //queueDataTowrite.push(currentChunk);
     totalBasesSum+=totalBasesL;
     totalSitesSum+=totalSitesL;
 
-    rc = pthread_mutex_unlock(&mutexCounter);
+    rc = pthread_mutex_unlock(&mutexQueueToWrite);
     checkResults("pthread_mutex_unlock()\n", rc);
 
 #ifdef COVERAGETVERBOSE    
@@ -2355,6 +2479,10 @@ void *mainCoverageComputationThread(void * argc){
     return NULL;
 
 } // mainCoverageComputationThread
+
+
+
+
 
 
 
@@ -2455,7 +2583,7 @@ int main (int argc, char *argv[]) {
         (argc== 2 && string(argv[1]) == "-h") ||
         (argc== 2 && string(argv[1]) == "-help") ||
         (argc== 2 && string(argv[1]) == "--help") ){
-        cout<<usage<<endl;
+        cerr<<usage<<endl;
         return 1;
     }
 
@@ -2680,7 +2808,7 @@ int main (int argc, char *argv[]) {
 
 #ifdef DEBUGILLUMINAFREQ
     for(unsigned int i=0;i<16;i++){
-    	cout<<i<<"\t"<<illuminaErrorsProb.s[i]<<endl;	
+    	cerr<<i<<"\t"<<illuminaErrorsProb.s[i]<<endl;	
     }
 
     for(int b1=0;b1<4;b1++)
@@ -2871,9 +2999,10 @@ int main (int argc, char *argv[]) {
 	queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
 
 
-	pthread_mutex_init(&mutexQueue,   NULL);
-	pthread_mutex_init(&mutexCounter, NULL);
-	pthread_mutex_init(&mutexRank ,   NULL);
+	pthread_mutex_init(&mutexQueueToRead,   NULL);
+	pthread_mutex_init(&mutexQueueToWrite,  NULL);
+	pthread_mutex_init(&mutexRank ,         NULL);
+	pthread_mutex_init(&mutexCERR ,         NULL);
 
 	for(int i=0;i<numberOfThreads;i++){
 	    rc = pthread_create(&threadCov[i], NULL, mainCoverageComputationThread, NULL);
@@ -2894,9 +3023,11 @@ int main (int argc, char *argv[]) {
 	    checkResults("pthread_join()\n", rc);
 	}
 	cerr<<"Coverage computations are done"<<endl;
+
 	pthread_mutex_destroy(&mutexRank);
-	pthread_mutex_destroy(&mutexQueue);
-	pthread_mutex_destroy(&mutexCounter);
+	pthread_mutex_destroy(&mutexQueueToRead);
+	pthread_mutex_destroy(&mutexQueueToWrite);
+	pthread_mutex_destroy(&mutexCERR);
 
 	//    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
 	cerr<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
@@ -2912,8 +3043,8 @@ int main (int argc, char *argv[]) {
     long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
     
 #ifdef DEBUGCOV
-    cout<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
-    cout<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
+    cerr<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
+    cerr<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
 #endif
 
     cov2probPoisson = new vector<long double> (MAXCOV+1,0);
@@ -2981,9 +3112,10 @@ int main (int argc, char *argv[]) {
 
 
     cerr<<"Creating threads for heterozygosity calculation"<<endl;
-    pthread_mutex_init(&mutexQueue,   NULL);
-    pthread_mutex_init(&mutexCounter, NULL);
-    pthread_mutex_init(&mutexRank ,   NULL);
+    pthread_mutex_init(&mutexQueueToRead,   NULL);
+    pthread_mutex_init(&mutexQueueToWrite,  NULL);
+    pthread_mutex_init(&mutexRank,          NULL);
+    pthread_mutex_init(&mutexCERR,          NULL);
     
 
     for(int i=0;i<numberOfThreads;i++){
@@ -3017,6 +3149,10 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
 
+    string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\thLow\thHigh\n";		       
+    bgzipWriterHest.Write(headerHest.c_str(), headerHest.size());
+    
+
     bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
     if(!bgzipWriterGL.IsOpen()){
 	cerr<<"Cannot open file "<<(outFilePrefix+".vcf.gz")<<" in bgzip writer"<<endl;
@@ -3048,7 +3184,7 @@ int main (int argc, char *argv[]) {
     while(!wroteEverything){
 
 	//threads are running here
-	rc = pthread_mutex_lock(&mutexCounter);
+	rc = pthread_mutex_lock(&mutexQueueToWrite);
 	checkResults("pthread_mutex_lock()\n", rc);
 	
 	bool wroteData=false;
@@ -3058,18 +3194,19 @@ int main (int argc, char *argv[]) {
 
 	    if( lastWrittenChunk == (dataToWrite->rank-1) ){ 	    //correct order
 		queueDataTowrite.pop();
-		rc = pthread_mutex_unlock(&mutexCounter);
+		rc = pthread_mutex_unlock(&mutexQueueToWrite);
 		checkResults("pthread_mutex_unlock()\n", rc);
 
 		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<dataToWrite->vecPositionResults->size()<<" records"<<endl;
 
-		string strToWrite=dataToWrite->rangeGen.asBed()+"\t";
+		string strToWrite=dataToWrite->rangeGen.asBed()+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
+		
 		if(dataToWrite->hetEstResults.hasConverged){
 		    strToWrite+=stringify(dataToWrite->hetEstResults.h)+"\t"+stringify(dataToWrite->hetEstResults.hLow)+"\t"+stringify(dataToWrite->hetEstResults.hHigh)+"\n";
 		}else{
 		    strToWrite+="NA\tNA\tNA\n";
 		}
-		cout<<"writing "<<strToWrite<<endl;
+		cerr<<"writing "<<strToWrite<<endl;
 		bgzipWriterHest.Write(strToWrite.c_str(), strToWrite.size());
 
 #ifdef LATER
@@ -3106,13 +3243,13 @@ int main (int argc, char *argv[]) {
 		delete dataToWrite;
 	    }else{
 		//do nothing, we have to wait for the chunk with the right rank
-		rc = pthread_mutex_unlock(&mutexCounter);
+		rc = pthread_mutex_unlock(&mutexQueueToWrite);
 		checkResults("pthread_mutex_unlock()\n", rc);
 	
 	    }
 
 	}else{//end if queue not empty
-	    rc = pthread_mutex_unlock(&mutexCounter);
+	    rc = pthread_mutex_unlock(&mutexQueueToWrite);
 	    checkResults("pthread_mutex_unlock()\n", rc);
 	}
 
@@ -3120,11 +3257,19 @@ int main (int argc, char *argv[]) {
 	    sleep(timeSleepWrite);
     }
     //#endif
+
+    pthread_mutex_destroy(&mutexRank);
+    pthread_mutex_destroy(&mutexQueueToRead);
+    pthread_mutex_destroy(&mutexQueueToWrite);
+    pthread_mutex_destroy(&mutexCERR);
+
     ///////////////////////
     //end Writing data out/
     ///////////////////////
     bgzipWriterHest.Close();
     
+
+
     //////////////////////////////////
     //                              //
     // BEGIN HMM                    //
