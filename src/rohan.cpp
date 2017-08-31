@@ -107,6 +107,10 @@ alleleFrequency         dnaDefaultBases;
 vector<alleleFrequency> defaultDNA5p;
 vector<alleleFrequency> defaultDNA3p;
 
+string fastaFile;
+string fastaIndex;
+
+
 
 // 1D: mapping quality 
 // 2D: length of fragment
@@ -1219,6 +1223,9 @@ inline void genotypePositions(const int                   mostLikelyBaBdIdx,
 
     long double mostLikelyGeno                     =-1.0*numeric_limits<long double>::infinity();
     int         mostLikelyGenoIdx                  =-1;
+    long double mostLikelyGenoHet                  =-1.0*numeric_limits<long double>::infinity();
+    int         mostLikelyGenoHetIdx               =-1;
+
     long double loglikelihoodForEveryGeno          =0.0;
     long double loglikelihoodForEveryGeno_minusBest=0.0;
 
@@ -1229,13 +1236,33 @@ inline void genotypePositions(const int                   mostLikelyBaBdIdx,
 	    mostLikelyGeno    = vectorOfloglikelihoodForGivenGeno->at(g);
 	    mostLikelyGenoIdx = g;
 	}
+
+	//if het
+	if( (g !=  0) && 
+	    (g !=  4) && 
+	    (g !=  7) && 
+	    (g !=  9) ){
+	    
+	    if(vectorOfloglikelihoodForGivenGeno->at(g) > mostLikelyGenoHet){
+		mostLikelyGenoHet    = vectorOfloglikelihoodForGivenGeno->at(g);
+		mostLikelyGenoHetIdx = g;
+	    }
+
+	}
+
     }
-	
+    pr->mostLikelyGenoIdx    = mostLikelyGenoIdx;
+    pr->mostLikelyGenoHetIdx = mostLikelyGenoHetIdx;
+
+    
     for(int g=0;g<10;g++){
 	if(g != mostLikelyGenoIdx)
 	    loglikelihoodForEveryGeno_minusBest = oplusInitnatl( loglikelihoodForEveryGeno_minusBest , vectorOfloglikelihoodForGivenGeno->at(g) ); // 
 	loglikelihoodForEveryGeno               = oplusInitnatl( loglikelihoodForEveryGeno           , vectorOfloglikelihoodForGivenGeno->at(g) ); // 
     }
+    pr->gq = ( loglikelihoodForEveryGeno_minusBest - loglikelihoodForEveryGeno);
+
+
 
     //---------------------------------------------
     // END convert to 10 genotypes
@@ -1288,7 +1315,7 @@ inline void genotypePositions(const int                   mostLikelyBaBdIdx,
 
 
 inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
-			  vector<PositionResult *>    * dataToWriteOut,
+			  vector<PositionResult *>    * vecPositionResults,
 			  const int threadID){
 
 
@@ -1335,7 +1362,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     checkResults("pthread_mutex_unlock()\n", rc);
 
     //max iterations
-    int sitesPer1M=randomInt(1,1000);// between 1 and 1000 sites per million
+    int sitesPer1M=randomInt(200,1000);// between 1 and 1000 sites per million
     // long double theta     = double(sitesPer1M)/double(1000000); //theta
     // long double theta_t_1 = theta;
     long double hp;
@@ -1578,13 +1605,17 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    //////////////////////////////////////////////////////
 	    if(lastIteration){//do it at the last iteration		
 		PositionResult * pr=new PositionResult();
-		pr->pos = piForGenomicWindow->at(p).posAlign;
+
+		pr->refB   = piForGenomicWindow->at(p).refBase;
+		pr->pos    = piForGenomicWindow->at(p).posAlign;
+		pr->avgMQ  = piForGenomicWindow->at(p).avgMQ;
+
 		genotypePositions( mostLikelyBaBdIdx                 ,
 				   &vectorOfloglikelihoodForGivenBaBd,
 				   &vectorOfloglikelihoodForGivenGeno,
 				   pr);
-		//dataToWriteOut
-		dataToWriteOut->push_back(pr);
+		//vecPositionResults
+		vecPositionResults->push_back(pr);
 	    }
 	    ////////////////////////////////////////////////////
 	    // END GENOTYPING
@@ -1671,8 +1702,8 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    alpha_ = alpha_/2.0;
 	}
 
-	if(h>1){
-	    h     = 1-1.0e-11;
+	if(h>0.1){
+	    h     = 0.1-1.0e-11;
 	    alpha_ = alpha_/2.0;                        
         }
                   
@@ -1720,7 +1751,8 @@ public:
 			  const unsigned int rightCoord,
 			  //vector<PositionResult *> * dataToWriteOut,
 			  const int threadID,
-			  vector<positionInformation> * piForGenomicWindow)
+			  vector<positionInformation> * piForGenomicWindow,
+			  Fasta * fastaReference)
 	: PileupVisitor()
 	, m_references(references)
 	, m_refID(refID)
@@ -1732,6 +1764,7 @@ public:
 	, totalBases(0)
 	, totalSites(0)   
 	, m_piForGenomicWindow( piForGenomicWindow )
+	, m_fastaReference(fastaReference)
     { 
 	//cerr<<"heteroComputerVisitor constructor"<<endl;
     }
@@ -1774,14 +1807,32 @@ public:
 	// vector<int>              mmQual       ; //mismapping probability
 	// vector<bool>             isRevVec;
 	//vector<singleRead> singleReadToAdd;
+
+
+
+	unsigned int                posAlign = pileupData.Position+1;
+
+	char referenceBase = 'N';
+	if ( !m_fastaReference->GetBase(pileupData.RefId, posAlign-1, referenceBase ) ) {
+	    cerr << "rohan convert ERROR: pileup conversion - could not read reference base from FASTA file" << endl;
+	    return;
+	}
+	referenceBase = toupper(referenceBase);
+	
+	if(!isResolvedDNA(referenceBase)){ //avoid Ns
+	    return; 
+	}
+
 	positionInformation piToAdd;
 
 	piToAdd.skipPosition = false;
 
-
-	unsigned int                posAlign = pileupData.Position+1;
 	piToAdd.posAlign                     = posAlign;
-
+	//piToAdd.refID                        = posAlign;
+	piToAdd.refBase                      = referenceBase;
+	//
+	double probMM=0;
+	
 	bool foundSites=false;
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
 
@@ -1809,8 +1860,8 @@ public:
 	    int   q    = MIN( int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual), MAXBASEQUAL);
 	    int   m    = MIN( int(pileupData.PileupAlignments[i].Alignment.MapQuality), MAXMAPPINGQUAL );
 	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
+	    probMM += likeMismatchProbMap[m]; 
 	    
-
 	    totalBases++;
 	    foundSites=true;
 
@@ -1842,6 +1893,7 @@ public:
 	}//END FOR EACH READ
 
 	if( foundSites ){
+	    piToAdd.avgMQ =  round(-10*log10(probMM/double(totalSites)));
 	    totalSites++;
 	}
 	
@@ -1859,7 +1911,7 @@ public:
 
 private:
     RefVector m_references;
-    //Fasta * m_fastaReference;
+    Fasta * m_fastaReference;
     unsigned int totalBases;
     unsigned int totalSites;
 
@@ -2051,9 +2103,18 @@ void *mainHeteroComputationThread(void * argc){
     }
 
     DataToWrite  * dataToWrite = new DataToWrite();
-
+    //cout<<"range1 "<<currentChunk->rangeGen<<endl;
     dataToWrite->rangeGen      =  currentChunk->rangeGen;
+    //cout<<"range2 "<<currentChunk->rangeGen<<endl;
     dataToWrite->rank          =  currentChunk->rank;
+    dataToWrite->refID         =  refID;
+
+    Fasta fastaReference;
+    
+    if ( !fastaReference.Open(fastaFile , fastaIndex) ){        //from bamtools
+         cerr << "ERROR: failed to open fasta file " <<fastaFile<<" and fasta index " << fastaIndex<<""<<endl;
+         exit(1);
+     }
 
     vector<positionInformation> * piForGenomicWindow = new vector<positionInformation> ();
 
@@ -2062,9 +2123,10 @@ void *mainHeteroComputationThread(void * argc){
 							  refID,
 							  currentChunk->rangeGen.getStartCoord(), 
 							  currentChunk->rangeGen.getEndCoord()  ,
-							  //dataToWrite->vecPositionResults,
+							  // dataToWrite->vecPositionResults,
 							  rankThread,
-							  piForGenomicWindow);
+							  piForGenomicWindow,
+							  &fastaReference);
 
     
 
@@ -2713,9 +2775,9 @@ int main (int argc, char *argv[]) {
 
     // }
 
-    string fastaFile         = string(argv[lastOpt]);
-    bamFileToOpen            = string(argv[lastOpt+1]);
-    string fastaIndex        = fastaFile+".fai";
+    fastaFile         = string(argv[lastOpt]);
+    bamFileToOpen     = string(argv[lastOpt+1]);
+    fastaIndex        = fastaFile+".fai";
 
     cerr<<"Parsing arguments ...";
 
@@ -3131,7 +3193,7 @@ int main (int argc, char *argv[]) {
      // 	 sleep(timeThreadSleep);
      // }
     cerr<<"done creating threads "<<endl;
-    cerr<<"outFilePrefixFlag ="<<outFilePrefixFlag<<endl;
+    //cerr<<"outFilePrefixFlag ="<<outFilePrefixFlag<<endl;
     ///////////////////
     //Writing data out/
     ///////////////////
@@ -3167,14 +3229,46 @@ int main (int argc, char *argv[]) {
     // 	}
     
 
-    // 	string headerOutFile;
+    string headerVCFFile;
+    headerVCFFile=string("")+
+    "##fileformat=VCFv4.2\n"+
+    "##ALT=<ID=NON_REF,Description=\"Represents any possible alternative allele at this location\">\n"+
+    "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Approximate read depth\">\n"+
+    "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n"+
+    "##FORMAT=<ID=PL,Number=G,Type=Integer,Description=\"Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification\">\n";
+
+
     // 	if(useVCFoutput){
     // 	    headerOutFile="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
     // 	}else{
     // 	    headerOutFile="#CHROM\tPOS\tA\tC\tG\tT\tGENO\tGENOS\tQualL\tCovL\tAA\tAC\tAG\tAT\tCC\tCG\tCT\tGG\tGT\tTT\n";	
     // 	}
 
-    // 	bgzipWriter.Write(headerOutFile.c_str(),headerOutFile.size());
+    string filenameFAI = fastaIndex;
+    ifstream myFileFAI;
+
+    myFileFAI.open(filenameFAI.c_str(), ios::in);
+
+   if (myFileFAI.is_open()){
+       string l;
+       while ( getline (myFileFAI,l)){
+	   vector<string> tem = allTokens(l,'\t');
+	   if(tem.size()!=5){
+	       cerr<<"ERROR line "<<l<<" does not have 5 fields, has "<<tem.size()<<" fields instead"<<endl;
+	       return 1;
+	   }
+	   headerVCFFile+="##contig=<ID="+tem[0]+",length="+tem[1]+">\n";
+       }
+       myFileFAI.close();
+   }else{
+       cerr << "Unable to open fasta fai file "<<filenameFAI<<endl;
+       return 1;
+    }
+   headerVCFFile+="##reference="+fastaFile+"\n";
+
+   headerVCFFile+="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
+
+   bgzipWriterGL.Write(headerVCFFile.c_str(),headerVCFFile.size());
     // }
 
     //#ifdef LATER
@@ -3206,21 +3300,23 @@ int main (int argc, char *argv[]) {
 		}else{
 		    strToWrite+="NA\tNA\tNA\n";
 		}
-		cerr<<"writing "<<strToWrite<<endl;
+		// cerr<<"writing "<<strToWrite<<endl;
 		bgzipWriterHest.Write(strToWrite.c_str(), strToWrite.size());
 
-#ifdef LATER
-		sizeGenome+=dataToWrite->vecPositionResults->size();
+		//#ifdef LATER
+		//sizeGenome+=dataToWrite->vecPositionResults->size();
 		    
 		strToWrite="";
+		// cerr<<"SIZE "<<dataToWrite->vecPositionResults->size()<<endl;
 		for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
-		    //cout<<i<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(references)<<endl;
-		    strToWrite += dataToWrite->vecPositionResults->at(i)->toString(references);
+		    //cerr<<i<<endl;
+		    // cerr<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID)<<endl;
+		    strToWrite += dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID);
 		    //cout<<i<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(references);
 		    if( (i%500) == 499){
-			if(outFileSiteLLFlag){
-			    bgzipWriter.Write(strToWrite.c_str(), strToWrite.size());
-			}
+			//if(outFileSiteLLFlag){
+			bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size());
+			//}
 			strToWrite="";
 		    }
 		    
@@ -3229,11 +3325,13 @@ int main (int argc, char *argv[]) {
 		}
 
 		if(!strToWrite.empty()){
-		    if(outFileSiteLLFlag){
-			if(outFileSiteLLFlag){ bgzipWriter.Write(strToWrite.c_str(), strToWrite.size()); }
-		    }
+		    // if(outFileSiteLLFlag){
+		    // 	if(outFileSiteLLFlag){ 
+		    bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size()); 
+		    // 	}
+		    // }
 		}
-#endif		    
+		//#endif		    
 		
 		wroteData=true;		
 		lastWrittenChunk=dataToWrite->rank;

@@ -15,12 +15,14 @@ using namespace std;
 
 #include "GenomicRange.h"
 #include "PositionResult.h"
+#include "miscfunc.h"
 
 class DataToWrite{
  private:
     
  public:
     vector<PositionResult *>  * vecPositionResults;
+    int refID;
     GenomicRange rangeGen;
     int rank;
     hResults hetEstResults;

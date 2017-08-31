@@ -158,8 +158,10 @@ typedef struct {
     vector<singleRead> readsVec;
     /* long double mapqAvg; */
     //int cov;
-    //char refBase;
+    char refBase;
+    //int refID;
     int posAlign;
+    int avgMQ;
     bool skipPosition;
 } positionInformation;
 

@@ -1,5 +1,5 @@
 
-CXX      = g++ #-g -pg
+CXX      = g++ #-g # -pg
 LIBGAB   = ../lib/libgab/
 
 CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c
@@ -9,7 +9,7 @@ LDLIBS   = ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o 
 
 all: testComp testCompCont rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof
 
-%.o: %.cpp ../lib/libgab/utils.o  
+%.o: %.cpp #../lib/libgab/utils.o  
 	${CXX} ${CXXFLAGS} $^ -o $@
 
 testComp:	testComp.o 
@@ -55,6 +55,6 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 	cd ../lib/bamtools/ && mkdir -p build/  && cd build/ && cmake .. && make && cd ../..
 
 clean :
-	rm -f testComp.o testComp testCompCont.o testCompCont refPlusSegToGeno.o refPlusSegToGeno sitesPlusGeno.o sitesPlusGeno testPrior.o testPrior rohan.o rohan ref2DNAprof.o ref2DNAprof
+	rm -f *.o testComp  testCompCont  refPlusSegToGeno sitesPlusGeno  testPrior  rohan  ref2DNAprof
 
 
