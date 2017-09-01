@@ -1143,7 +1143,6 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 
 		}//END  for each fragment at pos p
 
-		//TODO, pre compute the log the prior
 		//  product of (\prod_{fragment} P(D|G)) times the prior P(G) for the genotype
 		
 		bblikeForGivenPos.gl[babdIdx] = loglikelihoodForGivenBaBd;
@@ -1606,9 +1605,11 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    if(lastIteration){//do it at the last iteration		
 		PositionResult * pr=new PositionResult();
 
-		pr->refB   = piForGenomicWindow->at(p).refBase;
-		pr->pos    = piForGenomicWindow->at(p).posAlign;
-		pr->avgMQ  = piForGenomicWindow->at(p).avgMQ;
+		pr->refB   =     piForGenomicWindow->at(p).refBase;
+		pr->pos    =     piForGenomicWindow->at(p).posAlign;
+		pr->avgMQ  =     piForGenomicWindow->at(p).avgMQ;
+
+		pr->dp     = int(piForGenomicWindow->at(p).readsVec.size());
 
 		genotypePositions( mostLikelyBaBdIdx                 ,
 				   &vectorOfloglikelihoodForGivenBaBd,
@@ -1832,8 +1833,9 @@ public:
 	piToAdd.refBase                      = referenceBase;
 	//
 	double probMM=0;
-	
+	int    basesRetained=0;
 	bool foundSites=false;
+	
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
 
 	    
@@ -1860,14 +1862,18 @@ public:
 	    int   q    = MIN( int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual), MAXBASEQUAL);
 	    int   m    = MIN( int(pileupData.PileupAlignments[i].Alignment.MapQuality), MAXMAPPINGQUAL );
 	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
+	    // if(posAlign == 74310){
+	    // 	cout<<m<<" "<<probMM<<" "<<likeMismatchProbMap[m]<<endl;
+	    // }
 	    probMM += likeMismatchProbMap[m]; 
-	    
+	    basesRetained++;
+
 	    totalBases++;
 	    foundSites=true;
 
 	    singleRead sr_;
 	    sr_.base    = uint8_t(bIndex);
-	    sr_.qual    = uint8_t(q);
+	    sr_.qual    = uint8_t(q);	    
 	    sr_.mapq    = uint8_t(m);
 	    sr_.lengthF = uint8_t(pileupData.PileupAlignments[i].Alignment.Length);
 
@@ -1893,7 +1899,11 @@ public:
 	}//END FOR EACH READ
 
 	if( foundSites ){
-	    piToAdd.avgMQ =  round(-10*log10(probMM/double(totalSites)));
+	    piToAdd.avgMQ =  round(-10*log10(probMM/double(basesRetained)));
+	    // if(posAlign == 74310){
+	    // 	cout<<piToAdd.avgMQ<<" "<<probMM<<" "<<basesRetained<<endl;
+	    // }
+
 	    totalSites++;
 	}
 	
@@ -2190,11 +2200,7 @@ void *mainHeteroComputationThread(void * argc){
     
 
     //TODO: EACH THREAD WRITE TO A TEMP FILE 
-    //THEN COMBINED
-    // std::ifstream if_a("a.txt", std::ios_base::binary);
-    // std::ifstream if_b("b.txt", std::ios_base::binary);
-    // std::ofstream of_c("c.txt", std::ios_base::binary);    
-    // of_c << if_a.rdbuf() << if_b.rdbuf();
+    //THEN COMBINE?
 
     queueDataTowrite.push(dataToWrite);
 

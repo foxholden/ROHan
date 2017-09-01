@@ -15,7 +15,7 @@ PositionResult::~PositionResult(){
     //cerr<<"Destructor  addr: "<<this<<endl;
 }
 
-pair<char,char> PositionResult::hetIndex2Bases(){
+pair<char,char> PositionResult::hetIndex2Bases() const{
     if(mostLikelyGenoHetIdx==1)
 	return make_pair<char,char>('A','C');
     if(mostLikelyGenoHetIdx==2)
@@ -33,8 +33,38 @@ pair<char,char> PositionResult::hetIndex2Bases(){
     
 }
 
+int PositionResult::bases2hetIndex(char c1, char c2) const{
+    if(c1>c2){
+	char c=c1;
+	c1=c2;
+	c2=c;
+    }
 
-char PositionResult::homoIndex2Base(){
+    if(c1=='A' && c2=='C')
+	return 1;
+
+    if(c1=='A' && c2=='G')
+	return 2;
+
+    if(c1=='A' && c2=='T')
+	return 3;
+
+    if(c1=='C' && c2=='G')
+	return 5;
+
+    if(c1=='C' && c2=='T')
+	return 6;
+
+    if(c1=='G' && c2=='T')
+	return 8;
+
+    cerr<<"PositionResult: wrong state"<<endl;
+    exit(1);
+    
+}
+
+
+char PositionResult::homoIndex2Base() const{
     if(mostLikelyGenoIdx==0)
 	return 'A';
     if(mostLikelyGenoIdx==4)
@@ -46,6 +76,21 @@ char PositionResult::homoIndex2Base(){
     cerr<<"PositionResult: wrong state"<<endl;
     exit(1);
     
+}
+
+
+int PositionResult::base2HomoIndex(const char b) const{
+    if(	b == 'A')
+	return 0;
+    if(	b == 'C')
+	return 4;
+    if( b == 'G')
+	return 7;
+    if(	b == 'T')
+	return 9;
+
+    cerr<<"PositionResult: wrong state"<<endl;
+    exit(1);    
 }
 
 string PositionResult::toString(const RefVector  * references, const int & refID) const{
@@ -63,46 +108,86 @@ string PositionResult::toString(const RefVector  * references, const int & refID
     s<<refB<<"\t";
 
     string altB;
-    
+    string gt="./.";
+    stringstream pl;
     if(mostLikelyGenoIdx ==  mostLikelyGenoHetIdx){//heterozygous
 	bool hasRefAsAlt=false;
 	pair<char,char> hetBase = hetIndex2Bases();
 	hasRefAsAlt = (refB == hetBase.first) || (refB == hetBase.second) ;
 	if(hasRefAsAlt){
+	    gt="0/1";
 	    if( refB == hetBase.first )
-		altB = string(hetBase.second);
+		altB = stringify(hetBase.second);
 	    else
-		altB = string(hetBase.first);
-	    
+		altB = stringify(hetBase.first);	    
+
+	    //pl is 00, 01, 11
+	    pl<<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(refB)]<<","
+		<<setprecision(0) << fixed << -1.0*ll[mostLikelyGenoIdx]<<","
+		<<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(altB[0])];
+
 	}else{
-	    altB = string(hetBase.first)+","+string(hetBase.second);
+	    gt="1/2";
+	    altB = stringify(hetBase.first)+","+stringify(hetBase.second);
+
+	    pl<<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(altB[0])]<<","
+	      <<setprecision(0) << fixed << -1.0*ll[mostLikelyGenoIdx]<<","
+	      <<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(altB[2])];
+		
 	}
     }else{//homozygous
 	char bhomo=homoIndex2Base();
-	if(bhomo!=refB){
-	    altB=string(bhomo);
-	}else{
+	bool hasRefAsAlt=false;
+	if(bhomo != refB){ //is homo not reference
+	    altB = stringify(bhomo);
+	    gt="1/1";
+
+	    pl<<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(refB)]<<","
+	      <<setprecision(0) << fixed << -1.0*ll[bases2hetIndex(refB,altB[0])]<<","
+	      <<setprecision(0) << fixed << -1.0*ll[mostLikelyGenoIdx];
+
+	}else{//is homo reference
+	    gt="0/0";
 	    pair<char,char> hetBase = hetIndex2Bases();
 	    hasRefAsAlt = (refB == hetBase.first) || (refB == hetBase.second) ;
 	    if(hasRefAsAlt){
 		if( refB == hetBase.first )
-		    altB = string(hetBase.second);
+		    altB = stringify(hetBase.second);
 		else
-		    altB = string(hetBase.first);
+		    altB = stringify(hetBase.first);
 	    }else{
 		cerr<<"ERROR at site "<<references->at(refID).RefName<<":"<<pos<<endl;
-
 	    }
+	    pl<<setprecision(0) << fixed << -1.0*ll[mostLikelyGenoIdx]<<","
+	      <<setprecision(0) << fixed << -1.0*ll[bases2hetIndex(refB,altB[0])]<<","
+	      <<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(altB[0])];
+
 	}
     }
 
     //find if has ref
     s<<altB<<"\t";
 
-    s<<"GT:AD:DP:GQ:PL\t";
 
-    s<<gq<<"\t.\t";//the . is the filter
+
+    s<< setprecision(1) << fixed << -1.0*gq;
+    s<<"\t.\t";//the . is the filter
+    s<<"MQ="<<avgMQ<<"\t";//INFO field
+    s<<"GT:DP:GQ:PL:PL10\t";//format field
     
+    s<<gt<<":";
+    s<<dp<<":";
+    s<< setprecision(1) << fixed << -1.0*gq <<":";
+    s<<pl.str()<<":";
+
+    for(int g=0;g<9;g++)
+	s<<setprecision(0) << fixed << -1.0*ll[g]<<",";
+    s<<setprecision(0) << fixed << -1.0*ll[9]<<"";
+
+    s<<"\n";
+
+    //cout<<"toString "<<toReturn<<endl;
+    return s.str();
 
     // s<<refC<<"\t";
     // s<<altC<<"\t";
@@ -127,17 +212,14 @@ string PositionResult::toString(const RefVector  * references, const int & refID
     // s<<lqual<<"\t";
     // s<<llCov<<"\t";
 
-     for(int g=0;g<10;g++)
-     	s<<ll[g]<<"\t";	
+    //for(int g=0;g<10;g++)
+    // 	s<<ll[g]<<"\t";	
+
     // // s<<rrll<<"\t";
     // // s<<rall<<"\t";
     // // s<<aall<<"\t";
 
 
-    s<<"\n";
-
-    //cout<<"toString "<<toReturn<<endl;
-    return s.str();
 }
 
 //TODO code to VCF

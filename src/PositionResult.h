@@ -30,6 +30,7 @@ class PositionResult{
     char         refB;
     /* char         altB; */
     int avgMQ;
+    int dp;
     /* int         baseC[4]; */
     /* int          refC; */
     /* int          altC; */
@@ -41,7 +42,7 @@ class PositionResult{
     int         mostLikelyGenoHetIdx;
 
     long double gq;
-
+    
     /* long double  lqual; */
     /* long double  llCov; */
     /* int          geno; */
@@ -55,8 +56,10 @@ class PositionResult{
 
     PositionResult & operator= (const PositionResult & other);
     //    friend ostream & operator<<(ostream & os, const PositionResult & ct);
-    pair<char,char> hetIndex2Bases();
-    char homoIndex2Base();
+    pair<char,char> hetIndex2Bases() const;
+    char homoIndex2Base() const;
+    int base2HomoIndex(const char b) const;
+    int bases2hetIndex(const char c1,const char c2) const;
 };
 
 
