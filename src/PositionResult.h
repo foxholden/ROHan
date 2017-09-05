@@ -31,7 +31,7 @@ class PositionResult{
     /* char         altB; */
     int avgMQ;
     int dp;
-    /* int         baseC[4]; */
+    int         baseC[4];
     /* int          refC; */
     /* int          altC; */
 

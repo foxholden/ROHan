@@ -1609,6 +1609,9 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 		pr->pos    =     piForGenomicWindow->at(p).posAlign;
 		pr->avgMQ  =     piForGenomicWindow->at(p).avgMQ;
 
+		for(int n=0;n<4;n++)
+		    pr->baseC[n] = piForGenomicWindow->at(p).baseC[n];
+
 		pr->dp     = int(piForGenomicWindow->at(p).readsVec.size());
 
 		genotypePositions( mostLikelyBaBdIdx                 ,
@@ -1835,7 +1838,11 @@ public:
 	double probMM=0;
 	int    basesRetained=0;
 	bool foundSites=false;
-	
+
+	for(int n=0;n<4;n++){
+	    piToAdd.baseC[n]=0;
+	}
+
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
 
 	    
@@ -1865,6 +1872,7 @@ public:
 	    // if(posAlign == 74310){
 	    // 	cout<<m<<" "<<probMM<<" "<<likeMismatchProbMap[m]<<endl;
 	    // }
+	    piToAdd.baseC[bIndex]++;
 	    probMM += likeMismatchProbMap[m]; 
 	    basesRetained++;
 
@@ -1890,8 +1898,7 @@ public:
 	    // obsBase.push_back( bIndex  );
 	    // obsQual.push_back( q        );
 	    // mmQual.push_back(  m        );
-	    // isRevVec.push_back(isRev);
-
+	    // isRevVec.push_back(isRev);	    
 	    //mmProb.push_back(  likeMismatchProbMap[m]  );
 	    // substitutionRatesPerRead.push_back( probSubMatchToUseEndo );
 	    //	    includeFragment[i]=true;
@@ -3045,7 +3052,7 @@ int main (int argc, char *argv[]) {
     readDataDone=true;
     //    return 1;
 
-    vector<GenoResults *> vectorGenoResults;
+    // vector<GenoResults *> vectorGenoResults;
 
 
     if( !lambdaCovSpecified ){
@@ -3237,11 +3244,10 @@ int main (int argc, char *argv[]) {
 
     string headerVCFFile;
     headerVCFFile=string("")+
-    "##fileformat=VCFv4.2\n"+
-    "##ALT=<ID=NON_REF,Description=\"Represents any possible alternative allele at this location\">\n"+
-    "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Approximate read depth\">\n"+
-    "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n"+
-    "##FORMAT=<ID=PL,Number=G,Type=Integer,Description=\"Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification\">\n";
+	"##fileformat=VCFv4.2\n";
+    headerVCFFile+="##ROHanVersion="+returnGitHubVersion(argv[0],"")+"\n";
+    headerVCFFile+="##reference="+fastaFile+"\n";
+
 
 
     // 	if(useVCFoutput){
@@ -3270,9 +3276,20 @@ int main (int argc, char *argv[]) {
        cerr << "Unable to open fasta fai file "<<filenameFAI<<endl;
        return 1;
     }
-   headerVCFFile+="##reference="+fastaFile+"\n";
 
-   headerVCFFile+="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
+
+
+    headerVCFFile+="##ALT=<ID=NON_REF,Description=\"Represents any possible alternative allele at this location\">\n";
+    headerVCFFile+="##INFO=<ID=MQ,Number=1,Type=Integer,Description=\"Root-mean-square mapping quality of covering reads\">\n";
+    headerVCFFile+="##INFO=<ID=AC4,Number=4,Type=Integer,Description=\"Count of each 4 bases\">\n";
+
+    headerVCFFile+="##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">\n";
+    headerVCFFile+="##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Approximate read depth\">\n";
+    headerVCFFile+="##FORMAT=<ID=GQ,Number=1,Type=Integer,Description=\"Genotype Quality\">\n";    
+    headerVCFFile+="##FORMAT=<ID=PL,Number=G,Type=Integer,Description=\"Phred-scaled likelihoods for genotypes\">\n";
+    headerVCFFile+="##FORMAT=<ID=PL10,Number=G,Type=Integer,Description=\"Phred-scaled likelihoods for all 10 genotypes\">\n";
+
+    headerVCFFile+="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
 
    bgzipWriterGL.Write(headerVCFFile.c_str(),headerVCFFile.size());
     // }
@@ -3302,7 +3319,7 @@ int main (int argc, char *argv[]) {
 		string strToWrite=dataToWrite->rangeGen.asBed()+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
 		
 		if(dataToWrite->hetEstResults.hasConverged){
-		    strToWrite+=stringify(dataToWrite->hetEstResults.h)+"\t"+stringify(dataToWrite->hetEstResults.hLow)+"\t"+stringify(dataToWrite->hetEstResults.hHigh)+"\n";
+		    strToWrite+=stringify( MIN(dataToWrite->hetEstResults.h,0) )+"\t"+stringify( MIN(dataToWrite->hetEstResults.hLow,0) )+"\t"+stringify( MIN(dataToWrite->hetEstResults.hHigh,0) )+"\n";
 		}else{
 		    strToWrite+="NA\tNA\tNA\n";
 		}
@@ -3326,8 +3343,8 @@ int main (int argc, char *argv[]) {
 			strToWrite="";
 		    }
 		    
-		    GenoResults * toadd =  new GenoResults( dataToWrite->vecPositionResults->at(i) );
-		    vectorGenoResults.push_back(toadd);
+		    // GenoResults * toadd =  new GenoResults( dataToWrite->vecPositionResults->at(i) );
+		    // vectorGenoResults.push_back(toadd);
 		}
 
 		if(!strToWrite.empty()){

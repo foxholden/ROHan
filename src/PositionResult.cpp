@@ -172,7 +172,11 @@ string PositionResult::toString(const RefVector  * references, const int & refID
 
     s<< setprecision(1) << fixed << -1.0*gq;
     s<<"\t.\t";//the . is the filter
-    s<<"MQ="<<avgMQ<<"\t";//INFO field
+    //INFO
+    s<<"MQ="<<avgMQ<<";";
+    s<<"AC4="<<baseC[0]<<","<<baseC[1]<<","<<baseC[2]<<","<<baseC[3];
+    s<<"\t";//INFO field
+
     s<<"GT:DP:GQ:PL:PL10\t";//format field
     
     s<<gt<<":";

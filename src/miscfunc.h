@@ -162,6 +162,7 @@ typedef struct {
     //int refID;
     int posAlign;
     int avgMQ;
+    int          baseC[4];
     bool skipPosition;
 } positionInformation;
 

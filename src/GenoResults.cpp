@@ -12,10 +12,10 @@ GenoResults::GenoResults(){
 }
 
 GenoResults::GenoResults(const PositionResult * pr){
-    cov=0;
-    for(int n=0;n<4;n++){
-	cov+=pr->baseC[n];
-    }
+    // cov=0;
+    // for(int n=0;n<4;n++){
+    // 	cov+=pr->baseC[n];
+    // }
 
 
     for(int g=0;g<10;g++)
@@ -23,18 +23,18 @@ GenoResults::GenoResults(const PositionResult * pr){
     // rrll   = pr->rrll ;
     // rall   = pr->rall ;
     // aall   = pr->aall ;
-    lqual  = pr->lqual;
-    llCov  = pr->llCov;
-    geno   = pr->geno ;    
+    // lqual  = pr->lqual;
+    // llCov  = pr->llCov;
+    // geno   = pr->geno ;    
 }
 
 GenoResults::GenoResults(const string lineToAdd){
     vector<string> tokensS=allTokens(lineToAdd,'\t');
 
-    cov=0;
-    for(int n=0;n<4;n++){
-	cov+=destringify<int>(tokensS[2+n]);
-    }
+    // cov=0;
+    // for(int n=0;n<4;n++){
+    // 	cov+=destringify<int>(tokensS[2+n]);
+    // }
    
     if(         tokensS[6+0] == "0/0"){
 	geno=0;
