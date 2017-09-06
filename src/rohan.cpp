@@ -3319,7 +3319,14 @@ int main (int argc, char *argv[]) {
 		string strToWrite=dataToWrite->rangeGen.asBed()+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
 		
 		if(dataToWrite->hetEstResults.hasConverged){
-		    strToWrite+=stringify( MIN(dataToWrite->hetEstResults.h,0) )+"\t"+stringify( MIN(dataToWrite->hetEstResults.hLow,0) )+"\t"+stringify( MIN(dataToWrite->hetEstResults.hHigh,0) )+"\n";
+		    long double h     = dataToWrite->hetEstResults.h;
+		    long double hLow  = dataToWrite->hetEstResults.hLow;
+		    long double hHigh = dataToWrite->hetEstResults.hHigh;
+		    if(h<0)      h     = 0;
+		    if(hLow<0)   hLow  = 0;
+		    if(hHigh<0)  hHigh = 0;
+
+		    strToWrite+=stringify( h )+"\t"+stringify( hLow )+"\t"+stringify( hHigh )+"\n";
 		}else{
 		    strToWrite+="NA\tNA\tNA\n";
 		}
