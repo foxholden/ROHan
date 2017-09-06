@@ -50,6 +50,7 @@ using namespace BamTools;
 //#define DEBUGCOMPUTELLGENO
 //#define DEBUGCOMPUTELL
 //#define DEBUGCOMPUTELLEACHBASE
+#define DEBUGPRECOMPUTEBABD 2610
 
 
 
@@ -1081,7 +1082,9 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 				
 		long double loglikelihoodForGivenBaBd          =0.0;
 
-
+#ifdef DEBUGPRECOMPUTEBABD
+		bool printDEBUG = (piForGenomicWindow->at(p).posAlign==DEBUGPRECOMPUTEBABD);
+#endif
 		
 		for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){ //for each fragment at pos p
 		    //Likelihood it comes from A
@@ -1119,23 +1122,33 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 		    }
 			
 
+#ifdef DEBUGPRECOMPUTEBABD
+		    if(printDEBUG){
+			cerr<<"i="<<i<<" "<<
+			    piForGenomicWindow->at(p).readsVec[i].lengthF<<" 5p="<<
+			    piForGenomicWindow->at(p).readsVec[i].pos5p<<" mp="<<			   
+			    piForGenomicWindow->at(p).readsVec[i].mapq<<" q="<<
+			    piForGenomicWindow->at(p).readsVec[i].qual<<" b="<<" "<<llA<<" "<<llD<<endl;
+
+		    }
+#endif
 
 
-// #else
+		    // #else
 		    
-// 		    // //without precompute log
-// 		    long double llA = logl(0.5* length2pos2mpq2bsq2submatrix
-// 		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
-// 		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
-// 		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base]);
+		    // 		    // //without precompute log
+		    // 		    long double llA = logl(0.5* length2pos2mpq2bsq2submatrix
+		    // 		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    // 		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+		    // 		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base]);
 
-// 		    //Likelihood it comes from D
-// 		    long double llD = logl(0.5* length2pos2mpq2bsq2submatrix
-// 		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
-// 		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
-// 		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base]);
+		    // 		    //Likelihood it comes from D
+		    // 		    long double llD = logl(0.5* length2pos2mpq2bsq2submatrix
+		    // 		    			   [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    // 		    			   [piForGenomicWindow->at(p).readsVec[i].pos5p]->at( piForGenomicWindow->at(p).readsVec[i].mapq)
+		    // 		    			   [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base]);
 // #endif
-
+		    
     
 		       
 		    
