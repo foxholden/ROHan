@@ -20,6 +20,11 @@ using namespace std;
 
 
 typedef struct { 
+    int maxReadLength;
+    bool isPe;
+ } rgInfo;
+
+typedef struct { 
     long double h;
     long double hLow;
     long double hHigh;

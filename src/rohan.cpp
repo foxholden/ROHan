@@ -36,13 +36,13 @@ using namespace BamTools;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-#define PRECOMPUTELOG
+//#define PRECOMPUTELOG
 //#define DEBUGCOV
 //#define DEBUGILLUMINAFREQ
 //#define DEBUGINITSCORES
 
 // #define DEBUGINITLIKELIHOODSCORES
-//#define DEBUGINITLIKELIHOODSCORES2
+//#define DEBUGINITLIKELIHOODSCORES2 55
 
 //#define DEBUGDEFAULTFREQ//print the default base frequency 
 //#define DEBUGDEAM //to print deamination scores
@@ -50,7 +50,7 @@ using namespace BamTools;
 //#define DEBUGCOMPUTELLGENO
 //#define DEBUGCOMPUTELL
 //#define DEBUGCOMPUTELLEACHBASE
-#define DEBUGPRECOMPUTEBABD 2610
+//#define DEBUGPRECOMPUTEBABD 2610
 
 
 
@@ -111,7 +111,8 @@ vector<alleleFrequency> defaultDNA3p;
 string fastaFile;
 string fastaIndex;
 
-
+map<string,rgInfo> rg2info;
+bool specifiedDeam=false;
 
 // 1D: mapping quality 
 // 2D: length of fragment
@@ -372,7 +373,6 @@ void initScores(){
     for(int i=0;i<=MAXMAPPINGQUAL;i++){
 	//cerr<<"m= "<<i<<"\t"<<likeMatchMap[i]<<"\t"<<likeMismatchMap[i]<<"\t"<<likeMatchProbMap[i]<<"\t"<<likeMismatchProbMap[i]<<endl;
 	cerr<<"m= "<<i<<"\t"<<likeMatchProbMap[i]<<"\t"<<likeMismatchProbMap[i]<<endl;
-
     }
 #endif
 
@@ -883,36 +883,35 @@ void initLikelihoodScores(){
 	for(int l=0;l<L;l++){//for each pos
 	    // cerr<<"pos "<<l<<"/"<<L<<endl;//<<"\t"<<length2pos2mpq2bsq2submatrix[L][l]->size()<<endl;
 	    
-	    for(int mq=0;mq<=MAXMAPPINGQUAL;mq++){ //for each mapping quality 
-		//cerr<<"mq="<<mq<<"\t"<<endl;//length2pos2mpq2bsq2submatrix[L][l]->at(mq).size()<<endl;
+	    if( l == DEBUGINITLIKELIHOODSCORES2){
 
-		for(int q=0;q<=MAXBASEQUAL;q++){ //for each base quality
-		    cerr<<"pos "<<l<<"/"<<L<<" mq="<<mq<<" bq="<<q<<endl;
+		for(int mq=0;mq<=MAXMAPPINGQUAL;mq++){ //for each mapping quality 
+		    //cerr<<"mq="<<mq<<"\t"<<endl;//length2pos2mpq2bsq2submatrix[L][l]->at(mq).size()<<endl;
 
-		    //cerr<<" mq = "<<mq<<" ("<<likeMatchProbMap[mq]<<" "<<likeMismatchProbMap[mq]<<" )  q = "<<q<<endl;
-		    for(int nuc1=0;nuc1<4;nuc1++){
-			cerr<<"ACGT"[nuc1]<<"\t";		    
-			long double s=0;//sum of probs
+		    for(int q=0;q<=MAXBASEQUAL;q++){ //for each base quality
+			cerr<<"pos "<<l<<"/"<<L<<" mq="<<mq<<" bq="<<q<<endl;
 
-			for(int nuc2=0;nuc2<4;nuc2++){
-			    cerr<<length2pos2mpq2bsq2submatrix[L][l]->at(mq)[q].p[nuc1][nuc2]<<"\t";
-			    //length2pos2mpq2bsq2submatrix[L][l]->at(mq)
-			    //toAddForBaseQual5p.p[nuc1][nuc2]<<"\t";
-			    s+=length2pos2mpq2bsq2submatrix[L][l]->at(mq)[q].p[nuc1][nuc2];
+			//cerr<<" mq = "<<mq<<" ("<<likeMatchProbMap[mq]<<" "<<likeMismatchProbMap[mq]<<" )  q = "<<q<<endl;
+			for(int nuc1=0;nuc1<4;nuc1++){
+			    cerr<<"ACGT"[nuc1]<<"\t";		    
+			    long double s=0;//sum of probs
+
+			    for(int nuc2=0;nuc2<4;nuc2++){
+				cerr<<2*exp(length2pos2mpq2bsq2submatrix[L][l]->at(mq)[q].p[nuc1][nuc2])<<"\t";
+				//length2pos2mpq2bsq2submatrix[L][l]->at(mq)
+				//toAddForBaseQual5p.p[nuc1][nuc2]<<"\t";
+				s+=length2pos2mpq2bsq2submatrix[L][l]->at(mq)[q].p[nuc1][nuc2];
+			    }
+
+			    cerr<<"\tsum="<<s<<endl;
 			}
-
-			cerr<<"\t"<<s<<endl;
-		    }
-		    cerr<<endl;
+			cerr<<endl;
 		    
-		}//for each base qual	   		    
+		    }//for each base qual	   		    
 
-	    }// for each mapping quality
-
-
-	    
-
-	}
+		}// for each mapping quality	   
+	    }
+	}//for each pos
     }//for each fragment length
 
 #endif    
@@ -1072,6 +1071,9 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 
 	int         babdIdx          =0;
 
+#ifdef DEBUGPRECOMPUTEBABD
+	bool printDEBUG = (piForGenomicWindow->at(p).posAlign==DEBUGPRECOMPUTEBABD);
+#endif
        	
 	for(uint8_t ba=0;ba<4;ba++){//ancestral base
 	    uint8_t ba_c = 3-ba;
@@ -1082,9 +1084,6 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 				
 		long double loglikelihoodForGivenBaBd          =0.0;
 
-#ifdef DEBUGPRECOMPUTEBABD
-		bool printDEBUG = (piForGenomicWindow->at(p).posAlign==DEBUGPRECOMPUTEBABD);
-#endif
 		
 		for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){ //for each fragment at pos p
 		    //Likelihood it comes from A
@@ -1093,7 +1092,7 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 		    //#ifdef PRECOMPUTELOG
 		    long double llA; //Likelihood it comes from A
 		    long double llD; //Likelihood it comes from D
-
+		    
 		    if(piForGenomicWindow->at(p).readsVec[i].isrv){
 			llA = length2pos2mpq2bsq2submatrix
 			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
@@ -1104,7 +1103,6 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
 			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at(   piForGenomicWindow->at(p).readsVec[i].mapq)
 			    [piForGenomicWindow->at(p).readsVec[i].qual].p[bd_c][piForGenomicWindow->at(p).readsVec[i].base];
-
 
 		    }else{
 
@@ -1124,11 +1122,13 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 
 #ifdef DEBUGPRECOMPUTEBABD
 		    if(printDEBUG){
-			cerr<<"i="<<i<<" "<<
-			    piForGenomicWindow->at(p).readsVec[i].lengthF<<" 5p="<<
-			    piForGenomicWindow->at(p).readsVec[i].pos5p<<" mp="<<			   
-			    piForGenomicWindow->at(p).readsVec[i].mapq<<" q="<<
-			    piForGenomicWindow->at(p).readsVec[i].qual<<" b="<<" "<<llA<<" "<<llD<<endl;
+		 
+			cout<<"ba "<<"ACGT"[ba]<<" r"<<"ACGT"[ba_c]<<" bc "<<"ACGT"[bd]<<" r"<<"ACGT"[bd_c]<<" i="<<i<<" l="<<
+			    int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<" 5p="<<
+			    int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<" mp="<<			   
+			    int(piForGenomicWindow->at(p).readsVec[i].mapq)<<" q="<<
+			    int(piForGenomicWindow->at(p).readsVec[i].qual)<<" b="<<"ACGT"[int(piForGenomicWindow->at(p).readsVec[i].base)]<<" "<< piForGenomicWindow->at(p).readsVec[i].isrv  <<" "<<llA<<" "<<2*exp(llA)<<" "<<llD<<" "<<2*exp(llD)<<endl;
+		
 
 		    }
 #endif
@@ -1160,13 +1160,16 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 		
 		bblikeForGivenPos.gl[babdIdx] = loglikelihoodForGivenBaBd;
 		
-
+		
 		
 
 		babdIdx++;
 	    }//END for each derived base
 	}//END for each ancestral base
 
+#ifdef DEBUGPRECOMPUTEBABD
+		    if(printDEBUG){ exit(1); }
+#endif
 
 	vectorBaBdLikelihood->push_back(  bblikeForGivenPos );
     }//END for each genomic position
@@ -1434,7 +1437,6 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	// cerr<<setprecision(20)<<"TEST3 "<<"\tL2P="<<length2pos2mpq2bsq2submatrix[113][12]->at(37)[38].p[0][3]<<"\t"<<length2pos2mpq2bsq2submatrix[113][12]->at(37)[18].p[0][3]<<"\t"<<expl(length2pos2mpq2bsq2submatrix[113][12]->at(37)[38].p[0][3])<<"\t"<<expl(length2pos2mpq2bsq2submatrix[113][12]->at(37)[18].p[0][3])<<"\t"<<logl(0.5*length2pos2mpq2bsq2submatrix[113][12]->at(37)[38].p[0][3])<<"\t"<<logl(0.5*length2pos2mpq2bsq2submatrix[113][12]->at(37)[18].p[0][3])<<endl ;
 
 #ifdef DEBUGCOMPUTELL
-
 	cerr<<"h="<<h<<endl;
 	cerr<<"\t";
 	for(int ba=0;ba<4;ba++)
@@ -2167,7 +2169,36 @@ void *mainHeteroComputationThread(void * argc){
     //unsigned int numReads=0;
     while ( reader.GetNextAlignment(al) ) {
         //cout<<"mainHeteroComputationThread al.Name="<<al.Name<<endl;
-	
+	if(specifiedDeam){
+	    if( al.IsPaired() ) continue; //skip paired-end reads because we cannot get proper deamination
+	    string rg;
+	    if(al.HasTag("RG")) {
+		if(!al.GetTag("RG",rg) ){ 
+		    cerr << "Heterozygosity computation: could not retrieve the RG tag from  "<<al.Name<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<endl;
+		    exit(1);	
+		}
+	    }else{
+		rg="NA";
+	    }
+
+	    //The goal of the code below is to avoid having 
+	    //fragments for which we cannot quantify misincorporations
+	    //due to deamination at a given position
+	    if(rg2info.find(rg) == rg2info.end()){
+		cerr << "Heterozygosity computation: found an unknown RG tag from  "<<al.Name<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<endl;
+		exit(1);	
+	    }else{
+		if(!rg2info[rg].isPe){ //
+		    if(al.Length == rg2info[rg].maxReadLength)//probably reached the end of the read length
+			continue;		    
+		}else{
+		    //since we skipped the paired reads, if we have reached here
+		    //we can add single-end fragments 
+		    
+		}
+	    }
+
+	}
 
 	if(al.Length>=MINLENGTHFRAGMENT &&
 	   al.Length<=MAXLENGTHFRAGMENT ){	   
@@ -2513,6 +2544,34 @@ void *mainCoverageComputationThread(void * argc){
     BamAlignment al;
     //unsigned int numReads=0;
     while ( reader.GetNextAlignment(al) ) {
+	if(specifiedDeam){
+	    if( al.IsPaired() ) continue; //skip paired-end reads because we cannot get proper deamination
+	}
+
+	string rg;
+	if(al.HasTag("RG")) {
+	    if(!al.GetTag("RG",rg) ){ 
+		cerr << "Coverage computation: could not retrieve the RG tag from  "<<al.Name<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<endl;
+		exit(1);	
+	    }
+	}else{
+	    rg="NA";
+	}
+
+
+
+	if(rg2info.find(rg) == rg2info.end()){
+	    rgInfo toadd;
+	    toadd.isPe          = al.IsPaired();
+	    toadd.maxReadLength = MAX(al.Length,al.InsertSize);
+	    rg2info[rg]         = toadd;
+	}else{
+	    rg2info[rg].isPe          = rg2info[rg].isPe || al.IsPaired();
+	    rg2info[rg].maxReadLength = MAX( MAX(al.Length,al.InsertSize), rg2info[rg].maxReadLength );
+	}
+
+
+
         pileup.AddAlignment(al);
     }
 
@@ -2646,7 +2705,7 @@ int main (int argc, char *argv[]) {
                               "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t\t"+"Size of windows in bp  (default: "+stringify(sizeChunk)+")"+"\n"+	      
-			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
+			      //			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
 			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+	      
 
 
@@ -2751,12 +2810,12 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
-        if(string(argv[i]) == "--lambda"  ){
-	    lambdaCovSpecified=true;
-            lambdaCov         =destringify<double>(argv[i+1]);
-	    i++;
-            continue;
-        }
+        // if(string(argv[i]) == "--lambda"  ){
+	//     lambdaCovSpecified=true;
+        //     lambdaCov         =destringify<double>(argv[i+1]);
+	//     i++;
+        //     continue;
+        // }
 
         if(string(argv[i]) == "--tstv"  ){
             TStoTVratio         =destringify<long double>(argv[i+1]);
@@ -2768,12 +2827,14 @@ int main (int argc, char *argv[]) {
         if(string(argv[i]) == "--deam5p"  ){
             deam5pfreqE=string(argv[i+1]);
             i++;
+	    specifiedDeam=true;
             continue;
         }
 
         if(string(argv[i]) == "--deam3p"  ){
             deam3pfreqE=string(argv[i+1]);
             i++;
+	    specifiedDeam=true;
             continue;
         }
 
@@ -3048,7 +3109,7 @@ int main (int argc, char *argv[]) {
     
     unsigned int      rank  = 0;
     int          lastRank   =-1;
-    unsigned int sizeGenome = 0;
+    //unsigned int sizeGenome = 0;
 
     for(unsigned int i=0;i<v.size();i++){
 	//cout<<"genomic region #"<<i<<" "<<v[i]<<endl;
@@ -3068,7 +3129,8 @@ int main (int argc, char *argv[]) {
     // vector<GenoResults *> vectorGenoResults;
 
 
-    if( !lambdaCovSpecified ){
+
+    if( ! isFile(outFilePrefix+".rginfo.gz") ){
 
 	// if(!genoFileAsInputFlag){
 
@@ -3118,15 +3180,67 @@ int main (int argc, char *argv[]) {
 	pthread_mutex_destroy(&mutexCERR);
 
 	//    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
-	cerr<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
-	pthread_exit(NULL);
-
 	rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
+	cerr<<"Final computation:" <<" bases="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda coverrage="<<rateForPoissonCov<<endl;
+	//pthread_exit(NULL);	
+	//	cerr<<"Lambda coverage: " <<rateForPoissonCov<<endl;	
+       
+	Internal::BgzfStream  bgzipWriterInfo;
+	
+	bgzipWriterInfo.Open(outFilePrefix+".rginfo.gz", IBamIODevice::WriteOnly);
+	if(!bgzipWriterInfo.IsOpen()){
+	    cerr<<"Cannot open file "<<(outFilePrefix+".rginfo.gz")<<" in bgzip writer"<<endl;
+	    return 1;
+	}
+	string stringinfo= stringify(rateForPoissonCov)+"\n";
+	
+	for (map<string,rgInfo>::iterator it=rg2info.begin(); it!=rg2info.end(); ++it){
+	    string s = stringify(it->first)+"\t"+stringify(it->second.isPe)+"\t"+stringify(it->second.maxReadLength)+"\n";
+	    cerr<<"RG:\t" <<s<<endl;	
+	    stringinfo+=s;
+	}
+	bgzipWriterInfo.Write(stringinfo.c_str(), stringinfo.size());
+
+	bgzipWriterInfo.Close();
+
     }else{ //not lambdaCovSpecified
 	//use the rate specified via the command line
-	rateForPoissonCov = lambdaCov;
+
+	//rateForPoissonCov = lambdaCov;
+	igzstream infoFilePreComputed;
+	string filen = outFilePrefix+".rginfo.gz";
+	cerr<<"Found read group file: "<<filen<<endl;
+
+	infoFilePreComputed.open(filen.c_str(), ios::in);
+
+	if (infoFilePreComputed.good()){
+	    string l;
+	    getline (infoFilePreComputed,l);
+	    rateForPoissonCov = destringify<long double>(l);
+	    cerr<<"lambda coverrage="<<rateForPoissonCov<<endl;
+	    while ( getline (infoFilePreComputed,l)){		
+		vector<string> tempv = allTokens(l,'\t');		
+		if(tempv.size() != 3){
+		    cerr<<"ERROR line "<<l<<" in file "<<filen<<" does not have 3 fields, has "<<tempv.size()<<" fields instead"<<endl;
+		    return 1;
+		}
+		
+		rgInfo toadd;
+		toadd.isPe          =                 (tempv[1]=="1");
+		toadd.maxReadLength = destringify<int>(tempv[2]);
+		rg2info[ tempv[0] ] = toadd;
+		cerr<<"RG:\t" <<l<<endl;	
+	    }
+	    infoFilePreComputed.close();
+
+	}else{
+	    cerr << "Unable to open info file: "<<filen<<endl;
+	    return 1;
+	}
+
     }
-    cerr<<"Final" <<" "<<rateForPoissonCov<<endl;
+    //    return 1;
+    
     long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
     long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
     
