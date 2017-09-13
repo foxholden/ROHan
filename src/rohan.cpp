@@ -7,9 +7,13 @@
 
 //TODO
 
+// deamination overall 
+// add coverage correction
 // HMM
+// global estimate
 // add mappability track?
-
+// ?
+// profit
 
 
 #include "api/internal/io/BgzfStream_p.h"
@@ -56,10 +60,10 @@ using namespace BamTools;
 
 #define HETVERBOSE
 //#define COVERAGETVERBOSE
-#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
+//#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
-#define MINLENGTHFRAGMENT     35      // mininam length for fragment
-#define MAXLENGTHFRAGMENT     250     // maximal length for fragment
+// #define MINLENGTHFRAGMENT     35      // mininam length for fragment
+// #define MAXLENGTHFRAGMENT     250     // maximal length for fragment
 
 
 //#define MAXMAPPINGQUAL        257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
@@ -69,6 +73,10 @@ using namespace BamTools;
 //#define MAXMAPPINGBASEQUAL    64      // maximal base quality score, should be sufficient as mapping qualities are encoded using 8 bits
 
 #define MAXCOV             50     // maximal coverage
+
+
+unsigned int MINLENGTHFRAGMENT  =    35;      // minimal length for fragment
+unsigned int MAXLENGTHFRAGMENT  =    MINLENGTHFRAGMENT;     //  maximal length for fragment
 
 char offsetQual=33;
 
@@ -659,7 +667,7 @@ void initLikelihoodScores(){
 // vector< vector< vector<diNucleotideProb> > >  pos2mpq2BaseQual2SubMatrix5p;
 // vector< vector< vector<diNucleotideProb> > >  pos2mpq2BaseQual2SubMatrix3p;
     
-    for(int l=0;l<( (MAXLENGTHFRAGMENT/2) +1);l++){//for each position
+    for(int l=0;l<( int(MAXLENGTHFRAGMENT/2) +1);l++){//for each position
 
 	mpq2bsq2submatrix  mpq2BaseQualSubMatrix5p;
 	mpq2bsq2submatrix  mpq2BaseQualSubMatrix3p;
@@ -850,12 +858,12 @@ void initLikelihoodScores(){
 
     //vector< vector< mpq2bsq2submatrix * > > length2pos2mpq2bsq2submatrix;
     //dummy values
-    for(int L=0;L<MINLENGTHFRAGMENT;L++){//for each fragment length
+    for(int L=0;L<int(MINLENGTHFRAGMENT);L++){//for each fragment length
 	vector< mpq2bsq2submatrix * > vectorToAdd;	
 	length2pos2mpq2bsq2submatrix.push_back(vectorToAdd);
     }
 
-    for(int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){//for each fragment length
+    for(int L=int(MINLENGTHFRAGMENT);L<=int(MAXLENGTHFRAGMENT);L++){//for each fragment length
 	vector< mpq2bsq2submatrix * > vectorToAdd;
 	for(int l=0;l<L;l++){//for each pos
 	    //cerr<<l<<" "<<(L-l-1)<<" "<<L<<endl;	   
@@ -1943,21 +1951,33 @@ public:
 
 private:
     RefVector m_references;
-    Fasta * m_fastaReference;
-    unsigned int totalBases;
-    unsigned int totalSites;
-
-    int          m_threadID;
     int          m_refID;
     unsigned int m_leftCoord;
     unsigned int m_rightCoord;
+    int          m_threadID;
+    unsigned int m_numberOfSites;
+
+    unsigned int totalBases;
+    unsigned int totalSites;
+
+    vector<positionInformation> * m_piForGenomicWindow;
+    Fasta * m_fastaReference;
 
     //vector<PositionResult *> * m_dataToWriteOut;
-    unsigned int m_numberOfSites;
-    vector<positionInformation> * m_piForGenomicWindow;
-
 };//heteroComputerVisitor
 
+
+	// , m_references(references)
+	// , m_refID(refID)
+	// , m_leftCoord(leftCoord)
+	// , m_rightCoord(rightCoord)
+	//   //, m_dataToWriteOut( dataToWriteOut)
+	// , m_threadID( threadID )
+	// , m_numberOfSites( 0 )
+	// , totalBases(0)
+	// , totalSites(0)   
+	// , m_piForGenomicWindow( piForGenomicWindow )
+	// , m_fastaReference(fastaReference)
 
 
 
@@ -2189,7 +2209,8 @@ void *mainHeteroComputationThread(void * argc){
 		exit(1);	
 	    }else{
 		if(!rg2info[rg].isPe){ //
-		    if(al.Length == rg2info[rg].maxReadLength)//probably reached the end of the read length
+		    if(al.Length == rg2info[rg].maxReadLength)//probably reached the end of the read length, we will keep maxlength-1 and under
+			
 			continue;		    
 		}else{
 		    //since we skipped the paired reads, if we have reached here
@@ -2200,8 +2221,8 @@ void *mainHeteroComputationThread(void * argc){
 
 	}
 
-	if(al.Length>=MINLENGTHFRAGMENT &&
-	   al.Length<=MAXLENGTHFRAGMENT ){	   
+	if(al.Length>=int(MINLENGTHFRAGMENT) &&
+	   al.Length<=int(MAXLENGTHFRAGMENT) ){	   
 	    pileup.AddAlignment(al);
 	}
     }
@@ -2399,10 +2420,11 @@ public:
 private:
     RefVector m_references;
     //Fasta * m_fastaReference;
-    unsigned int totalBases;
-    unsigned int totalSites;
     unsigned int m_leftCoord;
     unsigned int m_rightCoord;
+    unsigned int totalBases;
+    unsigned int totalSites;
+
     
 };//end coverageComputeVisitor
 
@@ -2982,113 +3004,6 @@ int main (int argc, char *argv[]) {
     // END read Illumina error profile //
     ///////////////////////////////////////    
 
-
-    cerr<<"Begin pre-computation ...";
-    ////////////////////////////////////////////////////////////////////////
-    //
-    // BEGIN DEAMINATION PROFILE
-    //
-    ////////////////////////////////////////////////////////////////////////
-    
-
-    initDeamProbabilities(deam5pfreqE,deam3pfreqE);
-    
-    // return 1;
-    ////////////////////////////////////////////////////////////////////////
-    //
-    // END  DEAMINATION PROFILE
-    //
-    ////////////////////////////////////////////////////////////////////////
-
-
-
-    // for(int q=0;q<=63;q++){
-    // 	long double mmp=0.000000000001;
-
-
-
-    // 	int al1Current=1;
-    // 	long double sum=0;
-    // 	cout<<"q="<<q<<"\t";
-    // 	for(int obs=0;obs<4;obs++){
-
-    // 	    long double t=computeBaseAl2Obs(al1Current  ,
-    // 					    obs         ,
-    // 					    q           ,
-    // 					    //&defaultSubMatch,
-    // 					    &(sub3p[0]) ,
-    // 					    false       ,
-    // 					    mmp         );
-    // 	    sum+=t;
-    // 	    cout<<obs<<"\t"<<t<<"\t";
-		
-
-    // 	    // int dinucIndex1toObs =     al1Current               *4+              obs;      
-    // 	    // //long double probSubDeam1toObs              = defaultSubMatch.s[dinucIndex1toObs];
-    // 	    // long double probSubDeam1toObs              = sub3p[0].s[dinucIndex1toObs];
-	    
-
-
-    // 	}
-    // 	cout<<"\t"<<sum<<endl;
-
-    // }
-
-
-
-
-    ////////////////////////////////////////////////////////////////////////
-    //
-    // BEGIN DNA BASE FREQUENCY
-    //
-    ////////////////////////////////////////////////////////////////////////
-
-    initDefaultBaseFreq(dnafreqFile);
-
-    
-    //return 1;
-    ////////////////////////////////////////////////////////////////////////
-    //
-    // END DNA BASE FREQUENCY
-    //
-    ////////////////////////////////////////////////////////////////////////
-
-
-
-
-    // alleleFrequency dnaDefaultBases;
-    // vector<alleleFrequency> defaultDNA5p;
-    // vector<alleleFrequency> defaultDNA3p;
-
-    // for(unsigned int i=0;i<sub5p.size();i++){
-    // 	//defaultDNA5p
-    // 	alleleFrequency toadd;
-    // 	for(int b=0;b<4;b++){
-	    
-    // 	}
-    // 	for(unsigned int i=0;i<sub5p.size();i++){
-    // 	}
-    // }
-    // vector<alleleFrequency> defaultDNA5p;
-    // vector<alleleFrequency> defaultDNA3p;
-
-
-
-    ////////////////////////////////////////////////////////////////////////
-    //
-    // BEGIN COMPUTE P[OBSERVED BASE|THEORITICAL BASE]
-    //
-    ////////////////////////////////////////////////////////////////////////
-
-    initLikelihoodScores();
-
-    ////////////////////////////////////////////////////////////////////////
-    //
-    // END COMPUTE P[OBSERVED BASE|THEORITICAL BASE]
-    //
-    ////////////////////////////////////////////////////////////////////////
-
-    cerr<<"..done"<<endl;
     //    return 1;
 
     cerr<<"Computing average coverage.."<<endl;
@@ -3196,6 +3111,10 @@ int main (int argc, char *argv[]) {
 	
 	for (map<string,rgInfo>::iterator it=rg2info.begin(); it!=rg2info.end(); ++it){
 	    string s = stringify(it->first)+"\t"+stringify(it->second.isPe)+"\t"+stringify(it->second.maxReadLength)+"\n";
+	    if(it->second.isPe)
+		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)it->second.maxReadLength );
+	    else
+		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(it->second.maxReadLength-1) );
 	    cerr<<"RG:\t" <<s<<endl;	
 	    stringinfo+=s;
 	}
@@ -3228,6 +3147,11 @@ int main (int argc, char *argv[]) {
 		rgInfo toadd;
 		toadd.isPe          =                 (tempv[1]=="1");
 		toadd.maxReadLength = destringify<int>(tempv[2]);
+		if(toadd.isPe)
+		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)toadd.maxReadLength );
+		else
+		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(toadd.maxReadLength -1) );
+
 		rg2info[ tempv[0] ] = toadd;
 		cerr<<"RG:\t" <<l<<endl;	
 	    }
@@ -3267,7 +3191,11 @@ int main (int argc, char *argv[]) {
 
 
     
+
     cerr<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<rateForPoissonCov<<endl;
+    // cerr<<MAXLENGTHFRAGMENT<<endl;
+    // return 1;
+
     // for(int i=0;i<20;i++){
     // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
     // }
@@ -3296,6 +3224,71 @@ int main (int argc, char *argv[]) {
 
 
 
+
+
+
+
+
+
+
+    cerr<<"Begin pre-computation ...";
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // BEGIN DEAMINATION PROFILE
+    //
+    ////////////////////////////////////////////////////////////////////////
+    
+
+    initDeamProbabilities(deam5pfreqE,deam3pfreqE);
+    
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // END  DEAMINATION PROFILE
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // BEGIN DNA BASE FREQUENCY
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+    initDefaultBaseFreq(dnafreqFile);
+
+    
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // END DNA BASE FREQUENCY
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // BEGIN COMPUTE P[OBSERVED BASE|THEORITICAL BASE]
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+    initLikelihoodScores();
+
+    ////////////////////////////////////////////////////////////////////////
+    //
+    // END COMPUTE P[OBSERVED BASE|THEORITICAL BASE]
+    //
+    ////////////////////////////////////////////////////////////////////////
+
+    cerr<<"..done"<<endl;
 
 
 
