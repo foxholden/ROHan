@@ -7,7 +7,7 @@
 
 //TODO
 
-// deamination overall, need to incorporate deam with length
+// ADD MAX OF FREQ not sum,  deamination overall, need to incorporate deam with length
 // add coverage correction
 // HMM
 // global estimate
@@ -49,7 +49,7 @@ using namespace BamTools;
 //#define DEBUGINITLIKELIHOODSCORES2 55
 
 #define DEBUGDEFAULTFREQ//print the default base frequency 
-//#define DEBUGDEAM //to print deamination scores
+#define DEBUGDEAM //to print deamination scores
 //#define DEBUGHCOMPUTE
 //#define DEBUGCOMPUTELLGENO
 //#define DEBUGCOMPUTELL
@@ -104,6 +104,11 @@ vector<probSubstition> sub3p;
 
 vector<diNucleotideProb> sub5pDiNuc;
 vector<diNucleotideProb> sub3pDiNuc;
+
+
+vector< vector<probSubstition> > subDeam;        //first dimension is fragment length, second is position
+vector <vector<diNucleotideProb> > subDeamDiNuc; //first dimension is fragment length, second is position
+
 
 probSubstition   defaultSubMatch;
 diNucleotideProb defaultSubMatchMatrix;
@@ -562,6 +567,77 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 #endif
 
 
+    for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){     //for each fragment length
+
+	//vector<alleleFrequency > defaultDNA;
+	vector<probSubstition> subDeam_;
+	vector<diNucleotideProb> subDeamDiNuc_;
+	for(unsigned int l=0;l<L;l++){     //position
+	    probSubstition    subDeam__;
+	    diNucleotideProb  subDeamDiNuc__;
+	    for(int b1=0;b1<4;b1++){
+		
+		for(int b2=0;b2<4;b2++){
+		    int b = b1*4+b2;		    	
+		    subDeam__.s[b]           = sub5p[l].s[b]         + sub3p[L-l-1].s[b]);
+		    subDeamDiNuc__.p[b1][b2] = sub5pDiB[l].p[b1][b2] + sub3pDiNuc[L-l-1].p[b1][b2]		    
+		}
+	    }
+	    subDeam_.push_back(      subDeam__ );
+	    subDeamDiNuc_.push_back( subDeamDiNuc__ );
+	}
+
+	subDeam.push_back(      subDeam_ );
+	subDeamDiNuc.push_back( subDeamDiNuc_ );       
+    }
+
+
+
+
+#ifdef DEBUGDEAM
+
+    for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){     //for each fragment length
+
+	cerr<<endl<<"L="<<L<<endl;
+	for(unsigned int l=0;l<L;l++){     //position
+
+	    cerr<<"l="<<l<<" - ";
+	    for(int nuc1=0;nuc1<4;nuc1++){
+		for(int nuc2=0;nuc2<4;nuc2++){
+		    int nuc = nuc1*4+nuc2;
+		    cerr<<subDeam[i].s[nuc]<<" ";
+		}
+		cerr<<" - ";
+	    }
+	    cerr<<endl;
+	}
+    }
+
+
+    for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){     //for each fragment length
+
+	cerr<<endl<<"L="<<L<<endl;
+	for(unsigned int l=0;l<L;l++){     //position
+
+	    cerr<<"l="<<l<<" - ";
+	    
+	    for(int nuc1=0;nuc1<4;nuc1++)
+		cerr<<"ACGT"[nuc1]<<"\t";
+	    cerr<<endl;
+	    for(int nuc1=0;nuc1<4;nuc1++){
+		cerr<<"ACGT"[nuc1]<<"\t";
+		for(int nuc2=0;nuc2<4;nuc2++){
+		    cerr<<sub5pDiNuc[i].p[nuc1][nuc2]<<"\t";
+		}
+		cerr<<endl;
+	    }
+	    cerr<<endl;
+	}
+    }
+
+
+
+#endif
 
 
     //if no deamination, cannot have a mismatch
@@ -674,7 +750,7 @@ void initDefaultBaseFreq_(const string & dnafreqFile){
 		
 		for(int b2=0;b2<4;b2++){ // original base base
 		    int b = b2*4+b1;
-		    dnaFreq_.f[b1] += dnaDefaultBases.f[b2]*(sub5p[l].s[b]+sub3p[L-l-1].s[b])/2.0;		    
+		    dnaFreq_.f[b1] += dnaDefaultBases.f[b2]*(MAX(sub5p[l].s[b],sub3p[L-l-1].s[b]));		    
 		}
 	    }
 	    defaultDNA.push_back(dnaFreq_);
