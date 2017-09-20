@@ -318,6 +318,7 @@ map<unsigned int, int>       threadID2Rank;
 // }
 
 
+
 //! A method to initialize various probability scores to avoid recomputation
 /*!
   This method is called by the main after capturing the arguments
@@ -394,8 +395,30 @@ void initScores(){
 }//END initScores()
 
 
+//! A method to combined 5' deam rates and 3' deam rates
+/*!
+  This method is called by the initDeamProbabilities.
+  It uses the "worse" deamination
+*/
+void combineDeamRates(long double f1[4],long double f2[4],long double f[4],int b){
+    
+    long double minFreq = MIN( f1[b] , f2[b] );
+    //cout<<b<<"\t"<<f1[b]<<"\t"<<f2[b]<<"\t"<<f[b]<<"\t"<<minFreq<<endl;
 
+    if(f1[b] == minFreq){//use f1
+	for(int i=0;i<4;i++)
+	    f[i] = f1[i];
 
+    }else{
+	if(f2[b] == minFreq){//use f2
+	    for(int i=0;i<4;i++)
+		f[i] = f2[i];
+	}else{    
+	    cerr<<"ERROR in combineDeamRates(), wrong state"<<endl;
+	    exit(1);
+	}
+    }
+}
 
 //! A method to initialize the deamination probabilities
 /*!
@@ -497,7 +520,8 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 
 
 #ifdef DEBUGDEAM
-    cerr<<"-- 5' deamination rates --"<<endl;
+
+    cerr<<endl<<"-- 5' deamination rates --"<<endl;
     for(unsigned int i=0;i<sub5p.size();i++){
     	cerr<<"i="<<i<<" - ";
     	for(int nuc1=0;nuc1<4;nuc1++){
@@ -566,6 +590,15 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 
 #endif
 
+    //dummy values
+    for(unsigned int L=0;L<MINLENGTHFRAGMENT;L++){     //for each fragment length
+	vector<probSubstition> subDeam_;
+	vector<diNucleotideProb> subDeamDiNuc_;
+
+	subDeam.push_back(      subDeam_      );
+	subDeamDiNuc.push_back( subDeamDiNuc_ );       
+    }
+
 
     for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){     //for each fragment length
 
@@ -575,19 +608,22 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 	for(unsigned int l=0;l<L;l++){     //position
 	    probSubstition    subDeam__;
 	    diNucleotideProb  subDeamDiNuc__;
-	    for(int b1=0;b1<4;b1++){
+
+	    for(int b1=0;b1<4;b1++){//original base
+		//pick the highest deam rates for that position
+		combineDeamRates(sub5pDiNuc[l].p[b1] ,  sub3pDiNuc[L-l-1].p[b1] , subDeamDiNuc__.p[b1], b1);
 		
-		for(int b2=0;b2<4;b2++){
-		    int b = b1*4+b2;		    	
-		    subDeam__.s[b]           = sub5p[l].s[b]         + sub3p[L-l-1].s[b]);
-		    subDeamDiNuc__.p[b1][b2] = sub5pDiB[l].p[b1][b2] + sub3pDiNuc[L-l-1].p[b1][b2]		    
+		for(int b2=0;b2<4;b2++){//post deam base
+		    int b = b1*4+b2;
+		    subDeam__.s[b]  = subDeamDiNuc__.p[b1][b2];
 		}
+
 	    }
-	    subDeam_.push_back(      subDeam__ );
+	    subDeam_.push_back(      subDeam__      );
 	    subDeamDiNuc_.push_back( subDeamDiNuc__ );
 	}
 
-	subDeam.push_back(      subDeam_ );
+	subDeam.push_back(      subDeam_      );
 	subDeamDiNuc.push_back( subDeamDiNuc_ );       
     }
 
@@ -595,6 +631,8 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 
 
 #ifdef DEBUGDEAM
+
+    cerr<<"-- per length deamination rates --"<<endl;
 
     for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){     //for each fragment length
 
@@ -605,13 +643,14 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 	    for(int nuc1=0;nuc1<4;nuc1++){
 		for(int nuc2=0;nuc2<4;nuc2++){
 		    int nuc = nuc1*4+nuc2;
-		    cerr<<subDeam[i].s[nuc]<<" ";
+		    cerr<<subDeam[L][l].s[nuc]<<" ";
 		}
 		cerr<<" - ";
 	    }
 	    cerr<<endl;
 	}
     }
+
 
 
     for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){     //for each fragment length
@@ -621,24 +660,22 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 
 	    cerr<<"l="<<l<<" - ";
 	    
-	    for(int nuc1=0;nuc1<4;nuc1++)
-		cerr<<"ACGT"[nuc1]<<"\t";
-	    cerr<<endl;
 	    for(int nuc1=0;nuc1<4;nuc1++){
 		cerr<<"ACGT"[nuc1]<<"\t";
 		for(int nuc2=0;nuc2<4;nuc2++){
-		    cerr<<sub5pDiNuc[i].p[nuc1][nuc2]<<"\t";
+		    cerr<<subDeamDiNuc[L][l].p[nuc1][nuc2]<<"\t";
 		}
 		cerr<<endl;
 	    }
 	    cerr<<endl;
 	}
     }
-
+    
 
 
 #endif
 
+    exit(1);
 
     //if no deamination, cannot have a mismatch
     for(int b1=0;b1<4;b1++){
