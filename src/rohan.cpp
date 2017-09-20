@@ -7,7 +7,8 @@
 
 //TODO
 
-// ADD MAX OF FREQ not sum,  deamination overall, need to incorporate deam with length
+// recompute ll with deam
+// add different base frequencies at different pos in the fragment
 // add coverage correction
 // HMM
 // global estimate
@@ -48,8 +49,8 @@ using namespace BamTools;
 // #define DEBUGINITLIKELIHOODSCORES
 //#define DEBUGINITLIKELIHOODSCORES2 55
 
-#define DEBUGDEFAULTFREQ//print the default base frequency 
-#define DEBUGDEAM //to print deamination scores
+//#define DEBUGDEFAULTFREQ//print the default base frequency 
+//#define DEBUGDEAM //to print deamination scores
 //#define DEBUGHCOMPUTE
 //#define DEBUGCOMPUTELLGENO
 //#define DEBUGCOMPUTELL
@@ -658,7 +659,7 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 	cerr<<endl<<"L="<<L<<endl;
 	for(unsigned int l=0;l<L;l++){     //position
 
-	    cerr<<"l="<<l<<" - ";
+	    cerr<<"l="<<l<<" - "<<endl;
 	    
 	    for(int nuc1=0;nuc1<4;nuc1++){
 		cerr<<"ACGT"[nuc1]<<"\t";
@@ -675,8 +676,8 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 
 #endif
 
-    exit(1);
-
+    //exit(1);
+    
     //if no deamination, cannot have a mismatch
     for(int b1=0;b1<4;b1++){
 	for(int b2=0;b2<4;b2++){
@@ -701,67 +702,67 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 
 
 
-//! A method to initialize the probability of seeing a base if a fragment is mismapped
-/*!
-  This method is called by the main after reading the deamination profiles
-  as deamination will bias this.
-*/
-void initDefaultBaseFreq(const string & dnafreqFile){
+// //! A method to initialize the probability of seeing a base if a fragment is mismapped
+// /*!
+//   This method is called by the main after reading the deamination profiles
+//   as deamination will bias this.
+// */
+// void initDefaultBaseFreq(const string & dnafreqFile){
 
-    readDNABaseFreq( dnafreqFile  ,  dnaDefaultBases );
+//     readDNABaseFreq( dnafreqFile  ,  dnaDefaultBases );
 
-    for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
-	//defaultDNA5p
-	alleleFrequency dnaFreq5p_;
-	alleleFrequency dnaFreq3p_;
+//     for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
+// 	//defaultDNA5p
+// 	alleleFrequency dnaFreq5p_;
+// 	alleleFrequency dnaFreq3p_;
 
-	for(int b=0;b<4;b++){//original base
-	    dnaFreq5p_.f[b]=0;
-	    dnaFreq3p_.f[b]=0;
-	}
+// 	for(int b=0;b<4;b++){//original base
+// 	    dnaFreq5p_.f[b]=0;
+// 	    dnaFreq3p_.f[b]=0;
+// 	}
 
-	for(int b1=0;b1<4;b1++){//    observed base
+// 	for(int b1=0;b1<4;b1++){//    observed base
 
-	    for(int b2=0;b2<4;b2++){ //original base base
-		int b = b2*4+b1;
-		//cerr<<"pos="<<i<<"\t"<<"ACGT"[b1]<<"\t"<<"ACGT"[b2]<<"\t"<<b<<"\t"<<dnaDefaultBases.f[b1]<<"\t"<<sub5p[i].s[b]<<"\t"<<sub3p[i].s[b]<<endl;
-		dnaFreq5p_.f[b1] += dnaDefaultBases.f[b2]*sub5p[i].s[b];
-		dnaFreq3p_.f[b1] += dnaDefaultBases.f[b2]*sub3p[i].s[b];
-		//cerr<<"\t"<<dnaFreq5p_.f[b1]<<"\t"<<dnaFreq3p_.f[b1]<<endl;
-	    }
-	}
+// 	    for(int b2=0;b2<4;b2++){ //original base base
+// 		int b = b2*4+b1;
+// 		//cerr<<"pos="<<i<<"\t"<<"ACGT"[b1]<<"\t"<<"ACGT"[b2]<<"\t"<<b<<"\t"<<dnaDefaultBases.f[b1]<<"\t"<<sub5p[i].s[b]<<"\t"<<sub3p[i].s[b]<<endl;
+// 		dnaFreq5p_.f[b1] += dnaDefaultBases.f[b2]*sub5p[i].s[b];
+// 		dnaFreq3p_.f[b1] += dnaDefaultBases.f[b2]*sub3p[i].s[b];
+// 		//cerr<<"\t"<<dnaFreq5p_.f[b1]<<"\t"<<dnaFreq3p_.f[b1]<<endl;
+// 	    }
+// 	}
 	
-	defaultDNA5p.push_back(dnaFreq5p_);
-	defaultDNA3p.push_back(dnaFreq3p_);	
-    }
+// 	defaultDNA5p.push_back(dnaFreq5p_);
+// 	defaultDNA3p.push_back(dnaFreq3p_);	
+//     }
 
-#ifdef DEBUGDEFAULTFREQ
+// #ifdef DEBUGDEFAULTFREQ
 
-    cerr<<"-- Default base frequencies --"<<endl;
-    cerr<<dnaDefaultBases.f[0]<<"\t"<<dnaDefaultBases.f[1]<<"\t"<<dnaDefaultBases.f[2]<<"\t"<<dnaDefaultBases.f[3]<<endl;
+//     cerr<<"-- Default base frequencies --"<<endl;
+//     cerr<<dnaDefaultBases.f[0]<<"\t"<<dnaDefaultBases.f[1]<<"\t"<<dnaDefaultBases.f[2]<<"\t"<<dnaDefaultBases.f[3]<<endl;
 
-    cerr<<"-- 5' base frequencies --"<<endl;
+//     cerr<<"-- 5' base frequencies --"<<endl;
     
-    for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
-    	cerr<<"i="<<i<<" - ";
-	cerr<<defaultDNA5p[i].f[0]<<"\t"<<defaultDNA5p[i].f[1]<<"\t"<<defaultDNA5p[i].f[2]<<"\t"<<defaultDNA5p[i].f[3]<<"\t"<<(defaultDNA5p[i].f[0]+defaultDNA5p[i].f[1]+defaultDNA5p[i].f[2]+defaultDNA5p[i].f[3])<<endl;
-    }
+//     for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
+//     	cerr<<"i="<<i<<" - ";
+// 	cerr<<defaultDNA5p[i].f[0]<<"\t"<<defaultDNA5p[i].f[1]<<"\t"<<defaultDNA5p[i].f[2]<<"\t"<<defaultDNA5p[i].f[3]<<"\t"<<(defaultDNA5p[i].f[0]+defaultDNA5p[i].f[1]+defaultDNA5p[i].f[2]+defaultDNA5p[i].f[3])<<endl;
+//     }
 
-    cerr<<"-- 3' base frequencies --"<<endl;
+//     cerr<<"-- 3' base frequencies --"<<endl;
 
-    for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
-    	cerr<<"i="<<i<<" - ";
-	cerr<<defaultDNA3p[i].f[0]<<"\t"<<defaultDNA3p[i].f[1]<<"\t"<<defaultDNA3p[i].f[2]<<"\t"<<defaultDNA3p[i].f[3]<<"\t"<<(defaultDNA3p[i].f[0]+defaultDNA3p[i].f[1]+defaultDNA3p[i].f[2]+defaultDNA3p[i].f[3])<<endl;
-    }
+//     for(unsigned int i=0;i<MAXLENGTHFRAGMENT;i++){     
+//     	cerr<<"i="<<i<<" - ";
+// 	cerr<<defaultDNA3p[i].f[0]<<"\t"<<defaultDNA3p[i].f[1]<<"\t"<<defaultDNA3p[i].f[2]<<"\t"<<defaultDNA3p[i].f[3]<<"\t"<<(defaultDNA3p[i].f[0]+defaultDNA3p[i].f[1]+defaultDNA3p[i].f[2]+defaultDNA3p[i].f[3])<<endl;
+//     }
 
     
-#endif
+// #endif
 
 
-}//end initDeamProbabilities
+// }//end initDeamProbabilities
 
 
-void initDefaultBaseFreq_(const string & dnafreqFile){
+void initDefaultBaseFreq(const string & dnafreqFile){
 
 
     readDNABaseFreq( dnafreqFile  ,  dnaDefaultBases );
@@ -783,18 +784,16 @@ void initDefaultBaseFreq_(const string & dnafreqFile){
 	    }
 	   
 
-	    for(int b1=0;b1<4;b1++){     // observed base
-		
+	    for(int b1=0;b1<4;b1++){     // observed base		
 		for(int b2=0;b2<4;b2++){ // original base base
 		    int b = b2*4+b1;
-		    dnaFreq_.f[b1] += dnaDefaultBases.f[b2]*(MAX(sub5p[l].s[b],sub3p[L-l-1].s[b]));		    
+		    dnaFreq_.f[b1] += dnaDefaultBases.f[b2]*subDeam[L][l].s[b];
 		}
 	    }
 	    defaultDNA.push_back(dnaFreq_);
 	}
     
 #ifdef DEBUGDEFAULTFREQ
-
 	cerr<<"-- Defautl base frequencies --"<<endl;
 	cerr<<dnaDefaultBases.f[0]<<"\t"<<dnaDefaultBases.f[1]<<"\t"<<dnaDefaultBases.f[2]<<"\t"<<dnaDefaultBases.f[3]<<endl;
     
@@ -811,8 +810,8 @@ void initDefaultBaseFreq_(const string & dnafreqFile){
     
 	defaultDNAFragmentLength.push_back(defaultDNA);
     }
-    //exit(1);
-}//end initDeamProbabilities
+    exit(1);
+}//end initDefaultBaseFreq 
 
 
 
@@ -1118,8 +1117,10 @@ void initLikelihoodScores_(){
 	length2pos2mpq2bsq2submatrix_.push_back(vectorToAdd);
     }
 
+    
     for(int L=int(MINLENGTHFRAGMENT);L<=int(MAXLENGTHFRAGMENT);L++){//for each fragment length
-	vector< mpq2bsq2submatrix  > vectorToAdd;
+	vector< mpq2bsq2submatrix  > pos2mpq2BaseQual2SubMatrix;
+
 	for(int l=0;l<L;l++){//for each pos
 	    mpq2bsq2submatrix  mpq2BaseQualSubMatrix;
 
@@ -1135,103 +1136,63 @@ void initLikelihoodScores_(){
 			    toAddForBaseQual_.p[bTheo][bObs]=0.0;			 
 			}
 		    }
-
+		    
+		    //marginalize over each potential base post deamination bpstDeam
+		    //This computes P[bObs | bTheo] in the absence of mismapping
+		    //P[bObs | bTheo]  =  sum_{bpstDeam = A,C,G,T} P[bpstDeam|bTheo] * P[bObs | bpstDeam] 		   
 		    for(int bTheo=0;bTheo<4;bTheo++){                   // each possible theoritical base
-			for(int bpstDeam=0;bpstDeam<4;bpstDeam++){	// each possible deaminated base		
-			    for(int bObs=0;bObs<4;bObs++){	        // each possible observed base
+			for(int bObs=0;bObs<4;bObs++){	                // each possible observed base
+			    for(int bpstDeam=0;bpstDeam<4;bpstDeam++){	// each possible deaminated base					    
 				toAddForBaseQual_.p[bTheo][bObs] +=       
-				    //prob of bTheo->bpstDeam
-				    sub5pDiNuc[   l  ].p[bTheo][bpstDeam] * 				
-				    sub3pDiNuc[ L-l-1].p[bTheo][bpstDeam] * 
-				    //prob of bpstDeam->bObs
-				    (likeMatchProb[q]    *   defaultSubMatchMatrix.p[bpstDeam][bObs]
-				     +
-				     likeMismatchProb[q] * illuminaErrorsProbMatrix.p[bpstDeam][bObs]
-				     );
+				    
+				    subDeamDiNuc[L][l].p[bTheo][bpstDeam] * //P[ bTheo->bpstDeam ]
 
-			    }//end each possible observed base
-			}//end each possible deaminated base		
+				    // P[ bObs|bpstDeam ] = 
+				    // P[ bObs|bpstDeam , !E ] * (1-e) + P[ bObs,bpstDeam , E ] * (e) + 
+				    (
+				     likeMatchProb[q]    *   defaultSubMatchMatrix.p[bpstDeam][bObs]  // P[ bpstDeam->bObs | !E ] * (1-e) 
+				     +
+				     likeMismatchProb[q] * illuminaErrorsProbMatrix.p[bpstDeam][bObs] // P[ bpstDeam->bObs |  E ] *   (e) 
+				     );
+			    }//end each possible deaminated base
+			}//end each possible observed base
 		    }//end each possible theoritical base
 		    
-		//     //
 
-		    		    		
-		for(int bTheo=0;bTheo<4;bTheo++){               // each possible theoretical base
-		    for(int bObs=0;bObs<4;bObs++){	        // each possible observed base
-			
-			//0.5 since this is the prior prob of having sampled a given chromosome
-			
-			toAddForBaseQual.p[bTheo][bObs] = logl(0.5 * (likeMatchProbMap[mq]*toAddForBaseQual_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNAFragmentLength[L][l].f[bObs]) );			
-			//toAddForBaseQual3p.p[bTheo][bObs] = logl(0.5 * (likeMatchProbMap[mq]*toAddForBaseQual3p_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNAFragmentLength[L][l].f[bObs]defaultDNA3p[l].f[bObs]) );
+
+		    //This computes P[bObs|bTheo] and includes the mapping quality
+		    
+		    for(int bTheo=0;bTheo<4;bTheo++){               // each possible theoretical base
+			for(int bObs=0;bObs<4;bObs++){	        // each possible observed base
+			    
+			    //0.5 since this is the prior prob of having sampled a given chromosome
+			    // m=correctly mapped
+			    // P[bObs|bTheo] =  P[bObs|bTheo,m]  P[m] + P[bObs|bTheo,!m]  P[!m] 
+			    toAddForBaseQual.p[bTheo][bObs] = logl(0.5 * 
+								   (likeMatchProbMap[mq]    * toAddForBaseQual_.p[bTheo][bObs] + 
+								    likeMismatchProbMap[mq] * defaultDNAFragmentLength[L][l].f[bObs])
+								   );  
+			    //toAddForBaseQual3p.p[bTheo][bObs] = logl(0.5 * (likeMatchProbMap[mq]*toAddForBaseQual3p_.p[bTheo][bObs] + likeMismatchProbMap[mq] * defaultDNAFragmentLength[L][l].f[bObs]defaultDNA3p[l].f[bObs]) );
 						
-		    }//for each bObs
-		}//for each bTheo, bpstDeam and bObs
-		
-
-		// cerr<<"ppos = "<<l<<" mq = "<<mq<<" ("<<likeMatchProbMap[mq]<<" "<<likeMismatchProbMap[mq]<<" )  q = "<<q<<endl;
-		// cerr<<"5'----------"<<endl;
-		// for(int nuc1=0;nuc1<4;nuc1++){
-		//     cerr<<"ACGT"[nuc1]<<"\t";		    
-		//     long double s=0;
-		//     for(int nuc2=0;nuc2<4;nuc2++){
-		// 	cerr<<toAddForBaseQual5p_.p[nuc1][nuc2]<<"\t";			
-		// 	s+=toAddForBaseQual5p_.p[nuc1][nuc2];
-		//     }
-		//     cerr<<"\t"<<s<<"\t";
-		//     s=0;
+			}//for each bObs
+		    }//for each bTheo, bpstDeam and bObs
 		    
-		//     for(int nuc2=0;nuc2<4;nuc2++){
-		// 	cerr<<defaultDNA5p[l].f[nuc2]<<"\t";			
-		// 	s+=defaultDNA5p[l].f[nuc2];
-		//     }
 
-		//     cerr<<"\t"<<s<<"\t";
-		//     s=0;
-		    
-		//     for(int nuc2=0;nuc2<4;nuc2++){
-		// 	cerr<<toAddForBaseQual5p.p[nuc1][nuc2]<<"\t";
-		// 	s+=toAddForBaseQual5p.p[nuc1][nuc2];
-		//     }
 
-		//     cerr<<"\t"<<s<<endl;
-		// }
-		// cerr<<endl;
-		// cerr<<"3'----------"<<endl;
-		// for(int nuc1=0;nuc1<4;nuc1++){
-		//     cerr<<"ACGT"[nuc1]<<"\t";
-		//     long double s=0;
-
-		//     for(int nuc2=0;nuc2<4;nuc2++){
-		// 	cerr<<toAddForBaseQual3p_.p[nuc1][nuc2]<<"\t";
-		// 	s+=toAddForBaseQual3p_.p[nuc1][nuc2];
-		//     }
-		//     cerr<<"\t"<<s<<"\t";
-		//     s=0;
+		    baseQual2SubMatrix.push_back(toAddForBaseQual);
+		    		
 		    
-		//     for(int nuc2=0;nuc2<4;nuc2++){
-		// 	cerr<<defaultDNA3p[l].f[nuc2]<<"\t";
-		// 	s+=defaultDNA3p[l].f[nuc2];			
-		//     }
-		//     cerr<<"\t"<<s<<"\t";
-		//     s=0;
-		    
-		//     for(int nuc2=0;nuc2<4;nuc2++){
-		// 	cerr<<toAddForBaseQual3p.p[nuc1][nuc2]<<"\t";
-		// 	s+=toAddForBaseQual3p.p[nuc1][nuc2];
-		//     }
-		//     cerr<<"\t"<<s<<endl;
-		// }
-		// cerr<<endl;
-
-		    
-		//}//for each base qual
-		
-		//
 		}//end for each base quality
+
+		mpq2BaseQualSubMatrix.push_back( baseQual2SubMatrix );
 		
 	    }//end for each mapping quality mq
-	    length2pos2mpq2bsq2submatrix_.push_back(vectorToAdd);
+	    
+	    pos2mpq2BaseQual2SubMatrix.push_back(mpq2BaseQualSubMatrix);
 	}//for each position l
+	
+	length2pos2mpq2bsq2submatrix_.push_back(pos2mpq2BaseQual2SubMatrix);	
+
     }//for each fragment length L
     
 
@@ -1486,83 +1447,90 @@ void initLikelihoodScores_(){
 
 
 
-//! A method to compute the prob. of seeing an observed base given an original allele
-/*!
-  This method is called by the computeLL to compute the prob. of seeing observed base ob 
-  with error rate q, a of deamination probDeam and original allele al. This method is called 
-  for each base.
-*/
-inline long double computeBaseAl2Obs(const int al,
-				     const int ob,
-				     const int q,
-				     const probSubstition * probDeam      , //rate of deamination
-				     const bool isRev,
-				     const long double mismappingProb){
-    int dinucal2al=-1;
+// //! A method to compute the prob. of seeing an observed base given an original allele
+// /*!
+//   This method is called by the computeLL to compute the prob. of seeing observed base ob 
+//   with error rate q, a of deamination probDeam and original allele al. This method is called 
+//   for each base.
+// */
+// inline long double computeBaseAl2Obs(const int al,
+// 				     const int ob,
+// 				     const int q,
+// 				     const probSubstition * probDeam      , //rate of deamination
+// 				     const bool isRev,
+// 				     const long double mismappingProb){
+//     int dinucal2al=-1;
 
-    if( isRev ){		    
-	dinucal2al =     complementInt(al)*4+complementInt(al);     //genotype is 1, observed is obsBase
-    }else{
-	dinucal2al =                   al*4+               al;       //genotype is 1, observed is obsBase
-    }
+//     if( isRev ){		    
+// 	dinucal2al =     complementInt(al)*4+complementInt(al);     //genotype is 1, observed is obsBase
+//     }else{
+// 	dinucal2al =                   al*4+               al;       //genotype is 1, observed is obsBase
+//     }
 
-    if(probDeam->s[dinucal2al] == 1.0){ //simple case, no deamination
-	int dinucIndexal2ob;
+//     if(probDeam->s[dinucal2al] == 1.0){ //simple case, no deamination
+// 	int dinucIndexal2ob;
 
 
-	if( isRev ){
-	    dinucIndexal2ob =     complementInt(al)*4+complementInt(ob);     //genotype is al, observed is ob
-	}else{
-	    dinucIndexal2ob =                   al *4+              ob;      //genotype is al, observed is ob
-	}
+// 	if( isRev ){
+// 	    dinucIndexal2ob =     complementInt(al)*4+complementInt(ob);     //genotype is al, observed is ob
+// 	}else{
+// 	    dinucIndexal2ob =                   al *4+              ob;      //genotype is al, observed is ob
+// 	}
                                                             
 	
-	return ( (1.0-mismappingProb)*(
-				       likeMatchProb[    q ]*defaultSubMatch.s[   dinucIndexal2ob]
-				       + 
-				       likeMismatchProb[ q ]*illuminaErrorsProb.s[dinucIndexal2ob] 
-				       )
-		 +
-		 mismappingProb*randomPMatch4Bases);
+// 	return ( (1.0-mismappingProb)*(
+// 				       likeMatchProb[    q ]*defaultSubMatch.s[   dinucIndexal2ob]
+// 				       + 
+// 				       likeMismatchProb[ q ]*illuminaErrorsProb.s[dinucIndexal2ob] 
+// 				       )
+// 		 +
+// 		 mismappingProb*randomPMatch4Bases);
 
-    }else{
+//     }else{
 	
-	long double sumProbToReturn = 0.0;
-	for(int alpostdeam=0;alpostdeam<4;alpostdeam++){
-	    int dinucal2ald = -1;
-	    if( isRev ){		    
-		dinucal2ald =     complementInt(al)*4+complementInt(alpostdeam);     //genotype is 1, observed is obsBase
-	    }else{
-		dinucal2ald =                   al*4+               alpostdeam;       //genotype is 1, observed is obsBase
-	    }
+// 	long double sumProbToReturn = 0.0;
+// 	for(int alpostdeam=0;alpostdeam<4;alpostdeam++){
+// 	    int dinucal2ald = -1;
+// 	    if( isRev ){		    
+// 		dinucal2ald =     complementInt(al)*4+complementInt(alpostdeam);     //genotype is 1, observed is obsBase
+// 	    }else{
+// 		dinucal2ald =                   al*4+               alpostdeam;       //genotype is 1, observed is obsBase
+// 	    }
 	    
 
-	    if(probDeam->s[dinucal2ald] > 0.0){ //has deamination       	
-		int dinucald2ob = -1;
-		if( isRev ){		    
-		    dinucald2ob =     complementInt(alpostdeam)*4+complementInt(ob);     //genotype is 1, observed is obsBase
-		}else{
-		    dinucald2ob =                   alpostdeam*4+               ob;       //genotype is 1, observed is obsBase
-		}
+// 	    if(probDeam->s[dinucal2ald] > 0.0){ //has deamination       	
+// 		int dinucald2ob = -1;
+// 		if( isRev ){		    
+// 		    dinucald2ob =     complementInt(alpostdeam)*4+complementInt(ob);     //genotype is 1, observed is obsBase
+// 		}else{
+// 		    dinucald2ob =                   alpostdeam*4+               ob;       //genotype is 1, observed is obsBase
+// 		}
 
-		sumProbToReturn += probDeam->s[dinucal2ald]*( (1.0-mismappingProb)*(
-										    likeMatchProb[    q ]*defaultSubMatch.s[   dinucald2ob]
-										    + 
-										    likeMismatchProb[ q ]*illuminaErrorsProb.s[dinucald2ob] 
-										    )
-							      +
-							      mismappingProb*randomPMatch4Bases);
-	    }
-	}
+// 		sumProbToReturn += probDeam->s[dinucal2ald]*( (1.0-mismappingProb)*(
+// 										    likeMatchProb[    q ]*defaultSubMatch.s[   dinucald2ob]
+// 										    + 
+// 										    likeMismatchProb[ q ]*illuminaErrorsProb.s[dinucald2ob] 
+// 										    )
+// 							      +
+// 							      mismappingProb*randomPMatch4Bases);
+// 	    }
+// 	}
 
-	return sumProbToReturn;
-    }
+// 	return sumProbToReturn;
+//     }
 
-    return -1;
-}//end computeBaseAl2Obs
+//     return -1;
+// }//end computeBaseAl2Obs
 
 
 
+//! A method to compute the prior prob.  for each genotype
+/*!
+   This method is called by the computeLL to compute the prior prob. for each genotype
+   
+   \param h : The heterozygosity rate
+
+*/
 
 inline void computePriorMatrix(long double h,
 			       diNucleotideProb * priorGenotype,
@@ -3813,7 +3781,7 @@ int main (int argc, char *argv[]) {
     //
     ////////////////////////////////////////////////////////////////////////
 
-    initDefaultBaseFreq_(dnafreqFile);
+    //initDefaultBaseFreq_(dnafreqFile);
     initDefaultBaseFreq(dnafreqFile);
     
     ////////////////////////////////////////////////////////////////////////
