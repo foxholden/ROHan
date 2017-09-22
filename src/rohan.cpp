@@ -7,8 +7,7 @@
 
 //TODO
 
-// recompute ll with deam
-// add different base frequencies at different pos in the fragment
+// test ll with deam
 // add coverage correction
 // HMM
 // global estimate
@@ -3596,6 +3595,20 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
+    //////////////////////////////////
+    //                              //
+    // BEGIN h global               //
+    //                              //
+    //////////////////////////////////
+
+
+    //////////////////////////////////
+    //                              //
+    //  END h global                //
+    //                              //
+    //////////////////////////////////
+
+    
     delete(cov2probPoisson);
     
     return 0;
