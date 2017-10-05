@@ -7,7 +7,7 @@
 
 //TODO
 
-// test ll with deam
+
 // add coverage correction
 // HMM
 // global estimate
@@ -41,7 +41,7 @@ using namespace BamTools;
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
 //#define PRECOMPUTELOG
-//#define DEBUGCOV
+#define DEBUGCOV
 //#define DEBUGILLUMINAFREQ
 //#define DEBUGINITSCORES
 
@@ -1712,10 +1712,15 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 
 	    //product for each genomic position
                                                         
-	    loglikelihoodForEveryPositionForEveryBaBd   += loglikelihoodForEveryBaBd;   // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-	    loglikelihoodForEveryPositionForEveryBaBdD1 += loglikelihoodForEveryBaBdD1; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-	    loglikelihoodForEveryPositionForEveryBaBdD2 += loglikelihoodForEveryBaBdD2; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-	
+	    // loglikelihoodForEveryPositionForEveryBaBd   += loglikelihoodForEveryBaBd;   // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+	    // loglikelihoodForEveryPositionForEveryBaBdD1 += loglikelihoodForEveryBaBdD1; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+	    // loglikelihoodForEveryPositionForEveryBaBdD2 += loglikelihoodForEveryBaBdD2; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+
+	    // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+	    loglikelihoodForEveryPositionForEveryBaBd   += cov2probPoisson->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBd;   
+	    loglikelihoodForEveryPositionForEveryBaBdD1 += cov2probPoisson->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD1; 
+	    loglikelihoodForEveryPositionForEveryBaBdD2 += cov2probPoisson->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD2; 
+
 	}//END for each genomic position
 
         errb = 1.96/sqrt(-1.0*loglikelihoodForEveryPositionForEveryBaBdD2);
@@ -3251,7 +3256,7 @@ int main (int argc, char *argv[]) {
 
     cerr<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<rateForPoissonCov<<endl;
     // cerr<<MAXLENGTHFRAGMENT<<endl;
-    // return 1;
+    //return 1;
 
     // for(int i=0;i<20;i++){
     // 	cout<<i<<"\t"<<pdfPoisson( (long double)i, rateForPoissonCov)/pdfPoisson( rateForPoissonCov, rateForPoissonCov)<<endl;
