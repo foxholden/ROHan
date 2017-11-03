@@ -16,7 +16,13 @@
 
 #include "utils.h"
 
+#define DEBUGCOV
 using namespace std;
+
+static vector<long double> lnFactVec;
+
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
 
 
 typedef struct { 
@@ -204,11 +210,64 @@ typedef struct {
     int cov;
 } singlePosInfo;
 
+
+
 void readNucSubstitionRatesFreq(const string filename,     vector<substitutionRates> & subVec);
 void readNucSubstitionFreq(     const string filename,     vector<probSubstition>    & subVec);
 void readDNABaseFreq(const string filename, alleleFrequency & dnaDefaultFreq);
 
 void readIlluminaError(const string errFile,probSubstition & illuminaErrorsProb);
+
+
+inline long double lnfact (unsigned int n){
+    long double toreturn=0.0;
+    for(unsigned int i=1;i<=n;i++){
+	toreturn +=  logl( (long double)i );
+    }
+    return toreturn;
+}
+
+inline void initMiscFuncVariables(){
+    for(double i=0;i<50;i++){
+    	lnFactVec.push_back(lnfact(i) );
+     }    
+}
+
+//taken from gsl/randist/multinomial.c
+inline long double gsl_ran_multinomial_lnpdf (const size_t K, const long double p[], const unsigned int n[]){
+  size_t k;
+  unsigned int N      =   0;
+  long double log_pdf = 0.0;
+  long double norm    = 0.0;
+
+  for (k = 0; k < K; k++){
+      N += n[k];
+  }
+  
+  for (k = 0; k < K; k++){
+      norm += p[k];
+  }
+  
+  log_pdf = lnfact (N);
+
+  for (k = 0; k < K; k++){
+      log_pdf -= lnfact (n[k]);
+  }
+
+  for (k = 0; k < K; k++){
+      log_pdf += logl (p[k] / norm) * n[k];
+  }
+
+  return log_pdf;
+}
+
+inline long double gsl_ran_multinomial_pdf (const size_t K,const long double p[], const unsigned int n[]){
+    return expl (gsl_ran_multinomial_lnpdf (K, p, n));
+}
+
+
+void populatedCoverateVector(      vector<long double> * cov2ProbSite, long double rateForPoissonCov, int maxcov);
+void populatedCoverateVectorSingle(vector<long double> * cov2ProbSite, long double rateForPoissonCov, int maxcov);
 /* void readMTConsensus(const string consensusFile,map<int, PHREDgeno> & pos2phredgeno,int & sizeGenome,vector<int> & posOfIndels); */
 /* void readMTAlleleFreq(const string freqFile,	map<int, alleleFrequency> & pos2allelefreq); */
 

@@ -31,17 +31,26 @@
 
 #include "GenomicWindows.h"
 
+#define MAXCOV             50     // maximal coverage
+
 #include "miscfunc.h"
 #include "utils.h"
 
 using namespace std;
 using namespace BamTools;
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
+//#define MIN(a,b) (((a)<(b))?(a):(b))
+//#define MAX(a,b) (((a)>(b))?(a):(b))
+
+#define CORRECTCOV
+//#define ONLYUSECOV 12
+// #define ONLYUSECOVMIN 5
+// #define ONLYUSECOVMAX 49
+
 
 //#define PRECOMPUTELOG
 #define DEBUGCOV
+
 //#define DEBUGILLUMINAFREQ
 //#define DEBUGINITSCORES
 
@@ -72,7 +81,7 @@ using namespace BamTools;
 
 //#define MAXMAPPINGBASEQUAL    64      // maximal base quality score, should be sufficient as mapping qualities are encoded using 8 bits
 
-#define MAXCOV             50     // maximal coverage
+
 
 
 unsigned int MINLENGTHFRAGMENT  =    35;      // minimal length for fragment
@@ -186,7 +195,7 @@ vector< vector< mpq2bsq2submatrix  > >  length2pos2mpq2bsq2submatrix;
 
 
 
-vector<long double> * cov2probPoisson;
+vector<long double> * cov2ProbSite;
 
 long double contrate=0.0;
 long double rateForPoissonCov;
@@ -325,6 +334,8 @@ map<unsigned int, int>       threadID2Rank;
   This method is called by the main after capturing the arguments
 */
 void initScores(){
+    initMiscFuncVariables();
+
     totalBasesSum=0;
     totalSitesSum=0;
 
@@ -1717,9 +1728,42 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    // loglikelihoodForEveryPositionForEveryBaBdD2 += loglikelihoodForEveryBaBdD2; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
 
 	    // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-	    loglikelihoodForEveryPositionForEveryBaBd   += cov2probPoisson->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBd;   
-	    loglikelihoodForEveryPositionForEveryBaBdD1 += cov2probPoisson->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD1; 
-	    loglikelihoodForEveryPositionForEveryBaBdD2 += cov2probPoisson->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD2; 
+#if defined(ONLYUSECOV) || defined(ONLYUSECOVMIN) || defined(ONLYUSECOVMAX)
+	    //cout<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+
+	    if(piForGenomicWindow->at(p).readsVec.size() < ONLYUSECOVMIN){
+	     	continue;
+	    }
+
+	    if(piForGenomicWindow->at(p).readsVec.size() > ONLYUSECOVMAX){
+	     	continue;
+	    }
+
+#endif
+	    loglikelihoodForEveryPositionForEveryBaBd   +=
+#ifdef CORRECTCOV
+		cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+#endif
+		loglikelihoodForEveryBaBd;
+// #ifdef DEBUGCOV
+
+// 	    cerr<<loglikelihoodForEveryPositionForEveryBaBd<<" "<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() )<<" "<<loglikelihoodForEveryBaBd<<" l="<<piForGenomicWindow->at(p).readsVec.size()<<"#"<<endl;
+// 	    if( isnan( cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) ) ){
+// 		cerr<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+// 		exit(1);
+// 	    }
+// #endif
+	    
+	    loglikelihoodForEveryPositionForEveryBaBdD1 +=
+#ifdef CORRECTCOV
+		cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+#endif
+		loglikelihoodForEveryBaBdD1; 
+	    loglikelihoodForEveryPositionForEveryBaBdD2 +=
+#ifdef CORRECTCOV
+		cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+#endif
+		loglikelihoodForEveryBaBdD2; 
 
 	}//END for each genomic position
 
@@ -2764,8 +2808,8 @@ int main (int argc, char *argv[]) {
     string sampleName        = "sample";
     bool   useVCFoutput      = false;
 
-    double lambdaCov=0;
-    bool   lambdaCovSpecified=false;
+    // double lambdaCov=0;
+    // bool   lambdaCovSpecified=false;
 
     TStoTVratio=2.1;
     // string genoFileAsInput    ="";
@@ -3198,7 +3242,7 @@ int main (int argc, char *argv[]) {
 	    string l;
 	    getline (infoFilePreComputed,l);
 	    rateForPoissonCov = destringify<long double>(l);
-	    cerr<<"lambda coverrage="<<rateForPoissonCov<<endl;
+	    cerr<<"lambda coverage="<<rateForPoissonCov<<endl;
 	    while ( getline (infoFilePreComputed,l)){		
 		vector<string> tempv = allTokens(l,'\t');		
 		if(tempv.size() != 3){
@@ -3227,31 +3271,34 @@ int main (int argc, char *argv[]) {
     }
     //    return 1;
     
-    long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
-    long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
+//     long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
+//     long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
+
     
-#ifdef DEBUGCOV
-    cerr<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
-    cerr<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
+// #ifdef DEBUGCOV
+//     cerr<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
+//     cerr<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
+// #endif
+
+    cov2ProbSite = new vector<long double> (MAXCOV+1,0);
+#ifdef CORRECTCOV
+    populatedCoverateVector(cov2ProbSite , rateForPoissonCov, MAXCOV);
 #endif
 
-    cov2probPoisson = new vector<long double> (MAXCOV+1,0);
 
     for(int i=0;i<=MAXCOV;i++){
-	long double florPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovFloor)/poisson_pmfl( rateForPoissonCovFloor, rateForPoissonCovFloor);
-	long double ceilPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovCeil) /poisson_pmfl( rateForPoissonCovCeil,  rateForPoissonCovCeil);
-		
-	cov2probPoisson->at(i) = (1.0-(rateForPoissonCov-rateForPoissonCovFloor))*florPPMF  + (1.0-(rateForPoissonCovCeil-rateForPoissonCov))*ceilPPMF;
+	// long double florPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovFloor)/poisson_pmfl( rateForPoissonCovFloor, rateForPoissonCovFloor);
+	// long double ceilPPMF=poisson_pmfl( (long double)(i), rateForPoissonCovCeil) /poisson_pmfl( rateForPoissonCovCeil,  rateForPoissonCovCeil);
 
 #ifdef DEBUGCOV
-	cerr<<"florPPMF "<<i<<" = "<<poisson_pmfl( (long double)(i), rateForPoissonCovFloor)<<"/"<<poisson_pmfl( rateForPoissonCovFloor, rateForPoissonCovFloor)<<" "<<florPPMF<<" w= "<<(1.0-(rateForPoissonCov-rateForPoissonCovFloor))<<endl;
-	cerr<<"ceilPPMF "<<i<<" = "<<poisson_pmfl( (long double)(i), rateForPoissonCovCeil) <<"/"<<poisson_pmfl( rateForPoissonCovCeil,  rateForPoissonCovCeil)<<" "<<ceilPPMF<<" w= "<<(1.0-(rateForPoissonCovCeil-rateForPoissonCov))<<endl;
-	cerr<<"cov2probPoisson["<<i<<"] = "<<cov2probPoisson->at(i)<<endl;
+	// cerr<<"florPPMF "<<i<<" = "<<poisson_pmfl( (long double)(i), rateForPoissonCovFloor)<<"/"<<poisson_pmfl( rateForPoissonCovFloor, rateForPoissonCovFloor)<<" "<<florPPMF<<" w= "<<(1.0-(rateForPoissonCov-rateForPoissonCovFloor))<<endl;
+	// cerr<<"ceilPPMF "<<i<<" = "<<poisson_pmfl( (long double)(i), rateForPoissonCovCeil) <<"/"<<poisson_pmfl( rateForPoissonCovCeil,  rateForPoissonCovCeil)<<" "<<ceilPPMF<<" w= "<<(1.0-(rateForPoissonCovCeil-rateForPoissonCov))<<endl;
+	cerr<<"cov2ProbSite["<<i<<"] = "<<cov2ProbSite->at(i)<<endl;
 #endif
 
     }
 
-
+    //return 1;
     
 
     cerr<<"Results\tbp="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda="<<rateForPoissonCov<<endl;
@@ -3614,7 +3661,7 @@ int main (int argc, char *argv[]) {
     //////////////////////////////////
 
     
-    delete(cov2probPoisson);
+    delete(cov2ProbSite);
     
     return 0;
 }
