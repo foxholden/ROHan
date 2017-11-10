@@ -291,8 +291,13 @@ void populatedCoverateVector(vector<long double> * cov2ProbSite, long double rat
 	
 	long double florPPMF = cov2ProbSiteFloor[cov-1];
 	long double ceilPPMF = cov2ProbSiteCeil[cov-1];
+	if(rateForPoissonCov<=1){
+	    rateForPoissonCovFloor = 0.0;
+	    rateForPoissonCovCeil  = 1.0;
+	    rateForPoissonCov      = 1.0;
+	}
 #ifdef DEBUGCOV
-	cerr<<cov<<"\t"<<(1.0-(rateForPoissonCov-rateForPoissonCovFloor))<<"\t"<<florPPMF<<"\t"<<(1.0-(rateForPoissonCovCeil-rateForPoissonCov))<<"\t"<<ceilPPMF<<"\t"<<(	    (1.0-(rateForPoissonCov-rateForPoissonCovFloor))*florPPMF
+	cerr<<cov<<"\t"<<rateForPoissonCov<<"\t"<<(1.0-(rateForPoissonCov-rateForPoissonCovFloor))<<"\t"<<florPPMF<<"\t"<<(1.0-(rateForPoissonCovCeil-rateForPoissonCov))<<"\t"<<ceilPPMF<<"\t"<<(	    (1.0-(rateForPoissonCov-rateForPoissonCovFloor))*florPPMF
 	    +
 	    (1.0-(rateForPoissonCovCeil-rateForPoissonCov))*ceilPPMF
 	)<<endl;
@@ -305,18 +310,30 @@ void populatedCoverateVector(vector<long double> * cov2ProbSite, long double rat
 	    );
 
     }
+
     cerr<<"..done"<<endl;
 }
 
 void populatedCoverateVectorSingle(vector<long double> * cov2ProbSite, long double lambda,int maxcov){
 
-
+    //string filein  = string("../preComputated/covNov9thWithfForSmallCov/correctionCov_"+stringify(lambda)+".bin");
+    //string filein  = string("../preComputated/poisson/correctionCov_"+stringify(lambda)+".bin");
     string filein  = string("../preComputated/flat/correctionCov_"+stringify(lambda)+".bin");
+
 #ifdef DEBUGCOV
     cerr<<"file in "<<filein<<endl;
 #endif
+    if(!isFile(filein)){
+	cerr<<"ERROR: Cannot find file "<<filein<<"  containing pre-computed coverage weights"<<endl;
+	exit(1);
+    }
+    
     ifstream in(filein.c_str(), ios::in | ios::binary);
-
+    if(!in.good()){
+	cerr<<"ERROR: Opening file "<<filein<<" failed containing pre-computed coverage weights"<<endl;
+	exit(1);
+    }
+    
     for(int cov=1;cov<=maxcov;cov++){
         long double fnum;
         in.read((char *) &fnum, sizeof(fnum) );

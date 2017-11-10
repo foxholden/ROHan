@@ -42,6 +42,7 @@ using namespace BamTools;
 //#define MIN(a,b) (((a)<(b))?(a):(b))
 //#define MAX(a,b) (((a)>(b))?(a):(b))
 
+#define DEBUGFIRSTWINDOWS 3
 #define CORRECTCOV
 //#define ONLYUSECOV 12
 // #define ONLYUSECOVMIN 5
@@ -3100,8 +3101,6 @@ int main (int argc, char *argv[]) {
     }
     cerr<<endl;
     
-
-
     return 1;
 #endif
 
@@ -3133,6 +3132,11 @@ int main (int argc, char *argv[]) {
     //unsigned int sizeGenome = 0;
 
     for(unsigned int i=0;i<v.size();i++){
+#ifdef DEBUGFIRSTWINDOWS
+	if(i==DEBUGFIRSTWINDOWS)
+	    break;
+#endif
+
 	//cout<<"genomic region #"<<i<<" "<<v[i]<<endl;
 	DataChunk * currentChunk = new DataChunk();
 	
@@ -3140,7 +3144,8 @@ int main (int argc, char *argv[]) {
 	currentChunk->rank       = rank;
 	lastRank                 = rank;
 	//sizeGenome             += v[i].getLength();
- 
+
+	
 	queueDataToprocess.push(currentChunk);
 	rank++;
     }
@@ -3451,7 +3456,6 @@ int main (int argc, char *argv[]) {
     //writing h estimates
 
 
-    Internal::BgzfStream  bgzipWriterGL;
     Internal::BgzfStream  bgzipWriterHest;
 
     bgzipWriterHest.Open(outFilePrefix+".hEst.gz", IBamIODevice::WriteOnly);
@@ -3460,15 +3464,23 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
 
+
+    
+    
     string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\thLow\thHigh\n";		       
     bgzipWriterHest.Write(headerHest.c_str(), headerHest.size());
     
+
+#ifndef DEBUGFIRSTWINDOWS
+
+    Internal::BgzfStream  bgzipWriterGL;
 
     bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
     if(!bgzipWriterGL.IsOpen()){
 	cerr<<"Cannot open file "<<(outFilePrefix+".vcf.gz")<<" in bgzip writer"<<endl;
 	return 1;
     }
+    
     
     // if(outFileSiteLLFlag){
     // 	bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
@@ -3529,7 +3541,9 @@ int main (int argc, char *argv[]) {
 
    bgzipWriterGL.Write(headerVCFFile.c_str(),headerVCFFile.size());
     // }
+#endif
 
+   
     //#ifdef LATER
     bool wroteEverything=false;
     int lastWrittenChunk=-1;   
@@ -3571,7 +3585,9 @@ int main (int argc, char *argv[]) {
 
 		//#ifdef LATER
 		//sizeGenome+=dataToWrite->vecPositionResults->size();
-		    
+
+#ifndef DEBUGFIRSTWINDOWS
+
 		strToWrite="";
 		// cerr<<"SIZE "<<dataToWrite->vecPositionResults->size()<<endl;
 		for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
@@ -3598,6 +3614,7 @@ int main (int argc, char *argv[]) {
 		    // }
 		}
 		//#endif		    
+#endif
 		
 		wroteData=true;		
 		lastWrittenChunk=dataToWrite->rank;
@@ -3631,7 +3648,11 @@ int main (int argc, char *argv[]) {
     //end Writing data out/
     ///////////////////////
     bgzipWriterHest.Close();
-    
+#ifndef DEBUGFIRSTWINDOWS
+
+    bgzipWriterGL.Close();
+
+#endif
 
 
     //////////////////////////////////

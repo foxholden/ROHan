@@ -28,7 +28,7 @@ pair<char,char> PositionResult::hetIndex2Bases() const{
 	return make_pair<char,char>('C','T');
     if(mostLikelyGenoHetIdx==8)
 	return make_pair<char,char>('G','T');
-    cerr<<"PositionResult: wrong state"<<endl;
+    cerr<<"PositionResult: wrong state hetIndex2Bases() "<<mostLikelyGenoHetIdx<<endl;
     exit(1);
     
 }
@@ -58,7 +58,7 @@ int PositionResult::bases2hetIndex(char c1, char c2) const{
     if(c1=='G' && c2=='T')
 	return 8;
 
-    cerr<<"PositionResult: wrong state"<<endl;
+    cerr<<"PositionResult: wrong state bases2hetIndex()"<<c1<<" "<<c2<<endl;
     exit(1);
     
 }
@@ -73,7 +73,7 @@ char PositionResult::homoIndex2Base() const{
 	return 'G';
     if(mostLikelyGenoIdx==9)
 	return 'T';
-    cerr<<"PositionResult: wrong state"<<endl;
+    cerr<<"PositionResult: wrong state homoIndex2Base()"<<mostLikelyGenoIdx<<endl;
     exit(1);
     
 }
@@ -89,7 +89,7 @@ int PositionResult::base2HomoIndex(const char b) const{
     if(	b == 'T')
 	return 9;
 
-    cerr<<"PositionResult: wrong state"<<endl;
+    cerr<<"PositionResult: wrong state base2HomoIndex() b="<<b<<"#"<<endl;
     exit(1);    
 }
 
