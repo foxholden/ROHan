@@ -30,6 +30,7 @@
 // #include "api/BamAux.h"
 
 #include "GenomicWindows.h"
+#include "Hmm.h"
 
 #define MAXCOV             50     // maximal coverage
 
@@ -2776,6 +2777,13 @@ int main (int argc, char *argv[]) {
     setlocale(LC_ALL, "POSIX");
 
 
+    Hmm hmm;
+    vector<emission>  eTest = hmm.generateStates(250,sizeChunk);
+    for(unsigned int i=0;i<eTest.size();i++){
+	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<endl;
+    }
+    return 1;
+    
 
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
