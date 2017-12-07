@@ -9,6 +9,7 @@
 #define HmmState_h
 #include <iostream>
 #include <ctime>//for time cmd
+#include <math.h>
 
 #include <gsl/gsl_randist.h>
 
@@ -16,7 +17,10 @@ using namespace std;
 
 class HmmState{
 private:
-    long double p;
+    long double h;
+    long double theta;
+    long double rateGeom;
+
     HmmState * second;
     gsl_rng * rng;
     int idx;
@@ -33,9 +37,10 @@ public:
 	
     /* } */
 
-    double probEmission(unsigned int mutations,unsigned int total);
-    unsigned int randomEmission(int total);
-    void setSecond(HmmState * second);
+    double probEmission(unsigned int mutations,unsigned int total) const;
+    unsigned int randomEmission(int total) const;
     int getIdx() const;
+
+    void setSecond(HmmState * second);
 };
 #endif

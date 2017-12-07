@@ -9,6 +9,7 @@
 
 
 Hmm::Hmm(){
+    //cerr<<"Hmm constr"<<endl;
     for(int n=0;n<NBRSTATES;n++){
 	if(n==0)
 	    hmmstates[n] = new  HmmState (n,0.000000012);
@@ -22,12 +23,25 @@ Hmm::Hmm(){
 	if(n==1)
 	    hmmstates[n]->setSecond(hmmstates[n-1]);
     }
+    // for(int m=0;m<1000;m++)
+    // 	cout<<m<<"\tp="<<hmmstates[1]->probEmission(m,1000000)<<endl;
     double pTrans = 0.1;
+    trans = new double*[NBRSTATES];
+    
+    for(int i = 0; i < NBRSTATES; ++i)
+	trans[i] = new double[NBRSTATES];
+    
     for(int n=0;n<NBRSTATES;n++){
 	probTrans[n] =   pTrans;
 	probStay[n]  = 1-pTrans;
+
+	trans[n][0]  =   pTrans;
+	trans[n][1]  = 1-pTrans;	
     }
     
+    for(int n=0;n<NBRSTATES;n++){
+	startingState[n] = 1/double(NBRSTATES);
+    }
     // HmmState roh    (0.0007);
     // HmmState normal (0.000000012);
     // roh.setSecond(&normal);
@@ -56,14 +70,14 @@ Hmm::~Hmm(){
 }
 
 
-vector<emission> Hmm::generateStates(unsigned int N,unsigned int total){
+vector<emission> Hmm::generateStates(unsigned int N,unsigned int total) const{
     vector<emission> vecToReturn;
     //int initState = randomInt(0,NBRSTATES-1);
     int initState = 1;
     HmmState * currrentState = hmmstates[ initState ];
     
     for(unsigned int i=0;i<N;i++){
-	//cout<<i<<endl;
+	//cerr<<"generateStates "<<i<<endl;
 	unsigned int d_ = currrentState->randomEmission(total);
 	emission eToAdd;
 	eToAdd.p     = double(d_)/double(total);
@@ -73,7 +87,7 @@ vector<emission> Hmm::generateStates(unsigned int N,unsigned int total){
 	double pt = randomProb();
 	//cout<<"state#"<<currrentState->getIdx()<<"\t"<<d<<"\t"<<pt<<"\t"<<probTrans[currrentState->getIdx()]<<endl;	
 
-	if(0)
+	//if(0)
 	if(pt < probTrans[currrentState->getIdx()]){//transit
 	    if(currrentState->getIdx() == 0)
 		currrentState = hmmstates[1];
@@ -87,3 +101,11 @@ vector<emission> Hmm::generateStates(unsigned int N,unsigned int total){
     return vecToReturn;
 }
 
+int  Hmm::getNumberStates() const{
+    return NBRSTATES;
+}
+
+
+double Hmm::getTrans(int i,int j) const{
+    return trans[i][j];
+}

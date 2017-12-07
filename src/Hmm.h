@@ -26,17 +26,23 @@ typedef struct {
 
 class Hmm{
 private:
+    double **trans;
+
+public:
+
+    long double startingState[NBRSTATES];
     long double probTrans[NBRSTATES];
     long double probStay[NBRSTATES];
     HmmState * hmmstates[NBRSTATES];
 	
-public:
     Hmm();
     Hmm(const Hmm & other);
     ~Hmm();
     Hmm & operator= (const Hmm & other);
 
-    vector<emission> generateStates(unsigned int N,unsigned int total);
-
+    vector<emission> generateStates(unsigned int N,unsigned int total) const;
+    int getNumberStates() const;
+    double getTrans(int i,int j) const;
+    
 };
 #endif

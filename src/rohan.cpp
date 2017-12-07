@@ -2759,10 +2759,141 @@ void *mainCoverageComputationThread(void * argc){
 
 
 
+double logRobust(double p_){
+    double p = p_;
+    if(p == 0){
+	p=numeric_limits<double>::epsilon();
+    }
+
+    return log(p);
+}
 
 
+//taken from https://gist.github.com/Feder1co5oave/2347228
 
+int* viterbi(Hmm * hmm, const vector<double> & observed){//, const int n) {
+    int n = int(observed.size());
 
+    //assert(n > 0); assert(observed != NULL);
+    int *seq = new int[n];
+    for (int i = 0; i < n; i++) seq[i] = 0;
+    double **prob = new double*[n];
+    int **prevs = new int*[n];
+
+    for (int i = 0; i < n; i++) {
+	prob[i] = new double[hmm->getNumberStates()];
+	prevs[i] = new int[hmm->getNumberStates()];
+	for (int j = 0; j < hmm->getNumberStates(); j++) { //unnecessary
+	    prob[i][j] = 0;
+	    prevs[i][j] = 0;
+	}
+    }
+	
+    for (int i = 0; i < hmm->getNumberStates(); i++) {
+	//prob[0][i] = hmm->startingState[i] * hmm->hmmstates[i]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk);
+	// double pss = hmm->startingState[i];
+	// if(pss==0){
+	//     pss=numeric_limits<double>::epsilon();
+	// }
+	// double pe = hmm->hmmstates[i]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk);
+	// if(pe==0){
+	//     pe=numeric_limits<double>::epsilon();
+	// }
+	
+	//prob[0][i] = log( pss ) + log(pe);
+	prob[0][i] = logRobust(hmm->startingState[i]) + logRobust( hmm->hmmstates[i]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) );
+	cout<<"prob0 "<<observed[0]<<" "<<i<<" "<<prob[0][i]<<" "<<endl;
+	//hmm->B[i][ observed[0] ];
+	//prob[0][i] = hmm->PI[i] * hmm->B[i][ observed[0] ]; //state i emit char 0
+    }
+    
+    //exit(1);
+    for (int i = 1; i < n; i++) {//each obs
+
+	for (int j = 0; j < hmm->getNumberStates(); j++) {//each state
+	    double pmax = -1.0*numeric_limits<double>::infinity();
+	    double p;
+	    int dmax=-1;
+
+	    for (int k = 0; k < hmm->getNumberStates(); k++) {//each previous state
+		//p = prob[i-1][k] * hmm->A[k][j];
+		//p = prob[i-1][k] * hmm->getTrans(k,j);
+		p = prob[i-1][k] + logRobust(hmm->getTrans(k,j));
+		
+		
+		if (p > pmax) {
+		    pmax = p;
+		    dmax = k;
+		}
+		cout<<"state#"<<k<<" "<<p<<" "<<pmax<<" "<<dmax<<endl;
+	    }//end each previous state
+	    cout<<"-------"<<endl;
+	    if(dmax==-1){
+		cerr<<"Error at obs "<<i<<" state#"<<j<<endl;
+		exit(1);
+	    }
+	    
+	    //prob[i][j] = hmm->B[j][ observed[i] ] * pmax;
+	    //prob[i][j]    = hmm->hmmstates[j]->probEmission( (unsigned int)(observed[i]*sizeChunk)  , sizeChunk) * pmax;
+	    prob[i][j]    = logRobust(hmm->hmmstates[j]->probEmission( (unsigned int)(observed[i]*sizeChunk)  , sizeChunk) ) + pmax ;
+	    prevs[i-1][j] = dmax;
+	}//each state
+    }//end each obs
+    
+    double pmax =  -1.0*numeric_limits<double>::infinity();
+    int    dmax =-1;
+    
+    for (int i = 0; i < hmm->getNumberStates(); i++) {
+	if (prob[n-1][i] > pmax) {
+	    pmax = prob[n-1][i];
+	    dmax = i;
+	}
+    }
+    
+    if(dmax==-1){
+	cerr<<"Error at last obs "<<n-1<<endl;
+	exit(1);
+    }
+    seq[n-1] = dmax;
+	
+    for (int i = n-2; i >= 0; i--) {
+	seq[i] = prevs[i][ seq[i+1] ];
+    }
+    
+	
+    //////////////////////////////////////////////////////////
+    // for (int i = 0; i < n; i++) {
+    // 	cout << "t = " << i << endl;
+    // 	for (int j = 0; j < hmm->getNumberStates(); j++) {
+    // 	    cout << '[' << j << ']' << prob[i][j] << ' ';
+    // 	}
+    // 	cout << "\n\n";
+    // }
+	
+    // for (int i = 0; i < n; i++) {
+    // 	cout << "t = " << i << endl;
+    // 	for (int j = 0; j < hmm->getNumberStates(); j++) {
+    // 	    cout << '[' << j << ']' << prevs[i][j] << ' ';
+    // 	}
+    // 	cout << "\n\n";
+    // }	
+	
+    // cout << endl;
+    for (int i = 0; i < n; i++)
+	cout  << i << "\t" << observed[i] <<"\t"<< seq[i] << endl;
+    cout << endl;
+    //////////////////////////////////////////////////////////
+	
+	
+    for (int i = 0; i < n; i++) {
+	delete[] prob[i];
+	delete[] prevs[i];
+    }
+    delete[] prob;
+    delete[] prevs;
+	
+    return seq;
+}
 
 
 //! Main method
@@ -2778,10 +2909,14 @@ int main (int argc, char *argv[]) {
 
 
     Hmm hmm;
+    vector<double> emittedH;
     vector<emission>  eTest = hmm.generateStates(250,sizeChunk);
     for(unsigned int i=0;i<eTest.size();i++){
 	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<endl;
+	emittedH.push_back( eTest[i].p );
     }
+    viterbi(&hmm, emittedH);//, const int n) {
+    
     return 1;
     
 
