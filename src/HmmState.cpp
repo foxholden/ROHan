@@ -11,6 +11,15 @@ HmmState::HmmState(int idx_,long double h_){
     idx = idx_;
 }
 
+HmmState::HmmState(const HmmState & other){
+    h        = other.h;
+    theta    = other.theta;
+    rateGeom = other.rateGeom;
+    idx      = other.idx;
+
+    rng  = gsl_rng_alloc (gsl_rng_taus);
+    gsl_rng_set(rng, time(NULL));
+}
 
 HmmState::~HmmState(){
     gsl_rng_free(rng);
@@ -58,3 +67,16 @@ int HmmState::getIdx() const{
 //     p      = other.p;
 //     second = other.second; 
 // }
+
+
+long double HmmState::getH(){
+    return h;
+}
+
+long double HmmState::getTheta(){
+    return theta;
+}
+
+long double HmmState::getRateGeom(){
+    return rateGeom;
+}

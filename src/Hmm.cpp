@@ -61,6 +61,28 @@ Hmm::Hmm(){
     
 }
 
+Hmm::Hmm(const Hmm & other){
+    if(NBRSTATES != other.getNumberStates()){
+	cerr<<"Discrepency between number of states"<<endl;
+	exit(1);
+    }
+
+    for(int n=0;n<NBRSTATES;n++){
+	startingState[n] = other.startingState[n];
+	probTrans[n]     = other.probTrans[n];
+	probStay[n]      = other.probStay[n];
+	
+	hmmstates[n]     = new  HmmState ( *other.hmmstates[n] );
+    }
+    
+     for(int n=0;n<NBRSTATES;n++){
+	if(n==0)
+	    hmmstates[n]->setSecond(hmmstates[n+1]);
+	if(n==1)
+	    hmmstates[n]->setSecond(hmmstates[n-1]);
+    }
+}
+
 Hmm::~Hmm(){
 
     for(int n=0;n<NBRSTATES;n++){
@@ -108,4 +130,35 @@ int  Hmm::getNumberStates() const{
 
 double Hmm::getTrans(int i,int j) const{
     return trans[i][j];
+}
+
+std::ostream& operator<<(ostream& os, const Hmm& hmm)  {
+    os<<"# of states"<<hmm.getNumberStates()<<endl;
+    os<<"--------"<<endl;
+    for(int s=0;s<hmm.getNumberStates();s++){
+    	os<<"p start      at state#"<<s<<" = "<<hmm.startingState[s]<<endl;
+    }
+    os<<"--------"<<endl;
+    for(int s=0;s<hmm.getNumberStates();s++){
+    	os<<"p transition at state#"<<s<<" = "<<hmm.probTrans[s]<<endl;
+    }
+    os<<"--------"<<endl;
+    for(int s=0;s<hmm.getNumberStates();s++){
+    	os<<"p staying    at state#"<<s<<" = "<<hmm.probStay[s]<<endl;
+    }
+    os<<"--------"<<endl;    
+    for(int s=0;s<hmm.getNumberStates();s++){
+    	os<<"h            at state#"<<s<<" = "<<hmm.hmmstates[s]->getH()<<endl;
+    }
+    os<<"--------"<<endl;
+    for(int s=0;s<hmm.getNumberStates();s++){
+    	os<<"theta        at state#"<<s<<" = "<<hmm.hmmstates[s]->getTheta()<<endl;
+    }
+    os<<"--------"<<endl;
+    for(int s=0;s<hmm.getNumberStates();s++){
+    	os<<"rate geom.   at state#"<<s<<" = "<<hmm.hmmstates[s]->getRateGeom()<<endl;
+    }
+    
+
+    return os;
 }

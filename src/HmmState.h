@@ -40,7 +40,11 @@ public:
     double probEmission(unsigned int mutations,unsigned int total) const;
     unsigned int randomEmission(int total) const;
     int getIdx() const;
+    long double getH();
+    long double getTheta();
+    long double getRateGeom();
 
+    
     void setSecond(HmmState * second);
 };
 #endif

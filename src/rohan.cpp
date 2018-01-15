@@ -2769,27 +2769,519 @@ double logRobust(double p_){
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+vector< vector<double> > forward (Hmm * hmm, const vector<double> & observed){
+    // hmm$transProbs[is.na(hmm$transProbs)]       = 0
+    // hmm$emissionProbs[is.na(hmm$emissionProbs)] = 0
+    // nObservations  = length(observation)
+    // 	nStates        = length(hmm$States)
+    int nObservations  = int(observed.size());
+    int nStates        = hmm->getNumberStates(); 
+    //f          = array(NA,c(nStates,nObservations))
+    vector< vector<double > > f;//1D # HMM states, 2D #obs,  probability of observation i by state j
+
+    for (int j = 0; j < hmm->getNumberStates(); j++) {//each state
+	
+	vector<double> toaddProb;
+	
+	for (int i = 0; i < nObservations; i++) {//each obs
+	    
+	    toaddProb.push_back(0.0);
+	}
+	
+	f.push_back(  toaddProb );
+    }
+
+
+    // Init
+    // for(state in hmm$States)  {
+    // 	f[state,1] = log(hmm$startProbs[state] * hmm$emissionProbs[state,observation[1]])
+    // 	    }
+    for (int state = 0; state < hmm->getNumberStates(); state++) { //
+	f[state][0] = logRobust(hmm->startingState[state]) + logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) );
+	//cout<<"prob0 "<<observed[0]<<" "<<i<<" "<<prob[0][i]<<" "<<endl;
+    }
+
+
+    for (int k = 1; k < n; k++) {//each obs
+
+	for (int state = 0; state < hmm->getNumberStates(); state++) {//each state
+	    double logsum = -1.0*numeric_limits<double>::infinity();
+	    // double p;
+	    // int dmax=-1;
+
+	    for (int previousState = 0; previousState < hmm->getNumberStates(); previousState++) {//each previous state
+
+		double temp = f[previousState][k-1] + logRobust(hmm->getTrans(previousState,state));
+		if(temp > -1.0*numeric_limits<double>::infinity() ) {
+		    logsum = temp + log(1 + exp(logsum - temp ));
+		}
+		
+		cout<<"state#"<<k<<" "<<p<<" "<<pmax<<" "<<dmax<<endl;
+	    }//end each previous state
+	    
+	    f[state,k] = logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) + logsum;
+
+	}//each state
+    }//end each obs
+    cerr<<"done forward()"<<endl;
+
+    
+    // # Iteration
+    //   for(k in 2:nObservations)
+    //   {
+    //     for(state in hmm$States)
+    //     {
+    //       logsum = -Inf
+    //       for(previousState in hmm$States)
+    //       {
+    //         temp   = f[previousState,k-1] + log(hmm$transProbs[previousState,state])
+    // 		if(temp > - Inf)
+    // 		{
+    // 			logsum = temp + log(1 + exp(logsum - temp ))
+    // 		}
+    //       }
+    //       f[state,k] = log(hmm$emissionProbs[state,observation[k]]) + logsum
+    //     }
+    //   }
+  
+    return f;
+}
+
+// backward = function(hmm, observation)
+// {
+//   hmm$transProbs[is.na(hmm$transProbs)]       = 0
+//   hmm$emissionProbs[is.na(hmm$emissionProbs)] = 0
+//   nObservations  = length(observation)
+//   nStates    = length(hmm$States)
+//   b          = array(NA,c(nStates,nObservations))
+//   dimnames(b)= list(states=hmm$States,index=1:nObservations)
+//   # Init
+//   for(state in hmm$States)
+//   {
+//     b[state,nObservations] = log(1)
+//   }
+//   # Iteration
+//   for(k in (nObservations-1):1)
+//   {
+//     for(state in hmm$States)
+//     {
+//       logsum = -Inf
+//       for(nextState in hmm$States)
+//       {
+//         temp   = b[nextState,k+1] + log(hmm$transProbs[state,nextState]*hmm$emissionProbs[nextState,observation[k+1]])
+// 		if(temp > - Inf)
+// 		{
+//         	logsum = temp + log(1 + exp(logsum-temp))
+// 		}
+//       }
+//       b[state,k] = logsum
+//     }
+//   }
+//   return(b)
+// }
+
+// baumWelchRecursion = function(hmm, observation){
+// 	TransitionMatrix    = hmm$transProbs
+// 	TransitionMatrix[,] = 0
+// 	EmissionMatrix      = hmm$emissionProbs
+// 	EmissionMatrix[,]   = 0
+// 	f = forward(hmm,  observation)
+// 	b = backward(hmm, observation)
+// 	probObservations = f[1,length(observation)]
+// 	for(i in 2:length(hmm$States))
+// 	{
+// 		j = f[i,length(observation)]
+// 		if(j > - Inf)
+// 		{
+// 			probObservations = j + log(1+exp(probObservations-j))
+// 		}
+// 	}
+// 	for(x in hmm$States)
+// 	{
+// 		for(y in hmm$States)
+// 		{
+// 			temp = f[x,1] + log(hmm$transProbs[x,y]) +
+// 					log(hmm$emissionProbs[y,observation[1+1]]) + b[y,1+1]
+// 			for(i in 2:(length(observation)-1))
+// 			{
+// 				j = f[x,i] + log(hmm$transProbs[x,y]) +
+// 						log(hmm$emissionProbs[y,observation[i+1]]) + b[y,i+1]
+// 				if(j > - Inf)
+// 				{
+// 					temp = j + log(1+exp(temp-j))
+// 				}
+// 			}
+// 			temp = exp(temp - probObservations)
+// 			TransitionMatrix[x,y] = temp
+// 		}
+// 	}
+// 	for(x in hmm$States)
+// 	{
+// 		for(s in hmm$Symbols)
+// 		{
+// 			temp = -Inf
+// 			for(i in 1:length(observation))
+// 			{
+// 				if(s == observation[i])
+// 				{
+// 					j = f[x,i] + b[x,i]
+// 					if(j > - Inf)
+// 					{
+// 						temp = j + log(1+exp(temp-j))
+// 					}
+// 				}
+// 			}
+// 			temp = exp(temp - probObservations)
+// 			EmissionMatrix[x,s] = temp
+// 		}
+// 	}
+// 	//return(list(TransitionMatrix=TransitionMatrix,EmissionMatrix=EmissionMatrix))
+// }
+
+//taken from https://cran.r-project.org/web/packages/HMM/
+void baum_welch(Hmm * hmm,		          // HMM to optimize
+ 		const vector<double> * emittedH   // observations
+){ 
+    Hmm tempHmm (*hmm);
+    int maxIterations=10;
+    for(int i=0;i<maxIterations;i++){
+
+	//Expectation Step (Calculate expected Transitions and Emissions)
+	bw = baumWelchRecursion(tempHmm, observation);
+	// T  = bw$TransitionMatrix;
+	// E  = bw$EmissionMatrix;
+	// // Pseudocounts
+	// T[!is.na(hmm$transProbs)]    = T[!is.na(hmm$transProbs)]    + pseudoCount;
+	// E[!is.na(hmm$emissionProbs)] = E[!is.na(hmm$emissionProbs)] + pseudoCount;
+	// // Maximization Step (Maximise Log-Likelihood for Transitions and Emissions-Probabilities)
+	// T = (T/apply(T,1,sum));
+	// E = (E/apply(E,1,sum));
+	// d = sqrt(sum((tempHmm$transProbs-T)^2)) + sqrt(sum((tempHmm$emissionProbs-E)^2));
+	// diff = c(diff, d);
+	// tempHmm$transProbs    = T;
+	// tempHmm$emissionProbs = E;
+	// if(d < delta){
+	//     break;
+	// }
+
+    }
+    // tempHmm$transProbs[is.na(hmm$transProbs)]       = 0
+	// tempHmm$emissionProbs[is.na(hmm$emissionProbs)] = 0
+	// diff = c()
+	// for(i in 1:maxIterations)
+	// {
+	// 	# Expectation Step (Calculate expected Transitions and Emissions)
+	// 	bw = baumWelchRecursion(tempHmm, observation)
+	// 	T  = bw$TransitionMatrix
+	// 	E  = bw$EmissionMatrix
+	// 	# Pseudocounts
+	// 	T[!is.na(hmm$transProbs)]    = T[!is.na(hmm$transProbs)]    + pseudoCount
+	// 	E[!is.na(hmm$emissionProbs)] = E[!is.na(hmm$emissionProbs)] + pseudoCount
+	// 	# Maximization Step (Maximise Log-Likelihood for Transitions and Emissions-Probabilities)
+	// 	T = (T/apply(T,1,sum))
+	// 	E = (E/apply(E,1,sum))
+	// 	d = sqrt(sum((tempHmm$transProbs-T)^2)) + sqrt(sum((tempHmm$emissionProbs-E)^2))
+	// 	diff = c(diff, d)
+	// 	tempHmm$transProbs    = T
+	// 	tempHmm$emissionProbs = E
+	// 	if(d < delta)
+	// 	{
+	// 		break
+	// 	}
+	// }
+	// tempHmm$transProbs[is.na(hmm$transProbs)]       = NA
+	// tempHmm$emissionProbs[is.na(hmm$emissionProbs)] = NA
+	// return(list(hmm=tempHmm,difference=diff))
+}
+
+// void baum_welch(Hmm * hmm,		          // HMM to optimize
+// 		const vector<double> * emittedH   // observations
+// ){ 
+//     const int length    = emittedH->size();
+//     //const int no_chunks = B.get_no_chunks_per_row();
+
+    
+//     // sequence &obsseq,
+//     // const HMMMatrix<float_type, sse_float_type> &F,
+//     // const HMMMatrix<float_type, sse_float_type> &B, 
+//     // const HMMVector<float_type, sse_float_type> &scales,
+//     // HMMVector<float_type, sse_float_type> &new_pi,
+//     // HMMMatrix<float_type, sse_float_type> &new_T,
+//     // HMMMatrix<float_type, sse_float_type> &new_E) {
+    
+
+// }
+
+/*
+//https://github.com/tttamaki/HMMLib/blob/master/HMMlib/hmm.hpp 
+void baum_welch(const sequence &obsseq,
+		const HMMMatrix<float_type, sse_float_type> &F,
+		const HMMMatrix<float_type, sse_float_type> &B, 
+		const HMMVector<float_type, sse_float_type> &scales,
+		HMMVector<float_type, sse_float_type> &new_pi,
+		HMMMatrix<float_type, sse_float_type> &new_T,
+		HMMMatrix<float_type, sse_float_type> &new_E) {
+		
+    // easier reference
+    HMMMatrix<float_type, sse_float_type> &T = *trans_prob;    //transition prob
+    HMMMatrix<float_type, sse_float_type> &E = *emission_prob; //emission   prob
+		
+    const int length = obsseq.size();
+    const int no_chunks = B.get_no_chunks_per_row();
+		
+    // sanity check
+    assert(new_T.get_no_columns() == no_states);
+    assert(new_T.get_no_rows() ==  no_states);
+    assert(new_E.get_no_columns() == no_states);
+    assert(new_E.get_no_rows() == alphabet_size);
+    assert(new_pi.get_size() == no_states);
+    assert(scales.get_size() == length);
+    assert(F.get_no_rows() == length);
+    assert(F.get_no_columns() == no_states);
+    assert(B.get_no_rows() == length);
+    assert(B.get_no_columns() == no_states);
+		
+    // initialise
+    new_pi.reset();
+    new_T.reset();
+    new_E.reset();
+
+    // compute counts
+    HMMVector<float_type, sse_float_type> pi_counts(no_states);
+    HMMMatrix<float_type, sse_float_type> T_counts(no_states, no_states);
+    HMMMatrix<float_type, sse_float_type> E_counts(alphabet_size, no_states);
+		
+    // compute new_pi and initialize E_counts
+    unsigned x = obsseq[0];
+    sse_float_type scale;
+    sse_operations_traits::set_all(scale, (float_type) (1.0/scales(0)));
+    for (int sc = 0; sc < no_chunks; ++sc) {
+	sse_float_type temp = (F.get_chunk(0,sc) * B.get_chunk(0,sc)) * scale;
+	new_pi.get_chunk(sc) = temp;
+	E_counts.get_chunk(x, sc) += temp;
+    }
+		
+    // compute transition and emission counts
+    for (int i = 1; i < length; ++i) {
+	x = obsseq[i];
+#ifdef WITH_OMP
+#pragma omp parallel for
+#endif
+	for(int j = 0; j < no_states; ++j) {
+	    // transition counts
+	    sse_float_type prev_forward;
+	    sse_operations_traits::set_all(prev_forward, F(i-1, j));
+	    for(int chunk = 0; chunk < no_chunks; ++chunk) {
+		T_counts.get_chunk(j, chunk) += prev_forward * 
+		    T.get_chunk(j,chunk) * 
+		    E.get_chunk(x,chunk) * 
+		    B.get_chunk(i,chunk);
+	    }
+	}
+	// emission counts
+	sse_operations_traits::set_all(scale, (float_type) (1.0/scales(i)));
+	for(int chunk = 0; chunk < no_chunks; ++chunk)
+	    E_counts.get_chunk(x,chunk) += F.get_chunk(i, chunk) * 
+		B.get_chunk(i, chunk) * scale;
+    }
+
+    // compute new_T and new_E by normalizing counts
+    for (int s = 0; s < no_states; ++s) {
+	// transition probabilities
+	float_type sum = 0.0;
+	for (int dst_state = 0; dst_state < no_states; ++dst_state)
+	    sum += T_counts(s, dst_state);
+	for (int dst_state = 0; dst_state < no_states; ++dst_state)
+	    new_T(s, dst_state) = T_counts(s, dst_state) / sum;
+
+	// emission probabilities
+	sum = 0.0;
+	for (int sym = 0; sym < alphabet_size; ++sym)
+	    sum += E_counts(sym, s);
+	for (int sym = 0; sym < alphabet_size; ++sym)
+	    new_E(sym, s) = E_counts(sym, s) / sum;
+    }
+}
+*/
+
 //taken from https://gist.github.com/Feder1co5oave/2347228
 
-int* viterbi(Hmm * hmm, const vector<double> & observed){//, const int n) {
+hmmpath viterbi(Hmm * hmm, const vector<double> & observed){//, const int n) {
     int n = int(observed.size());
 
     //assert(n > 0); assert(observed != NULL);
-    int *seq = new int[n];
-    for (int i = 0; i < n; i++) seq[i] = 0;
-    double **prob = new double*[n];
-    int **prevs = new int*[n];
+    //int *seq = new int[n];
+    //vector<int> seq =
+    hmmpath toreturn;
+    toreturn.seq = vector<int>(n,0);
+    
+    //add log like
+    for (int i = 0; i < n; i++)
+	toreturn.seq[i] = 0;
+	//	seq[i] = 0;
+    // if(hmm->getNumberStates() > n){
+    // 	cerr<<"Error in Viterbi(), there are more HMM states than 
+    // }
+    
+    vector< vector<double> > prob;  //1D #obs, 2D # HMM states, probability of observation i by state j
+    vector< vector<int>    > prevs; //1D #obs, 2D # HMM states, most likely state for observation i at state j
 
-    for (int i = 0; i < n; i++) {
-	prob[i] = new double[hmm->getNumberStates()];
-	prevs[i] = new int[hmm->getNumberStates()];
-	for (int j = 0; j < hmm->getNumberStates(); j++) { //unnecessary
-	    prob[i][j] = 0;
-	    prevs[i][j] = 0;
-	}
-    }
+    for (int i = 0; i < n; i++) {//each obs
+	vector<double> toaddProb;
+	vector<int>    toaddPrev;
 	
-    for (int i = 0; i < hmm->getNumberStates(); i++) {
+	for (int j = 0; j < hmm->getNumberStates(); j++) {//each state
+	    toaddProb.push_back(0.0);
+	    toaddPrev.push_back(  0);	    
+	}
+
+	prob.push_back(  toaddProb );
+	prevs.push_back( toaddPrev );
+	
+    }
+    
+    // double **prob = new double*[n]; //probability of the observation given 
+    // int **prevs   = new int*[n];
+
+    //
+    // for (int i = 0; i < n; i++) {
+    // 	prob[i]  = new double[hmm->getNumberStates()];
+    // 	prevs[i] = new int[hmm->getNumberStates()];
+    // 	for (int j = 0; j < hmm->getNumberStates(); j++) { //unnecessary
+    // 	    prob[i][j] = 0;
+    // 	    prevs[i][j] = 0;
+    // 	}
+    // }
+
+
+    //Initializing the matrix using starting probabilities for observation 0 
+    for (int i = 0; i < hmm->getNumberStates(); i++) { //
 	//prob[0][i] = hmm->startingState[i] * hmm->hmmstates[i]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk);
 	// double pss = hmm->startingState[i];
 	// if(pss==0){
@@ -2808,6 +3300,9 @@ int* viterbi(Hmm * hmm, const vector<double> & observed){//, const int n) {
     }
     
     //exit(1);
+
+
+    //Populate the prob[i][j] for observation i at state j using the previous computations at the previous state and previous observation
     for (int i = 1; i < n; i++) {//each obs
 
 	for (int j = 0; j < hmm->getNumberStates(); j++) {//each state
@@ -2835,14 +3330,17 @@ int* viterbi(Hmm * hmm, const vector<double> & observed){//, const int n) {
 	    
 	    //prob[i][j] = hmm->B[j][ observed[i] ] * pmax;
 	    //prob[i][j]    = hmm->hmmstates[j]->probEmission( (unsigned int)(observed[i]*sizeChunk)  , sizeChunk) * pmax;
+	    cerr<<"["<<i<<"]["<<j<<"]"<<endl;
 	    prob[i][j]    = logRobust(hmm->hmmstates[j]->probEmission( (unsigned int)(observed[i]*sizeChunk)  , sizeChunk) ) + pmax ;
 	    prevs[i-1][j] = dmax;
 	}//each state
     }//end each obs
+    cerr<<"done"<<endl;
     
     double pmax =  -1.0*numeric_limits<double>::infinity();
     int    dmax =-1;
-    
+
+    //finding max at last observation
     for (int i = 0; i < hmm->getNumberStates(); i++) {
 	if (prob[n-1][i] > pmax) {
 	    pmax = prob[n-1][i];
@@ -2854,10 +3352,16 @@ int* viterbi(Hmm * hmm, const vector<double> & observed){//, const int n) {
 	cerr<<"Error at last obs "<<n-1<<endl;
 	exit(1);
     }
-    seq[n-1] = dmax;
-	
+    //seq[n-1] = dmax;
+    toreturn.seq[n-1] = dmax;
+    
+    toreturn.llik = pmax;
+
+    //reconstructing the path
+    
     for (int i = n-2; i >= 0; i--) {
-	seq[i] = prevs[i][ seq[i+1] ];
+	//seq[i] = prevs[i][ seq[i+1] ];
+	toreturn.seq[i] = prevs[i][ toreturn.seq[i+1] ];
     }
     
 	
@@ -2879,20 +3383,21 @@ int* viterbi(Hmm * hmm, const vector<double> & observed){//, const int n) {
     // }	
 	
     // cout << endl;
-    for (int i = 0; i < n; i++)
-	cout  << i << "\t" << observed[i] <<"\t"<< seq[i] << endl;
-    cout << endl;
+    // for (int i = 0; i < n; i++)
+    // 	cout  << i << "\t" << observed[i] <<"\t"<< toreturn.seq[i] << endl;
+    // cout << endl;
     //////////////////////////////////////////////////////////
 	
 	
-    for (int i = 0; i < n; i++) {
-	delete[] prob[i];
-	delete[] prevs[i];
-    }
-    delete[] prob;
-    delete[] prevs;
-	
-    return seq;
+    // for (int i = 0; i < n; i++) {
+    // 	delete[] prob[i];
+    // 	delete[] prevs[i];
+    // }
+    // delete[] prob;
+    // delete[] prevs;
+
+    return toreturn;
+    //return seq;
 }
 
 
@@ -2909,13 +3414,30 @@ int main (int argc, char *argv[]) {
 
 
     Hmm hmm;
+    cout<<"Hmm:"<<hmm<<endl;
     vector<double> emittedH;
+    cerr<<"generating states"<<endl;
+    
     vector<emission>  eTest = hmm.generateStates(250,sizeChunk);
+
+    cerr<<"test data generated:"<<endl;
+    
     for(unsigned int i=0;i<eTest.size();i++){
 	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<endl;
 	emittedH.push_back( eTest[i].p );
     }
-    viterbi(&hmm, emittedH);//, const int n) {
+
+    cerr<<"Baum Welch"<<endl;
+    baum_welch(&hmm,&emittedH);
+	
+    cerr<<"testing viterbi algorithm"<<endl;
+    
+    hmmpath hp=viterbi(&hmm, emittedH);//, const int n) {
+    cout<<"done"<<endl;
+    for (unsigned int i = 0; i < hp.seq.size(); i++){
+	cout<<i;
+	cout<<"\tobs="<<eTest[i].idx<<"\t"<<eTest[i].p <<"\tpredicted="<< hp.seq[i] << endl;
+    }
     
     return 1;
     

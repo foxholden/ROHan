@@ -43,6 +43,10 @@ public:
     vector<emission> generateStates(unsigned int N,unsigned int total) const;
     int getNumberStates() const;
     double getTrans(int i,int j) const;
-    
+    friend ostream& operator<<(ostream& os, const Hmm& hmm);  
+
 };
+
+
+
 #endif
