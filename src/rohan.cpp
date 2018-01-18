@@ -2924,7 +2924,9 @@ vector< vector<double> > forward (Hmm * hmm, const vector<double> & observed){
     // 	f[state,1] = log(hmm$startProbs[state] * hmm$emissionProbs[state,observation[1]])
     // 	    }
     for (int state = 0; state < nStates; state++) { //
-	f[state][0] = logRobust(hmm->startingState[state]) + logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) );
+	f[state][0] =
+	    logRobust(hmm->startingState[state]) + //prob of starting a state
+	    logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) ); //emitting observed[0] by state
 	//cout<<"prob0 "<<observed[0]<<" "<<i<<" "<<prob[0][i]<<" "<<endl;
     }
 
@@ -2938,9 +2940,11 @@ vector< vector<double> > forward (Hmm * hmm, const vector<double> & observed){
 
 	    for (int previousState = 0; previousState < nStates; previousState++) {//each previous state
 
-		double temp = f[previousState][k-1] + logRobust(hmm->getTrans(previousState,state));
+		double temp =
+		    f[previousState][k-1] +                         // prob stored in previousState
+		    logRobust(hmm->getTrans(previousState,state));  // prob of transition from previousState to state
 		//		if(temp > (-1.0*numeric_limits<double>::infinity()) ) {
-		    //logsum = temp + log(1 + exp(logsum - temp ));
+		//logsum = temp + log(1 + exp(logsum - temp ));
 		logsum = oplusInitnatl( temp, logsum);
 			// }else{
 		//     cout<<"temp skipped"<<endl;
@@ -2949,8 +2953,13 @@ vector< vector<double> > forward (Hmm * hmm, const vector<double> & observed){
 		// cout<<"obs#"<<k<<" "<<observed[k]<< " state#"<<state<<" prevState#"<<previousState<<" temp="<<temp<<" prev="<< f[previousState][k-1] <<" log="<<logRobust(hmm->getTrans(previousState,state))<<" logsum="<<logsum<<endl;
 	    }//end each previous state
 
+	    //logsum contains the sum of all probs from every previous state
 
-	    f[state][k] = logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) + logsum;
+	    f[state][k] =
+		logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) +  //emission probability by state
+		logsum; //sum of all probs for every previous state
+
+
 	    // cout<<"f["<<state<<"]["<<k<<"] "<<f[state][k]<<" = logRobust = "<<logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) << " logsum = "<<logsum<<endl;
 
 
@@ -3001,33 +3010,36 @@ vector< vector<double> > backward (Hmm * hmm, const vector<double> & observed){
     //     b[state,nObservations] = log(1)
     //   }
 
-    for (int j = 0; j < nStates; j++) {//each state	
-	vector<double> toaddProb;	
-	for (int i = 0; i < nObservations; i++) {//each obs	    
-	    toaddProb.push_back(0.0);
-	}	
-	b.push_back(  toaddProb );
-    }
+    // for (int j = 0; j < nStates; j++) {//each state	
+    // 	vector<double> toaddProb;	
+    // 	for (int i = 0; i < nObservations; i++) {//each obs	    
+    // 	    toaddProb.push_back(0.0);
+    // 	}	
+    // 	b.push_back(  toaddProb );
+    // }
 
     
-    for (int k=(nObservations-1); k>=0; k--) {//each obs
+    for (int k=(nObservations-2); k>=0; k--) {//each obs
 
 	for (int state=0; state<nStates; state++) {//each state
 	    double logsum = -1.0*numeric_limits<double>::infinity();
 
 	    for (int nextState = 0; nextState < nStates; nextState++) {//each previous state
-		double temp = b[nextState][k+1] + logRobust(hmm->getTrans(state,nextState) ) + logRobust(hmm->hmmstates[nextState]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk));
+		double temp =
+		    b[nextState][k+1] + 
+		    logRobust(hmm->getTrans(state,nextState) ) + //transition from state to nextState
+		    logRobust(hmm->hmmstates[nextState]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk)); //emission probability of state 
 		//cout<<"b["<<nextState<<"]["<<(k+1)<<"] "<<f[state][k]<<" = logRobust = "<<logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) << " logsum = "<<logsum<<endl;
 
-
 		logsum = oplusInitnatl( temp, logsum);
-		cout<<k<<" "<<state<<" "<<nextState<<" "<<temp<<endl;
+		cout<<k<<" "<<state<<" "<<nextState<<" "<<temp<<" ";
 	    }//end each previous state
 
-	    cout<<"b["<<state<<"]["<<k<<"] = "<<logsum<<endl;
+	    cout<<"b["<<state<<"]["<<k<<"] = "<<logsum<<" ";
 	    b[state][k] = logsum;
 
 	}//each state
+	cout<<endl;
     }//end each obs
     
     return b;
@@ -3069,34 +3081,52 @@ void forwardBackward(Hmm * hmm, const vector<double> & observed){
     // }
 
 
+    exit(1);
+    vector< vector<double> > postProb (nStates,vector<double>(nObservations));
 
-    vector< vector<double> > postProb (lengthOfObservationSequence,vector<double>(numberOfStates));
-
+    cout<<"test postprob"<<endl;
     for(int i=0;i<nObservations;i++){
 	double temp = 0.0;
-	for(int x=0;x<nStates;x++){
-	    for(int y=0;y<nStates;y++){
-					posteriorProbabilities[t][i] = forwardProbabilities[t][i] + backwardProbabilities[t][i];
-
-	    }
+	cout<<"obs#"<<i<<" "<<observed[i];	
+	for(int x=0;x<nStates;x++){	    
+	    postProb[x][i]   = f[x][i] + b[x][i];
+	    cout<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f[x][i] <<" b="<< b[x][i]<<" ";
+	    temp             = oplusInitnatl(temp,postProb[x][i]);
 	}
+	cout<<" sum"<<temp<<endl;
+	
+	for(int x=0;x<nStates;x++){
+	    postProb[x][i]  -= temp;
+	    cout<<"Norm. postProb#"<<x<<" p="<<postProb[x][i]<<" ";
+	}
+	cout<<endl;	
     }
-    
-    // for(int x=0;x<nStates;x++){
-    // 	for(int y=0;y<nStates;y++){
-    // 	    //            forward up to x+trans x to y                    + emission observation of observed[0+1] from y                                                      + backward from y onwards
-    // 	    double temp = f[x][0]        + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[0+1]*sizeChunk)  , sizeChunk)) + b[y][0+1];
-    // 	    
-    // 		// forward up to x+ trans x to y                   + emission observation of observed[i+1] from y                                                      + backward from y onwards
-    // 		j =       f[x][i] + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[i+1]*sizeChunk)  , sizeChunk)) + b[y][i+1];
-    // 		temp = oplusInitnatl( j, temp );
-
-    // 		//TODO set transition matrix
-    // 	    }
-    // 	}
-    // }
+    exit(1);
+    cout<<"posterior prob"<<endl;
+    for(int i=0;i<nObservations;i++){
+	cout<<"obs#"<<i<<" "<<observed[i];
+	
+	for(int x=0;x<nStates;x++){
+	    cout<<" "<<postProb[x][i];
+	}
+	cout<<endl;
+    }
 
 }
+
+// for(int x=0;x<nStates;x++){
+// 	for(int y=0;y<nStates;y++){
+// 	    //            forward up to x+trans x to y                    + emission observation of observed[0+1] from y                                                      + backward from y onwards
+// 	    double temp = f[x][0]        + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[0+1]*sizeChunk)  , sizeChunk)) + b[y][0+1];
+// 	    
+// 		// forward up to x+ trans x to y                   + emission observation of observed[i+1] from y                                                      + backward from y onwards
+// 		j =       f[x][i] + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[i+1]*sizeChunk)  , sizeChunk)) + b[y][i+1];
+// 		temp = oplusInitnatl( j, temp );
+
+// 		//TODO set transition matrix
+// 	    }
+// 	}
+// }
 
 
 /*
