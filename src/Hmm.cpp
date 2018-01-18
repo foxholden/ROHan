@@ -34,10 +34,12 @@ Hmm::Hmm(){
     for(int n=0;n<NBRSTATES;n++){
 	probTrans[n] =   pTrans;
 	probStay[n]  = 1-pTrans;
-
-	trans[n][0]  =   pTrans;
-	trans[n][1]  = 1-pTrans;	
     }
+    trans[0][0]  = 1-pTrans;	
+    trans[0][1]  =   pTrans;
+    trans[1][0]  =   pTrans;
+    trans[1][1]  = 1-pTrans;	
+
     
     for(int n=0;n<NBRSTATES;n++){
 	startingState[n] = 1/double(NBRSTATES);

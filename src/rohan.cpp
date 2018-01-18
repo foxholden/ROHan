@@ -2925,9 +2925,8 @@ vector< vector<double> > forward (Hmm * hmm, const vector<double> & observed){
     // 	    }
     for (int state = 0; state < nStates; state++) { //
 	f[state][0] =
-	    logRobust(hmm->startingState[state]) + //prob of starting a state
+	    logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
 	    logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) ); //emitting observed[0] by state
-	//cout<<"prob0 "<<observed[0]<<" "<<i<<" "<<prob[0][i]<<" "<<endl;
     }
 
 
@@ -2939,27 +2938,24 @@ vector< vector<double> > forward (Hmm * hmm, const vector<double> & observed){
 	    // int dmax=-1;
 
 	    for (int previousState = 0; previousState < nStates; previousState++) {//each previous state
-
 		double temp =
 		    f[previousState][k-1] +                         // prob stored in previousState
 		    logRobust(hmm->getTrans(previousState,state));  // prob of transition from previousState to state
 		//		if(temp > (-1.0*numeric_limits<double>::infinity()) ) {
 		//logsum = temp + log(1 + exp(logsum - temp ));
-		logsum = oplusInitnatl( temp, logsum);
-			// }else{
+		logsum = oplusInitnatl( logsum, temp );
+		// }else{
 		//     cout<<"temp skipped"<<endl;
-		// }
-		
+		// }		
 		// cout<<"obs#"<<k<<" "<<observed[k]<< " state#"<<state<<" prevState#"<<previousState<<" temp="<<temp<<" prev="<< f[previousState][k-1] <<" log="<<logRobust(hmm->getTrans(previousState,state))<<" logsum="<<logsum<<endl;
 	    }//end each previous state
 
 	    //logsum contains the sum of all probs from every previous state
-
+	    
 	    f[state][k] =
 		logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) +  //emission probability by state
-		logsum; //sum of all probs for every previous state
-
-
+		logsum;                                                                                                  //sum of all probs for every previous state
+	    
 	    // cout<<"f["<<state<<"]["<<k<<"] "<<f[state][k]<<" = logRobust = "<<logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) << " logsum = "<<logsum<<endl;
 
 
@@ -3017,23 +3013,24 @@ vector< vector<double> > backward (Hmm * hmm, const vector<double> & observed){
     // 	}	
     // 	b.push_back(  toaddProb );
     // }
-
     
     for (int k=(nObservations-2); k>=0; k--) {//each obs
-
+	cout<<k<<" "<<observed[k]<<" "<<observed[k+1]<<" ";
 	for (int state=0; state<nStates; state++) {//each state
 	    double logsum = -1.0*numeric_limits<double>::infinity();
 
-	    for (int nextState = 0; nextState < nStates; nextState++) {//each previous state
+	    for (int nextState = 0; nextState < nStates; nextState++) {//each next state
 		double temp =
 		    b[nextState][k+1] + 
-		    logRobust(hmm->getTrans(state,nextState) ) + //transition from state to nextState
-		    logRobust(hmm->hmmstates[nextState]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk)); //emission probability of state 
+		    logRobust(hmm->getTrans(state,nextState) ) +                                                            //transition from state to nextState
+		    logRobust(hmm->hmmstates[nextState]->probEmission( (unsigned int)(observed[k+1]*sizeChunk)  , sizeChunk)); //emission probability of state 
 		//cout<<"b["<<nextState<<"]["<<(k+1)<<"] "<<f[state][k]<<" = logRobust = "<<logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) << " logsum = "<<logsum<<endl;
-
-		logsum = oplusInitnatl( temp, logsum);
-		cout<<k<<" "<<state<<" "<<nextState<<" "<<temp<<" ";
-	    }//end each previous state
+		
+		logsum = oplusInitnatl( logsum, temp );
+		cout<<" s="<<state<<" n="<<nextState<<" t="<<temp<<" "<<
+		    "b="<<b[nextState][k+1]<<" "
+		    "tr="<<hmm->getTrans(state,nextState) <<" pe="<<logRobust(hmm->hmmstates[nextState]->probEmission( (unsigned int)(observed[k+1]*sizeChunk)  , sizeChunk))<<" ";
+	    }//end each next state
 
 	    cout<<"b["<<state<<"]["<<k<<"] = "<<logsum<<" ";
 	    b[state][k] = logsum;
