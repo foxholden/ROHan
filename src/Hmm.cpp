@@ -134,6 +134,23 @@ double Hmm::getTrans(int i,int j) const{
     return trans[i][j];
 }
 
+void Hmm::setHetRateForNonROH(long double newH){
+    hmmstates[1]->setH(newH);
+}
+
+void Hmm::setTransprob(long double newTrans){
+    double pTrans = newTrans;    
+    for(int n=0;n<NBRSTATES;n++){
+	probTrans[n] =   pTrans;
+	probStay[n]  = 1-pTrans;
+    }
+    trans[0][0]  = 1-pTrans;	
+    trans[0][1]  =   pTrans;
+    trans[1][0]  =   pTrans;
+    trans[1][1]  = 1-pTrans;	
+
+}
+
 std::ostream& operator<<(ostream& os, const Hmm& hmm)  {
     os<<"# of states"<<hmm.getNumberStates()<<endl;
     os<<"--------"<<endl;
@@ -164,3 +181,7 @@ std::ostream& operator<<(ostream& os, const Hmm& hmm)  {
 
     return os;
 }
+
+
+
+

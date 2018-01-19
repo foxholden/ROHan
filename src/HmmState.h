@@ -44,7 +44,8 @@ public:
     long double getTheta();
     long double getRateGeom();
 
-    
+    void setH(long double newH);
+
     void setSecond(HmmState * second);
 };
 #endif

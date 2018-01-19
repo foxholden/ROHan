@@ -26,11 +26,6 @@ static vector<long double> lnFactVec;
 
 
 typedef struct { 
-    vector<int> seq;
-    double llik;
- } hmmpath;
-
-typedef struct { 
     int maxReadLength;
     bool isPe;
  } rgInfo;

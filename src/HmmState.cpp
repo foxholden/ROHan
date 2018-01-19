@@ -80,3 +80,9 @@ long double HmmState::getTheta(){
 long double HmmState::getRateGeom(){
     return rateGeom;
 }
+
+void HmmState::setH(long double newH){
+    h        = newH;
+    theta    = h/(1-h); //h = theta/theta+1
+    rateGeom = 1/(theta+1); //rate of geom
+}
