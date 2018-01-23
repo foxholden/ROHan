@@ -3,13 +3,11 @@
 #include <queue>
 #include <algorithm>   
 #include <cfloat>   
-//#include <random>
+#include <random>
 
 //TODO
 
 
-// add coverage correction
-// HMM
 // global estimate
 // add mappability track?
 // ?
@@ -2893,46 +2891,124 @@ int main (int argc, char *argv[]) {
 
 
     Hmm hmm;
-    cout<<"Hmm:"<<hmm<<endl;
+    //cout<<"Hmm:"<<hmm<<endl;
     vector<double> emittedH;
-    cerr<<"generating states"<<endl;
+    //cerr<<"generating states"<<endl;
     
     vector<emission>  eTest = hmm.generateStates(250,sizeChunk);
 
-    cerr<<"test data generated:"<<endl;
+    //cerr<<"test data generated:"<<endl;
     
     for(unsigned int i=0;i<eTest.size();i++){
-	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<endl;
+	cerr<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<endl;
 	emittedH.push_back( eTest[i].p );
     }
 
-    cerr<<"forward "<<endl;
-    vector< vector<double> > f=forward(&hmm, emittedH , sizeChunk);//, const int n) {
-    cerr<<"backward "<<endl;
-    vector< vector<double> > b=backward(&hmm, emittedH, sizeChunk);//, const int n) {
+    // cerr<<"forward "<<endl;
+    // vector< vector<double> > f=forward(&hmm, emittedH , sizeChunk);//, const int n) {
+    // cerr<<"backward "<<endl;
+    // vector< vector<double> > b=backward(&hmm, emittedH, sizeChunk);//, const int n) {
 
-    cerr<<"forward-backward"<<endl;
-    double sumProbData=forwardBackward(&hmm, emittedH, sizeChunk);//, const int n) {
-    cerr<<"forward-backward "<<sumProbData<<endl;
+    // cerr<<"forward-backward"<<endl;
+    // double sumProbData=forwardBackward(&hmm, emittedH, sizeChunk);//, const int n) {
+    // cerr<<"forward-backward "<<sumProbData<<endl;
 
-    cerr<<"forward Prob()"<<endl;
-    //for(double d=0.000
-    for (long double hHMM = 0.0001;hHMM < 0.001; hHMM += 0.00005){	
-	//cout<<"test "<<hHMM<<endl;
-	hmm.setHetRateForNonROH(hHMM);
-	double fwdProb=forwardProb(&hmm, emittedH , sizeChunk);
-	cout<<hHMM<<"\t"<<fwdProb<<endl;
+    // cerr<<"forward Prob()"<<endl;
+    // //for(double d=0.000
+    // // for (long double hHMM = 0.0001;hHMM < 0.001; hHMM += 0.00005){	
+    // // 	//cout<<"test "<<hHMM<<endl;
+    // // 	hmm.setHetRateForNonROH(hHMM);
+    // // 	double fwdProb=forwardProb(&hmm, emittedH , sizeChunk);
+    // // 	cout<<hHMM<<"\t"<<fwdProb<<endl;
+    // // }
+
+    // // for (long double pTrans = 0.01;pTrans < 0.99; pTrans += 0.01){	
+    // // 	//cout<<"test "<<hHMM<<endl;
+    // // 	hmm.setHetRateForNonROH(0.0007);
+    // // 	hmm.setTransprob(pTrans);
+    // // 	double fwdProb=forwardProb(&hmm, emittedH , sizeChunk);
+    // // 	cout<<pTrans<<"\t"<<fwdProb<<endl;
+    // // }
+    cout<<"MCMC"<<endl;
+    for(int mcmc=0;mcmc<1;mcmc++){
+	double step = 1000;
+	//init to random settings
+	long double partition= (long double)(step);
+	int accept=0;
+	long double x_i    ;
+	long double x_i_1  ;
+
+	//het rate
+	int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
+	long double h_i    = double(sitesPer1M)/double(1000000);
+	long double h_i_1;
+	long double hlower = double( 200)/double(1000000);
+	long double hupper = double(1000)/double(1000000);
+    
+	//transition rate
+	long double pTlowerFirstHalf  =    0.5;
+	long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+	
+	long double pTlower = pTlowerFirstHalf;	
+	long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+
+	long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
+	long double pT_i_1;
+	//long double pTlower =       numeric_limits<double>::epsilon();
+        
+	random_device rd;
+	default_random_engine dre (rd());
+	int maxChains = 100000;
+	//chain 0
+
+	hmm.setHetRateForNonROH(h_i);
+	hmm.setTransprob(pT_i);
+	x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
+	cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
+	for(int chain=1;chain<=maxChains;chain++){
+
+	    //computing new state
+	    normal_distribution<long double> distribution_h(h_i,(hupper-hlower)/partition  );
+	    h_i_1      = distribution_h(dre);
+
+	    if(h_i_1 <= hlower     ||  h_i_1 >= hupper     ){
+		h_i_1      = h_i;
+	    }
+
+
+	    normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
+	    pT_i_1      = distribution_pT(dre);
+
+	    if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
+		pT_i_1      = pT_i;
+	    }
+       
+	    hmm.setHetRateForNonROH(h_i_1);
+	    hmm.setTransprob(pT_i_1);
+
+	    x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
+
+	    if(chain>(maxChains/2)){
+		pTlower = pTlowerSecondHalf;
+	    }
+
+	    long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
+	    if( (long double)(randomProb()) < acceptance){
+		h_i           =  h_i_1;
+		pT_i          =  pT_i_1;
+		x_i           =  x_i_1;
+		accept++;
+		cerr<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+		//cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    
+	    }else{
+		cerr<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    }
+	    chain++;
+	    //sleep(0.1);
+	}
+	cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
     }
-
-    for (long double pTrans = 0.01;pTrans < 0.99; pTrans += 0.01){	
-	//cout<<"test "<<hHMM<<endl;
-	hmm.setHetRateForNonROH(0.0007);
-	hmm.setTransprob(pTrans);
-	double fwdProb=forwardProb(&hmm, emittedH , sizeChunk);
-	cout<<pTrans<<"\t"<<fwdProb<<endl;
-    }
-
-
     
     return 1;
 

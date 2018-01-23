@@ -154,10 +154,12 @@ void Hmm::setTransprob(long double newTrans){
 std::ostream& operator<<(ostream& os, const Hmm& hmm)  {
     os<<"# of states"<<hmm.getNumberStates()<<endl;
     os<<"--------"<<endl;
+
     for(int s=0;s<hmm.getNumberStates();s++){
     	os<<"p start      at state#"<<s<<" = "<<hmm.startingState[s]<<endl;
     }
     os<<"--------"<<endl;
+    
     for(int s=0;s<hmm.getNumberStates();s++){
     	os<<"p transition at state#"<<s<<" = "<<hmm.probTrans[s]<<endl;
     }
