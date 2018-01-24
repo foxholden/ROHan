@@ -25,11 +25,11 @@ Hmm::Hmm(){
     }
     // for(int m=0;m<1000;m++)
     // 	cout<<m<<"\tp="<<hmmstates[1]->probEmission(m,1000000)<<endl;
-    double pTrans = 0.1;
-    trans = new double*[NBRSTATES];
+    long double pTrans = 0.1;
+    trans = new long double*[NBRSTATES];
     
     for(int i = 0; i < NBRSTATES; ++i)
-	trans[i] = new double[NBRSTATES];
+	trans[i] = new long double[NBRSTATES];
     
     for(int n=0;n<NBRSTATES;n++){
 	probTrans[n] =   pTrans;
@@ -42,7 +42,7 @@ Hmm::Hmm(){
 
     
     for(int n=0;n<NBRSTATES;n++){
-	startingState[n] = 1/double(NBRSTATES);
+	startingState[n] = 1/(  (long double)NBRSTATES );
     }
     // HmmState roh    (0.0007);
     // HmmState normal (0.000000012);
@@ -104,11 +104,11 @@ vector<emission> Hmm::generateStates(unsigned int N,unsigned int total) const{
 	//cerr<<"generateStates "<<i<<endl;
 	unsigned int d_ = currrentState->randomEmission(total);
 	emission eToAdd;
-	eToAdd.p     = double(d_)/double(total);
+	eToAdd.p     =  ( (long double)d_ )/( (long double)total );
 	eToAdd.idx   = currrentState->getIdx();
 	
 	vecToReturn.push_back( eToAdd );
-	double pt = randomProb();
+	long double pt = randomProb();
 	//cout<<"state#"<<currrentState->getIdx()<<"\t"<<d<<"\t"<<pt<<"\t"<<probTrans[currrentState->getIdx()]<<endl;	
 
 	//if(0)
@@ -130,7 +130,7 @@ int  Hmm::getNumberStates() const{
 }
 
 
-double Hmm::getTrans(int i,int j) const{
+long double Hmm::getTrans(int i,int j) const{
     return trans[i][j];
 }
 
@@ -139,7 +139,7 @@ void Hmm::setHetRateForNonROH(long double newH){
 }
 
 void Hmm::setTransprob(long double newTrans){
-    double pTrans = newTrans;    
+    long double pTrans = newTrans;    
     for(int n=0;n<NBRSTATES;n++){
 	probTrans[n] =   pTrans;
 	probStay[n]  = 1-pTrans;

@@ -30,7 +30,7 @@ void HmmState::setSecond(HmmState * second_){
     second = second_;
 }
 
-double HmmState::probEmission(unsigned int mutations,unsigned int total) const{
+long double HmmState::probEmission(unsigned int mutations,unsigned int total) const{
 
     // double noMut=gsl_ran_geometric_pdf  (1, rateGeom);
     // cout<<"no mut="<<noMut<<" "<<(1-noMut)<<" "<<rateGeom<<endl;

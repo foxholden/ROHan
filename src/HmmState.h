@@ -37,7 +37,7 @@ public:
 	
     /* } */
 
-    double probEmission(unsigned int mutations,unsigned int total) const;
+    long double probEmission(unsigned int mutations,unsigned int total) const;
     unsigned int randomEmission(int total) const;
     int getIdx() const;
     long double getH();

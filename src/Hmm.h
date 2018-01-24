@@ -19,19 +19,19 @@
 using namespace std;
 
 typedef struct { 
-    double p;
+    long double p;
     int idx;
 } emission;
 
 
 typedef struct { 
     vector<int> seq;
-    double llik;
+    long double llik;
  } hmmpath;
 
 class Hmm{
 private:
-    double **trans;
+    long double **trans;
 
 public:
 
@@ -47,7 +47,7 @@ public:
 
     vector<emission> generateStates(unsigned int N,unsigned int total) const;
     int getNumberStates() const;
-    double getTrans(int i,int j) const;
+    long double getTrans(int i,int j) const;
     void setHetRateForNonROH(long double newH);
     void setTransprob(long double newTrans);
     
@@ -56,24 +56,26 @@ public:
 };
 
 
-inline double logRobust(double p_){
-    double p = p_;
+
+/* returns the log of p_ but returns esentially -inf if p_=0 */
+inline long double logRobust(long double p_){
+    long double p = p_;
     if(p == 0){
-	p=numeric_limits<double>::epsilon();
+	p=numeric_limits<long double>::epsilon();
     }
 
-    return log(p);
+    return logl(p);
 }
 
 
 
 
 
-inline double forwardProb (Hmm * hmm, const vector<double> & observed, unsigned int sizeChunk){
+inline long double forwardProb (Hmm * hmm, const vector<long double> & observed, unsigned int sizeChunk){
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates(); 
 
-    vector< vector<double > > f ( nStates , vector<double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
+    vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
     for (int state = 0; state < nStates; state++) { //
 	f[state][0] =
@@ -85,12 +87,12 @@ inline double forwardProb (Hmm * hmm, const vector<double> & observed, unsigned 
     for (int k = 1; k < nObservations; k++) {//each obs
 
 	for (int state = 0; state < nStates; state++) {//each state
-	    double logsum = -1.0*numeric_limits<double>::infinity();
+	    long double logsum = -1.0*numeric_limits<long double>::infinity();
 	    // double p;
 	    // int dmax=-1;
 
 	    for (int previousState = 0; previousState < nStates; previousState++) {//each previous state
-		double temp =
+		long double temp =
 		    f[previousState][k-1] +                         // prob stored in previousState
 		    logRobust(hmm->getTrans(previousState,state));  // prob of transition from previousState to state
 		logsum = oplusInitnatl( logsum, temp );
@@ -107,7 +109,7 @@ inline double forwardProb (Hmm * hmm, const vector<double> & observed, unsigned 
     }//end each obs
     
 
-    double temp=0;
+    long double temp=0;
     for (int state = 0; state < nStates; state++) {//each state
 	temp = oplusInitnatl( temp ,  	    f[state][nObservations-1]  );
     }
@@ -116,7 +118,7 @@ inline double forwardProb (Hmm * hmm, const vector<double> & observed, unsigned 
 }
 
 
-inline vector< vector<double> > forward (Hmm * hmm, const vector<double> & observed, unsigned int sizeChunk){
+inline vector< vector<long double> > forward (Hmm * hmm, const vector<long double> & observed, unsigned int sizeChunk){
     // hmm$transProbs[is.na(hmm$transProbs)]       = 0
     // hmm$emissionProbs[is.na(hmm$emissionProbs)] = 0
     // nObservations  = length(observation)
@@ -125,7 +127,7 @@ inline vector< vector<double> > forward (Hmm * hmm, const vector<double> & obser
     int nStates        = hmm->getNumberStates(); 
     //f          = array(NA,c(nStates,nObservations))
 
-    vector< vector<double > > f ( nStates , vector<double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
+    vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
     // for (int j = 0; j < hmm->getNumberStates(); j++) {//each state
 	
@@ -154,12 +156,12 @@ inline vector< vector<double> > forward (Hmm * hmm, const vector<double> & obser
     for (int k = 1; k < nObservations; k++) {//each obs
 	cout<<observed[k]<<" ";
 	for (int state = 0; state < nStates; state++) {//each state
-	    double logsum = -1.0*numeric_limits<double>::infinity();
+	    long double logsum = -1.0*numeric_limits<long double>::infinity();
 	    // double p;
 	    // int dmax=-1;
 
 	    for (int previousState = 0; previousState < nStates; previousState++) {//each previous state
-		double temp =
+		long double temp =
 		    f[previousState][k-1] +                         // prob stored in previousState
 		    logRobust(hmm->getTrans(previousState,state));  // prob of transition from previousState to state
 		//if(temp > (-1.0*numeric_limits<double>::infinity()) ) {
@@ -212,7 +214,7 @@ inline vector< vector<double> > forward (Hmm * hmm, const vector<double> & obser
 
 
 
-inline vector< vector<double> > backward (Hmm * hmm, const vector<double> & observed, unsigned int sizeChunk){
+inline vector< vector<long double> > backward (Hmm * hmm, const vector<long double> & observed, unsigned int sizeChunk){
     // backward = function(hmm, observation)
     // {
     //   hmm$transProbs[is.na(hmm$transProbs)]       = 0
@@ -225,7 +227,7 @@ inline vector< vector<double> > backward (Hmm * hmm, const vector<double> & obse
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates(); 
 
-    vector< vector<double > > b ( nStates , vector<double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
+    vector< vector<long double > > b ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
     //   # Init
     //   for(state in hmm$States)
@@ -244,10 +246,10 @@ inline vector< vector<double> > backward (Hmm * hmm, const vector<double> & obse
     for (int k=(nObservations-2); k>=0; k--) {//each obs
 	cout<<k<<" "<<observed[k]<<" "<<observed[k+1]<<" ";
 	for (int state=0; state<nStates; state++) {//each state
-	    double logsum = -1.0*numeric_limits<double>::infinity();
+	    long double logsum = -1.0*numeric_limits<long double>::infinity();
 
 	    for (int nextState = 0; nextState < nStates; nextState++) {//each next state
-		double temp =
+		long double temp =
 		    b[nextState][k+1] + 
 		    logRobust(hmm->getTrans(state,nextState) ) +                                                               //transition from state to nextState
 		    logRobust(hmm->hmmstates[nextState]->probEmission( (unsigned int)(observed[k+1]*sizeChunk)  , sizeChunk)); //emission probability of state 
@@ -290,7 +292,7 @@ inline vector< vector<double> > backward (Hmm * hmm, const vector<double> & obse
 
 
 
-inline double forwardBackward(Hmm * hmm, const vector<double> & observed, unsigned int sizeChunk){
+inline long double forwardBackward(Hmm * hmm, const vector<long double> & observed, unsigned int sizeChunk){
 
     /* cout<<"forwardBackward"<<endl; */
     /* exit(1); */
@@ -298,8 +300,8 @@ inline double forwardBackward(Hmm * hmm, const vector<double> & observed, unsign
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates(); 
 
-    vector< vector<double> >  f = forward( hmm,  observed, sizeChunk);
-    vector< vector<double> >  b = backward(hmm,  observed, sizeChunk);
+    vector< vector<long double> >  f = forward( hmm,  observed, sizeChunk);
+    vector< vector<long double> >  b = backward(hmm,  observed, sizeChunk);
 
     // double probObservations = f[0][nObservations-1];
     // for(int i=1;i<nStates;i++){
@@ -309,11 +311,11 @@ inline double forwardBackward(Hmm * hmm, const vector<double> & observed, unsign
 
 
     ///    exit(1);
-    vector< vector<double> > postProb (nStates,vector<double>(nObservations));
+    vector< vector<long double> > postProb (nStates,vector<long double>(nObservations));
 
     /* cout<<"FWBW test postprob"<<endl; */
     for(int i=0;i<nObservations;i++){
-	double temp = 0.0;
+	long double temp = 0.0;
 	cout<<"obs#"<<i<<" "<<observed[i];
 	for(int x=0;x<nStates;x++){	    
 	    postProb[x][i]   = f[x][i] + b[x][i];
@@ -333,10 +335,10 @@ inline double forwardBackward(Hmm * hmm, const vector<double> & observed, unsign
     }
 
     /* cout<<"posterior prob"<<endl; */
-    double sumProb=0.0;
+    long double sumProb=0.0;
     for(int i=0;i<nObservations;i++){
 	cout<<"obs#"<<i<<" "<<observed[i];
-	double temp = 0.0;
+	long double temp = 0.0;
 	for(int x=0;x<nStates;x++){
 	    cout<<" "<<x<<" "<<postProb[x][i]; 
 	    temp             = oplusInitnatl(temp,postProb[x][i]);
@@ -353,7 +355,7 @@ inline double forwardBackward(Hmm * hmm, const vector<double> & observed, unsign
 // for(int x=0;x<nStates;x++){
 // 	for(int y=0;y<nStates;y++){
 // 	    //            forward up to x+trans x to y                    + emission observation of observed[0+1] from y                                                      + backward from y onwards
-// 	    double temp = f[x][0]        + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[0+1]*sizeChunk)  , sizeChunk)) + b[y][0+1];
+// 	    long double temp = f[x][0]        + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[0+1]*sizeChunk)  , sizeChunk)) + b[y][0+1];
 // 	    
 // 		// forward up to x+ trans x to y                   + emission observation of observed[i+1] from y                                                      + backward from y onwards
 // 		j =       f[x][i] + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[i+1]*sizeChunk)  , sizeChunk)) + b[y][i+1];
@@ -366,7 +368,7 @@ inline double forwardBackward(Hmm * hmm, const vector<double> & observed, unsign
 
 
 /*
-void baumWelchRecursion (Hmm * hmm, const vector<double> & observed){
+void baumWelchRecursion (Hmm * hmm, const vector<long double> & observed){
     // baumWelchRecursion = function(hmm, observation){
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates(); 
@@ -377,12 +379,12 @@ void baumWelchRecursion (Hmm * hmm, const vector<double> & observed){
     // 	EmissionMatrix[,]   = 0
     // 	f = forward(hmm,  observation)
     // 	b = backward(hmm, observation)
-    vector< vector<double> >  f = forward( hmm,  observed);
-    vector< vector<double> >  b = backward(hmm,  observed);
+    vector< vector<long double> >  f = forward( hmm,  observed);
+    vector< vector<long double> >  b = backward(hmm,  observed);
 
-    double probObservations = f[0][nObservations-1];
+    long double probObservations = f[0][nObservations-1];
     for(int i=1;i<nStates;i++){
-	double j = f[i,nObservations-1];
+	long double j = f[i,nObservations-1];
 	probObservations = oplusInitnatl( j, probObservations );
     }
 // 		if(j > - Inf)
@@ -405,7 +407,7 @@ void baumWelchRecursion (Hmm * hmm, const vector<double> & observed){
     for(int x=0;x<nStates;x++){
 	for(int y=0;y<nStates;y++){
 	    //            forward up to x+trans x to y                    + emission observation of observed[0+1] from y                                                      + backward from y onwards
-	    double temp = f[x][0]        + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[0+1]*sizeChunk)  , sizeChunk)) + b[y][0+1];
+	    long double temp = f[x][0]        + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[0+1]*sizeChunk)  , sizeChunk)) + b[y][0+1];
 	    for(int i=1;i<(length(observation)-1);i++){
 		// forward up to x+ trans x to y                   + emission observation of observed[i+1] from y                                                      + backward from y onwards
 		j =       f[x][i] + logRobust(hmm->getTrans(x,y) ) + logRobust(hmm->hmmstates[y]->probEmission( (unsigned int)(observed[i+1]*sizeChunk)  , sizeChunk)) + b[y][i+1];
@@ -465,7 +467,7 @@ void baumWelchRecursion (Hmm * hmm, const vector<double> & observed){
 
 //taken from https://cran.r-project.org/web/packages/HMM/
 void baum_welch(Hmm * hmm,		          // HMM to optimize
- 		const vector<double> * emittedH   // observations
+ 		const vector<long double> * emittedH   // observations
 ){ 
     Hmm tempHmm (*hmm);
     int maxIterations=10;
@@ -521,7 +523,7 @@ void baum_welch(Hmm * hmm,		          // HMM to optimize
 */
 
 // void baum_welch(Hmm * hmm,		          // HMM to optimize
-// 		const vector<double> * emittedH   // observations
+// 		const vector<long double> * emittedH   // observations
 // ){ 
 //     const int length    = emittedH->size();
 //     //const int no_chunks = B.get_no_chunks_per_row();
@@ -632,7 +634,7 @@ void baum_welch(const sequence &obsseq,
 
 //taken from https://gist.github.com/Feder1co5oave/2347228
 
-inline hmmpath viterbi(Hmm * hmm, const vector<double> & observed, unsigned int sizeChunk){//, const int n) {
+inline hmmpath viterbi(Hmm * hmm, const vector<long double> & observed, unsigned int sizeChunk){//, const int n) {
     int n = int(observed.size());
 
     //assert(n > 0); assert(observed != NULL);
@@ -650,7 +652,7 @@ inline hmmpath viterbi(Hmm * hmm, const vector<double> & observed, unsigned int 
     // }
     
     //vector< vector<double> > prob;  //1D #obs, 2D # HMM states, probability of observation i by state j
-    vector< vector<double> > prob ( hmm->getNumberStates() , vector<double>(n,0.0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
+    vector< vector<long double> > prob ( hmm->getNumberStates() , vector<long double>(n,0.0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
     //vector< vector<int>    > prevs; //1D #obs, 2D # HMM states, most likely state for observation i at state j
     vector< vector<int>    > prevs ( hmm->getNumberStates() ,   vector<int>(n,  0) );//1D # HMM states, 2D #obs,  most likely state for observation i at state j
     
@@ -708,8 +710,8 @@ inline hmmpath viterbi(Hmm * hmm, const vector<double> & observed, unsigned int 
     for (int i = 1; i < n; i++) {//each obs
 
 	for (int j = 0; j < hmm->getNumberStates(); j++) {//each state
-	    double pmax = -1.0*numeric_limits<double>::infinity();
-	    double p;
+	    long double pmax = -1.0*numeric_limits<long double>::infinity();
+	    long double p;
 	    int dmax=-1;
 
 	    for (int k = 0; k < hmm->getNumberStates(); k++) {//each previous state
@@ -739,7 +741,7 @@ inline hmmpath viterbi(Hmm * hmm, const vector<double> & observed, unsigned int 
     }//end each obs
     cerr<<"done"<<endl;
     
-    double pmax =  -1.0*numeric_limits<double>::infinity();
+    long double pmax =  -1.0*numeric_limits<long double>::infinity();
     int    dmax =-1;
 
     //finding max at last observation
