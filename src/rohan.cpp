@@ -3788,6 +3788,7 @@ int main (int argc, char *argv[]) {
     //////////////////////////////////
 
  beginhmm:
+
     Hmm hmm;
     cerr<<"Begin running HMM"<<endl;
     vector<emission>  eTest = hmm.generateStates(250,sizeChunk);
@@ -3826,79 +3827,75 @@ int main (int argc, char *argv[]) {
     long double hlower = double( 200)/double(1000000);
     long double hupper = double(1000)/double(1000000);
     
-	//transition rate
-	long double pTlowerFirstHalf  =    0.5;
-	long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+    //transition rate
+    long double pTlowerFirstHalf  =    0.5;
+    long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
 	
-	long double pTlower = pTlowerFirstHalf;	
-	long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+    long double pTlower = pTlowerFirstHalf;	
+    long double pTupper = 1.0 - numeric_limits<double>::epsilon();
 
-	long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
-	long double pT_i_1;
-	//long double pTlower =       numeric_limits<double>::epsilon();
+    long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
+    long double pT_i_1;
+    //long double pTlower =       numeric_limits<double>::epsilon();
         
-	random_device rd;
-	default_random_engine dre (rd());
-	int maxChains = 100000;
-	//chain 0
+    random_device rd;
+    default_random_engine dre (rd());
+    int maxChains = 100000;
+    //chain 0
 
-	hmm.setHetRateForNonROH(h_i);
-	hmm.setTransprob(pT_i);
-	x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
-	cerr<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
-	for(int chain=1;chain<=maxChains;chain++){
+    hmm.setHetRateForNonROH(h_i);
+    hmm.setTransprob(pT_i);
+    x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
+    cerr<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
+    for(int chain=1;chain<=maxChains;chain++){
 
-	    //computing new state
-	    normal_distribution<long double> distribution_h(h_i,(hupper-hlower)/partition  );
-	    h_i_1      = distribution_h(dre);
+	//computing new state
+	normal_distribution<long double> distribution_h(h_i,(hupper-hlower)/partition  );
+	h_i_1      = distribution_h(dre);
 
-	    if(h_i_1 <= hlower     ||  h_i_1 >= hupper     ){
-		h_i_1      = h_i;
-	    }
-
-
-	    normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
-	    pT_i_1      = distribution_pT(dre);
-
-	    if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
-		pT_i_1      = pT_i;
-	    }
-       
-	    hmm.setHetRateForNonROH(h_i_1);
-	    hmm.setTransprob(pT_i_1);
-
-	    x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
-
-	    if(chain>(maxChains/2)){
-		pTlower = pTlowerSecondHalf;
-	    }
-
-	    long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
-	    if( (long double)(randomProb()) < acceptance){
-		h_i           =  h_i_1;
-		pT_i          =  pT_i_1;
-		x_i           =  x_i_1;
-		accept++;
-		cerr<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
-		//cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
-	    
-	    }else{
-		cerr<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
-	    }
-	    chain++;
-	    //sleep(0.1);
+	if(h_i_1 <= hlower     ||  h_i_1 >= hupper     ){
+	    h_i_1      = h_i;
 	}
-	cerr<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+
+
+	normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
+	pT_i_1      = distribution_pT(dre);
+
+	if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
+	    pT_i_1      = pT_i;
+	}
+       
+	hmm.setHetRateForNonROH(h_i_1);
+	hmm.setTransprob(pT_i_1);
+
+	x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
+
+	if(chain>(maxChains/2)){
+	    pTlower = pTlowerSecondHalf;
+	}
+
+	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
+	if( (long double)(randomProb()) < acceptance){
+	    h_i           =  h_i_1;
+	    pT_i          =  pT_i_1;
+	    x_i           =  x_i_1;
+	    accept++;
+	    cerr<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    
+	}else{
+	    cerr<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	}
+	chain++;
+	//sleep(0.1);
+    }
+    cerr<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
 
 	
     //cerr<<"Baum Welch"<<endl;
     //baum_welch(&hmm,&emittedH);
 	
-	cerr<<"testing viterbi algorithm"<<endl;
-	
-    hmmpath hp=viterbi(&hmm, emittedH, sizeChunk);//, const int n) {
-    // cout<<"done"<<endl;
-
+    cerr<<"HMM done"<<endl;
 
 
     //////////////////////////////////

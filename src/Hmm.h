@@ -117,6 +117,73 @@ inline long double forwardProb (Hmm * hmm, const vector<long double> & observed,
     return temp;
 }
 
+typedef struct { 
+    long double plow;
+    long double phigh;
+    bool undef;     //0 = defined,    1 = undefined
+    bool chrBreak;  //0 = continuous, 1 = break
+} emissionUndef;
+
+
+inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
+    int nObservations  = int(observed.size());
+    int nStates        = hmm->getNumberStates(); 
+
+    vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
+
+    for (int state = 0; state < nStates; state++) { //
+	if(observed[state].undef){
+	    f[state][0] =
+		logRobust( hmm->startingState[state]) ;                                                                //prob of starting a state
+	}else{
+	    f[state][0] =
+		logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
+		logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) ); //emitting observed[0] by state
+	}
+    }
+
+
+    for (int k = 1; k < nObservations; k++) {//each obs
+
+	for (int state = 0; state < nStates; state++) {//each state
+	    long double logsum = -1.0*numeric_limits<long double>::infinity();
+	    long double logsumNotrans = -1.0*numeric_limits<long double>::infinity();
+	    // double p;
+	    // int dmax=-1;
+	    
+	    for (int previousState = 0; previousState < nStates; previousState++) {//each previous state
+		long double temp =
+		    f[previousState][k-1] +                         // prob stored in previousState
+		    logRobust(hmm->getTrans(previousState,state));  // prob of transition from previousState to state
+		logsum = oplusInitnatl( logsum, temp );
+		logsumNotrans = oplusInitnatl( logsumNotrans, f[previousState][k-1] );
+	    }//end each previous state
+
+	    //logsum contains the sum of all probs from every previous state
+	    if( observed[state].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
+		f[state][k]     =		    logsumNotrans;   
+	    }else{
+		if(observed[state].undef){
+		    f[state][k] =		    logsum;   //forego emission                                                                                               //sum of all probs for every previous state	    
+		}else{
+		    f[state][k] =
+			logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) +  //emission probability by state
+			logsum;                                                                                                  //sum of all probs for ev
+		}
+	    }
+	}//each state
+
+    }//end each obs
+    
+
+    long double temp=0;
+    for (int state = 0; state < nStates; state++) {//each state
+	temp = oplusInitnatl( temp ,  	    f[state][nObservations-1]  );
+    }
+
+    return temp;
+}
+
 
 inline vector< vector<long double> > forward (Hmm * hmm, const vector<long double> & observed, unsigned int sizeChunk){
     // hmm$transProbs[is.na(hmm$transProbs)]       = 0
