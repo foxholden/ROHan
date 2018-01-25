@@ -87,6 +87,9 @@ unsigned int MAXLENGTHFRAGMENT  =    MINLENGTHFRAGMENT;     //  maximal length f
 
 long double stepHMM = 1000;
 char offsetQual=33;
+//                                         4 u       Ne
+int minSegSitesPer1M=  80; // 0.00008	 = 4*2e-8* 1000
+int maxSegSitesPer1M=5000; // 0.00500    = 4*2e-8*62500
 
 long double likeMatch           [MAXBASEQUAL+1];
 long double likeMismatch        [MAXBASEQUAL+1];
@@ -1452,7 +1455,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     checkResults("pthread_mutex_unlock()\n", rc);
 
     //max iterations
-    int sitesPer1M=randomInt(200,1000);// between 1 and 1000 sites per million
+    int sitesPer1M=randomInt(minSegSitesPer1M,maxSegSitesPer1M);// between minSegSitesPer1M and maxSegSitesPer1M  and 1000 sites per million
     // long double theta     = double(sitesPer1M)/double(1000000); //theta
     // long double theta_t_1 = theta;
     long double hp;
@@ -3788,8 +3791,19 @@ int main (int argc, char *argv[]) {
     //////////////////////////////////
 
  beginhmm:
-
-    Hmm hmm;
+    //calculating min/max number of sites per sizeChunk
+    int minSegSitesPerChunk;
+    int maxSegSitesPerChunk;
+    if(sizeChunk == 1000000){
+	minSegSitesPerChunk = minSegSitesPer1M;
+	maxSegSitesPerChunk = maxSegSitesPer1M;
+    }else{
+	minSegSitesPerChunk = int( (double(minSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+	maxSegSitesPerChunk = int( (double(maxSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+    }
+    
+    Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
+    
     cerr<<"Begin running HMM"<<endl;
     vector<emission>  eTest = hmm.generateStates(250,sizeChunk);
     //TODO add multiple bootstraps
@@ -3822,10 +3836,11 @@ int main (int argc, char *argv[]) {
     //het rate
     //int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
     int sitesPer1M     = 1000;// 1000 sites per million
-    long double h_i    = double(sitesPer1M)/double(1000000);
+    long double h_i    = double(       sitesPer1M )/double(1000000);
     long double h_i_1;
-    long double hlower = double( 200)/double(1000000);
-    long double hupper = double(1000)/double(1000000);
+
+    long double hlower = double( minSegSitesPer1M )/double(1000000);
+    long double hupper = double( maxSegSitesPer1M )/double(1000000);
     
     //transition rate
     long double pTlowerFirstHalf  =    0.5;

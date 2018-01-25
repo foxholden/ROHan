@@ -8,13 +8,13 @@
 #include "Hmm.h"
 
 
-Hmm::Hmm(){
+Hmm::Hmm(int minSegSitesPerChunk,int maxSegSitesPerChunk,int sizeChunk){
     //cerr<<"Hmm constr"<<endl;
     for(int n=0;n<NBRSTATES;n++){
 	if(n==0)
-	    hmmstates[n] = new  HmmState (n,0.000000012);
+	    hmmstates[n] = new  HmmState (n,0.000000012,minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
 	if(n==1)
-	    hmmstates[n] = new  HmmState (n,0.00072);	
+	    hmmstates[n] = new  HmmState (n,0.00072    ,minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
     }
 
     for(int n=0;n<NBRSTATES;n++){
@@ -60,7 +60,11 @@ Hmm::Hmm(){
     // probStay[1]=1-pTrans;
     
     //    cout<<"test"<<endl;
-    
+
+    // for(int m=0;m<1500;m++){
+    // 	cout<<m<<"\t"<<hmmstates[1]->probEmission(m,1000000)<<endl;       
+    // }
+    //exit(1);
 }
 
 Hmm::Hmm(const Hmm & other){

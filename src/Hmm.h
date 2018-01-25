@@ -40,7 +40,7 @@ public:
     long double probStay[NBRSTATES];
     HmmState * hmmstates[NBRSTATES];
 	
-    Hmm();
+    Hmm(int minSegSitesPerChunk,int maxSegSitesPerChunk,int sizeChunk);
     Hmm(const Hmm & other);
     ~Hmm();
     Hmm & operator= (const Hmm & other);
@@ -127,12 +127,12 @@ typedef struct {
 
 inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
     int nObservations  = int(observed.size());
-    int nStates        = hmm->getNumberStates(); 
+    int nStates        = hmm->getNumberStates();
 
     vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
     for (int state = 0; state < nStates; state++) { //
-	if(observed[state].undef){
+	if(observed[state].undef){ //if undefined
 	    f[state][0] =
 		logRobust( hmm->startingState[state]) ;                                                                //prob of starting a state
 	}else{
@@ -146,7 +146,7 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
     for (int k = 1; k < nObservations; k++) {//each obs
 
 	for (int state = 0; state < nStates; state++) {//each state
-	    long double logsum = -1.0*numeric_limits<long double>::infinity();
+	    long double logsum        = -1.0*numeric_limits<long double>::infinity();
 	    long double logsumNotrans = -1.0*numeric_limits<long double>::infinity();
 	    // double p;
 	    // int dmax=-1;
@@ -160,14 +160,15 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 	    }//end each previous state
 
 	    //logsum contains the sum of all probs from every previous state
-	    if( observed[state].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
-		f[state][k]     =		    logsumNotrans;   
+	    if( observed[k].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
+		f[state][k]     =		    logsumNotrans+ ; //previous probability without transition probability
+		                                    logRobust( hmm->startingState[state]) ; 
 	    }else{
-		if(observed[state].undef){
-		    f[state][k] =		    logsum;   //forego emission                                                                                               //sum of all probs for every previous state	    
-		}else{
+		if(observed[k].undef){
+		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
+		}else{//not undefined and not break
 		    f[state][k] =
-			logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) +  //emission probability by state
+			logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k].plow*sizeChunk), (unsigned int)(observed[k].phigh*sizeChunk)  , sizeChunk) ) +  //emission probability by state
 			logsum;                                                                                                  //sum of all probs for ev
 		}
 	    }
