@@ -138,7 +138,9 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 	}else{
 	    f[state][0] =
 		logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
-		logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) ); //emitting observed[0] by state
+		logRobust(hmm->hmmstates[state]->probEmissionRange( (unsigned int)(observed[0].plow *sizeChunk),
+								    (unsigned int)(observed[0].phigh*sizeChunk),
+								    sizeChunk)	); //emitting observed[0] by state
 	}
     }
 
@@ -161,14 +163,16 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 
 	    //logsum contains the sum of all probs from every previous state
 	    if( observed[k].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
-		f[state][k]     =		    logsumNotrans+ ; //previous probability without transition probability
-		                                    logRobust( hmm->startingState[state]) ; 
+		f[state][k]     =		    logsumNotrans+                            //previous probability without transition probability
+		    logRobust( hmm->startingState[state]) ;   //probability of "re"starting at state "state"
 	    }else{
 		if(observed[k].undef){
 		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
 		}else{//not undefined and not break
 		    f[state][k] =
-			logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k].plow*sizeChunk), (unsigned int)(observed[k].phigh*sizeChunk)  , sizeChunk) ) +  //emission probability by state
+			logRobust( hmm->hmmstates[state]->probEmissionRange( (unsigned int)(observed[k].plow *sizeChunk)  ,
+									     (unsigned int)(observed[k].phigh*sizeChunk)  ,
+									     sizeChunk) ) +  //emission probability by state
 			logsum;                                                                                                  //sum of all probs for ev
 		}
 	    }

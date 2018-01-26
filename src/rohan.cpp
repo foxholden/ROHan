@@ -3805,11 +3805,13 @@ int main (int argc, char *argv[]) {
     Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
     
     cerr<<"Begin running HMM"<<endl;
-    vector<emission>  eTest = hmm.generateStates(250,sizeChunk);
+    vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
+    vector<emissionUndef>  eTestUndef;
     //TODO add multiple bootstraps
     //- generate a number between hLower and hUpper
     // or modified probEmmission to reflect the uncertainty
     vector<long double> emittedH;
+    
     //TODO add a way to avoid missing data,
     //in the log-likelihood computation for missing data and chr breaks
     //for(unsigned int hWindow=0;hWindow<heteroEstResults.size();hWindow++){
@@ -3819,9 +3821,18 @@ int main (int argc, char *argv[]) {
     // 	//     emittedH.push_back( heteroEstResults[i].h );
     // 	// }
     // }
+    long double uncertainty = 0.00005;
     for(unsigned int i=0;i<eTest.size();i++){
-	cerr<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<endl;
+
 	emittedH.push_back( eTest[i].p );
+	emissionUndef e;
+	e.plow     = eTest[i].p - uncertainty;
+	if(e.plow < 0) e.plow=0.0;
+	e.phigh    = eTest[i].p + uncertainty;
+	e.undef    = false;
+	e.chrBreak = false;
+	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<"\t"<<e.plow<<" "<<e.phigh<<" "<<e.undef<<" "<<e.chrBreak <<endl;	
+	eTestUndef.push_back( e );
     }
 
     
@@ -3860,8 +3871,9 @@ int main (int argc, char *argv[]) {
 
     hmm.setHetRateForNonROH(h_i);
     hmm.setTransprob(pT_i);
-    x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
-    cerr<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
+    //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
+    x_i    =  forwardProbUncertaintyMissing(&hmm, eTestUndef , sizeChunk);
+    cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
     for(int chain=1;chain<=maxChains;chain++){
 
 	//computing new state
@@ -3883,7 +3895,8 @@ int main (int argc, char *argv[]) {
 	hmm.setHetRateForNonROH(h_i_1);
 	hmm.setTransprob(pT_i_1);
 
-	x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
+	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
+	x_i_1=forwardProbUncertaintyMissing(&hmm, eTestUndef , sizeChunk);
 
 	if(chain>(maxChains/2)){
 	    pTlower = pTlowerSecondHalf;
@@ -3895,16 +3908,16 @@ int main (int argc, char *argv[]) {
 	    pT_i          =  pT_i_1;
 	    x_i           =  x_i_1;
 	    accept++;
-	    cerr<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    
 	}else{
-	    cerr<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	}
 	chain++;
 	//sleep(0.1);
     }
-    cerr<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+    cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
 
 	
     //cerr<<"Baum Welch"<<endl;
