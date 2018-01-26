@@ -49,7 +49,7 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 	mkdir ../lib/bamtools/
 	git clone --recursive https://github.com/pezmaster31/bamtools.git ../lib/bamtools/
 
-../lib/bamtools/build/build/src/api/libbamtools.a: ../lib/bamtools/src/api/BamAlignment.h
+../lib/bamtools/build/src/api/libbamtools.a: ../lib/bamtools/src/api/BamAlignment.h
 	cd ../lib/bamtools/ && mkdir -p build/  && cd build/ && cmake .. && make && cd ../..
 
 clean :
