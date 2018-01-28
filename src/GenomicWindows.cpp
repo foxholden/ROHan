@@ -8,6 +8,10 @@
 #include "GenomicWindows.h"
 
 
+GenomicWindows::GenomicWindows(){
+
+}
+
 GenomicWindows::GenomicWindows(string fastaIndex,bool allowSexChr){
     //    srand48 ( time(NULL) );
     // time_t t; 

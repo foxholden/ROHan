@@ -43,11 +43,11 @@ HmmState::HmmState(const HmmState & other){
     sizeChunk           = other.sizeChunk;
 
     delete probablitiesForEmission;
-    probablitiesForEmission = new vector<long double> ();
+    probablitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0);
     
     for(unsigned int mutations=0;mutations<=( (unsigned int)maxSegSitesPerChunk);mutations++){ //unsigned int total) const{
 	long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
-	probablitiesForEmission->push_back( probMut );
+	probablitiesForEmission->at(mutations) = probMut ;
     }
 
     rng  = gsl_rng_alloc (gsl_rng_taus);
@@ -72,12 +72,14 @@ long double HmmState::probEmission(unsigned int mutations,unsigned int total) co
     // }else{
     // 	return ( pow((1-noMut),mutations) + pow(noMut,(total-mutations)) );
     // }
+    //long double normalVal =   gsl_ran_binomial_pdf(mutations,h,total);
+
     if(int(total) != sizeChunk){
 	cerr<<"HmmState::probEmission("<<mutations<<","<<total<<") is different than the pre-computed size of chunk "<<sizeChunk<<endl;
 	exit(1);
     }
     
-    //return gsl_ran_binomial_pdf(mutations,h,total);
+
     if(mutations<0){
 	cerr<<"HmmState::probEmission("<<mutations<<","<<total<<") is lower than the defined minimum "<<minSegSitesPerChunk<<endl;
 	exit(1);	
@@ -89,13 +91,20 @@ long double HmmState::probEmission(unsigned int mutations,unsigned int total) co
     }
 
     
-    return probablitiesForEmission->at( mutations );
+    long double toReturn=probablitiesForEmission->at( mutations );
+    // cerr<<h<<"\t"<<mutations<<"\t"<<normalVal<<"\t"<<toReturn<<endl;
+    // if(normalVal != toReturn){
+    // 	exit(1);
+    // }
+    return toReturn;
 }
 
 
 //if we have a range to marginalize over using a uniform prior
 long double HmmState::probEmissionRange(unsigned int mutationsMin,unsigned int mutationsMax,unsigned int total) const{
 
+    //cerr<<"probEmissionRange "<<mutationsMin<<" "<<mutationsMax<<endl;
+    // exit(1);
     if(int(total) != sizeChunk){
 	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax<<","<<total<<") is different than the pre-computed size of chunk "<<sizeChunk<<endl;
 	exit(1);
@@ -112,6 +121,10 @@ long double HmmState::probEmissionRange(unsigned int mutationsMin,unsigned int m
 	exit(1);
     }
 
+    if(mutationsMin == mutationsMax){
+	mutationsMax = mutationsMin+1;
+    }
+
     if(int(mutationsMax) > maxSegSitesPerChunk ){
 	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax<<","<<total<<") is higher than the defined minimum "<<maxSegSitesPerChunk<<endl;
 	exit(1);	
@@ -122,7 +135,10 @@ long double HmmState::probEmissionRange(unsigned int mutationsMin,unsigned int m
 	sumPFE += probablitiesForEmission->at( m );
     }
     
+    //cerr<<"probablitiesForEmission sumPFE = "<<sumPFE<<" return="<<(sumPFE / (mutationsMax-mutationsMin) )<<endl;
+    //to test
     return (sumPFE / (mutationsMax-mutationsMin) );
+    //return probablitiesForEmission->at( (mutationsMax-mutationsMin)/2);
 }
 
 unsigned int HmmState::randomEmission(int total) const{
@@ -171,11 +187,11 @@ void HmmState::setH(long double newH){
 
     //need to recompute the probablitiesForEmission
     delete probablitiesForEmission;
-    probablitiesForEmission = new vector<long double> ();
+    probablitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0.0);
     
     for(unsigned int mutations=minSegSitesPerChunk;mutations<=( (unsigned int)maxSegSitesPerChunk);mutations++){ //unsigned int total) const{
 	long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
-	probablitiesForEmission->push_back( probMut );
+	probablitiesForEmission->at(mutations) = probMut;
     }
 
 }

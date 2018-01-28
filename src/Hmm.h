@@ -126,9 +126,9 @@ typedef struct {
 
 
 inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
+
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates();
-
     vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
     for (int state = 0; state < nStates; state++) { //
@@ -138,6 +138,9 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 	}else{
 	    f[state][0] =
 		logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
+		/* logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[0].plow+observed[0].phigh)/2.0 *sizeChunk), */
+		/* 					       sizeChunk)	); //emitting observed[0] by state */
+
 		logRobust(hmm->hmmstates[state]->probEmissionRange( (unsigned int)(observed[0].plow *sizeChunk),
 								    (unsigned int)(observed[0].phigh*sizeChunk),
 								    sizeChunk)	); //emitting observed[0] by state
@@ -170,10 +173,12 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
 		}else{//not undefined and not break
 		    f[state][k] =
+			/* logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[k].plow+observed[k].phigh)/2.0 *sizeChunk)  , */
+			/* 						sizeChunk) ) +  //emission probability by state */
 			logRobust( hmm->hmmstates[state]->probEmissionRange( (unsigned int)(observed[k].plow *sizeChunk)  ,
 									     (unsigned int)(observed[k].phigh*sizeChunk)  ,
 									     sizeChunk) ) +  //emission probability by state
-			logsum;                                                                                                  //sum of all probs for ev
+			logsum;                                                              //sum of all probs for ev
 		}
 	    }
 	}//each state

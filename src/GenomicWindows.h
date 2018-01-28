@@ -37,6 +37,7 @@ class GenomicWindows{
     bool allowSexChr;
 
 public:
+    GenomicWindows( );
     GenomicWindows(string fastaIndex,bool allowSexChr=false );
     ~GenomicWindows();
 

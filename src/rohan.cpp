@@ -2943,12 +2943,19 @@ int main (int argc, char *argv[]) {
     string stringinfo= stringify(rateForPoissonCov)+"\n";
     vector<hResults> heteroEstResults;
     Internal::BgzfStream  bgzipWriterHest;
- 
+    unsigned int      rank  = 0;
+    int          lastRank   =-1;
+    vector<GenomicRange> v ;
+    GenomicWindows     rw ;
+    int    bpToExtract;
+    int                   rc;
+    RefVector  references;
+    BamReader reader;
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
     
-    goto beginhmm;
+
     
     const string usage=string("\nThis program co-estimates heterozygosity rates and runs of homozygosity\n\n\t"+
                               string(argv[0])+                        
@@ -2987,7 +2994,7 @@ int main (int argc, char *argv[]) {
 
                               "");
 
-
+    goto beginhmm;
     if( (argc== 1) ||
         (argc== 2 && string(argv[1]) == "-h") ||
         (argc== 2 && string(argv[1]) == "-help") ||
@@ -3150,7 +3157,7 @@ int main (int argc, char *argv[]) {
 
 
     //Testing BAM file
-    BamReader reader;
+
     if ( !reader.Open(bamFileToOpen) ) {
 	cerr << "Could not open input BAM file:" << bamFileToOpen <<endl;
     	exit(1);
@@ -3164,7 +3171,7 @@ int main (int argc, char *argv[]) {
     }
 
     // retrieve reference data
-    const RefVector  references = reader.GetReferenceData();
+    references = reader.GetReferenceData();
 
 
     reader.Close();
@@ -3245,22 +3252,20 @@ int main (int argc, char *argv[]) {
 
     cerr<<"Computing average coverage.."<<endl;
 
-    int                   rc=0;
+    rc=0;
     pthread_t             threadCov[numberOfThreads];
 
-    int    bpToExtract       = sizeChunk;
+    bpToExtract       = sizeChunk;
     
 
 
 
-    GenomicWindows     rw  (fastaIndex,false);
+    rw = GenomicWindows  (fastaIndex,false);
 
 
-    vector<GenomicRange> v = rw.getGenomicWindows(bpToExtract,0);
+    v = rw.getGenomicWindows(bpToExtract,0);
     if( v.size() == 0 ){    cerr<<"No range found using these chr/loci settings"<<endl; return 1;}
     
-    unsigned int      rank  = 0;
-    int          lastRank   =-1;
     //unsigned int sizeGenome = 0;
 
     for(unsigned int i=0;i<v.size();i++){
@@ -3592,11 +3597,9 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
 
-
-    
-    
-    
+        
     bgzipWriterHest.Write(headerHest.c_str(), headerHest.size());
+
     
 
 #ifndef DEBUGFIRSTWINDOWS
@@ -3791,11 +3794,17 @@ int main (int argc, char *argv[]) {
     //////////////////////////////////
 
  beginhmm:
+
+
+
+#ifdef TESTHMMSIMS
     //calculating min/max number of sites per sizeChunk
     int minSegSitesPerChunk;
     int maxSegSitesPerChunk;
     if(sizeChunk == 1000000){
-	minSegSitesPerChunk = minSegSitesPer1M;
+	//those parameters are defined in the header, they correspond to the lowest possible h in a non-ROH region
+	//and the highest
+	minSegSitesPerChunk = minSegSitesPer1M;	
 	maxSegSitesPerChunk = maxSegSitesPer1M;
     }else{
 	minSegSitesPerChunk = int( (double(minSegSitesPer1M)/double(1000000))*double(sizeChunk) );
@@ -3805,8 +3814,12 @@ int main (int argc, char *argv[]) {
     Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
     
     cerr<<"Begin running HMM"<<endl;
+    cerr<<"generating a random set"<<endl;
     vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
+
+    
     vector<emissionUndef>  eTestUndef;
+    cerr<<"done"<<endl;
     //TODO add multiple bootstraps
     //- generate a number between hLower and hUpper
     // or modified probEmmission to reflect the uncertainty
@@ -3821,7 +3834,11 @@ int main (int argc, char *argv[]) {
     // 	//     emittedH.push_back( heteroEstResults[i].h );
     // 	// }
     // }
-    long double uncertainty = 0.00005;
+    //long double uncertainty = 0.000000000001;
+    //                        0.00072
+    //                        0.00005
+    //                        0.00001
+    long double uncertainty = 0.00001000;
     for(unsigned int i=0;i<eTest.size();i++){
 
 	emittedH.push_back( eTest[i].p );
@@ -3854,7 +3871,7 @@ int main (int argc, char *argv[]) {
     long double hupper = double( maxSegSitesPer1M )/double(1000000);
     
     //transition rate
-    long double pTlowerFirstHalf  =    0.5;
+    long double pTlowerFirstHalf  =    numeric_limits<double>::epsilon();//TODO put back 0.5 
     long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
 	
     long double pTlower = pTlowerFirstHalf;	
@@ -3866,7 +3883,8 @@ int main (int argc, char *argv[]) {
         
     random_device rd;
     default_random_engine dre (rd());
-    int maxChains = 100000;
+    //int maxChains = 100000;
+    int maxChains   =  50000;
     //chain 0
 
     hmm.setHetRateForNonROH(h_i);
@@ -3898,7 +3916,7 @@ int main (int argc, char *argv[]) {
 	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
 	x_i_1=forwardProbUncertaintyMissing(&hmm, eTestUndef , sizeChunk);
 
-	if(chain>(maxChains/2)){
+	if(chain>(maxChains/4)){
 	    pTlower = pTlowerSecondHalf;
 	}
 
@@ -3909,12 +3927,11 @@ int main (int argc, char *argv[]) {
 	    x_i           =  x_i_1;
 	    accept++;
 	    cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
-	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
-	    
+	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}else{
 	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	}
-	chain++;
+	//chain++;
 	//sleep(0.1);
     }
     cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
@@ -3924,7 +3941,7 @@ int main (int argc, char *argv[]) {
     //baum_welch(&hmm,&emittedH);
 	
     cerr<<"HMM done"<<endl;
-
+#ifdef ENDIF
 
     //////////////////////////////////
     //                              //
@@ -3938,6 +3955,8 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
+//produce plot libharu?
+//
 
     //////////////////////////////////
     //                              //
