@@ -2941,7 +2941,7 @@ int main (int argc, char *argv[]) {
     string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\thLow\thHigh\n";
     Internal::BgzfStream  bgzipWriterInfo;
     string stringinfo= stringify(rateForPoissonCov)+"\n";
-    vector<hResults> heteroEstResults;
+    vector<emissionUndef> heteroEstResults;
     Internal::BgzfStream  bgzipWriterHest;
     unsigned int      rank  = 0;
     int          lastRank   =-1;
@@ -2951,6 +2951,8 @@ int main (int argc, char *argv[]) {
     int                   rc;
     RefVector  references;
     BamReader reader;
+    string previousChrWritten="###";
+    bool skipToHMM=false;
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
@@ -2970,6 +2972,7 @@ int main (int argc, char *argv[]) {
 			      "\t\t"+""  +""+"--name" + "\t\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
 			      "\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
 			      //"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
+
 			      "\n\tComputation options:\n"+
                               "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
@@ -2977,6 +2980,8 @@ int main (int argc, char *argv[]) {
 			      //			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
 			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
 			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]" +"\t\t\t"+"Steps used for MCMC sampling (default: "+stringify(stepHMM)+")"+"\n"+  
+			      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""       +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
+			      "\t\t"+""  +""+""           +"\t\t\t"    + ""       +"\t\t\t"+"read the previous het. rates from files and skip to HMM"+"\n"+  
 			      
 			      
                               // "\n\tSample options:\n"+
@@ -2994,7 +2999,6 @@ int main (int argc, char *argv[]) {
 
                               "");
 
-    goto beginhmm;
     if( (argc== 1) ||
         (argc== 2 && string(argv[1]) == "-h") ||
         (argc== 2 && string(argv[1]) == "-help") ||
@@ -3020,6 +3024,17 @@ int main (int argc, char *argv[]) {
         //     i++;
         //     continue;
 	// }
+	
+        if( string(argv[i]) == "--step"  ){
+	    stepHMM=destringify<long double>(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if( string(argv[i]) == "--hmm"  ){
+	    skipToHMM=false;
+            continue;
+        }
 	
         if( string(argv[i]) == "--size"  ){
 	    sizeChunk=destringify<unsigned int>(argv[i+1]);
@@ -3123,6 +3138,12 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
 
+    pthread_t             threadCov[numberOfThreads];//coverage threads
+    pthread_t             threadHet[numberOfThreads];//het      threads
+    if(skipToHMM){//skip het computations
+	goto beginhmm;
+    }
+    
     if(!outFilePrefixFlag){
 	cerr<<"The output file has to be defined"<<endl;
 	return 1;	
@@ -3253,7 +3274,7 @@ int main (int argc, char *argv[]) {
     cerr<<"Computing average coverage.."<<endl;
 
     rc=0;
-    pthread_t             threadCov[numberOfThreads];
+
 
     bpToExtract       = sizeChunk;
     
@@ -3558,7 +3579,7 @@ int main (int argc, char *argv[]) {
     ///////////////////////
     //  Compute hetero   //
     ///////////////////////
-    pthread_t             threadHet[numberOfThreads];
+    
     threadID2Rank=map<unsigned int, int> ();
 
 
@@ -3678,6 +3699,7 @@ int main (int argc, char *argv[]) {
     //#ifdef LATER
     //cerr<<"test wroteEverything="<<wroteEverything<<endl;
     cerr<<"Writing data to logs/output file"<<endl;
+
     while(!wroteEverything){
 
 	//threads are running here
@@ -3697,21 +3719,41 @@ int main (int argc, char *argv[]) {
 		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<dataToWrite->vecPositionResults->size()<<" records"<<endl;
 
 		string strToWrite=dataToWrite->rangeGen.asBed()+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
-
-		heteroEstResults.push_back( dataToWrite->hetEstResults );
+		emissionUndef hetResToAdd;
+		
+		if(     previousChrWritten != dataToWrite->rangeGen.getChrName()){
+		    if(previousChrWritten == "###"){//first chr
+			hetResToAdd.chrBreak   = false;//not a true chr break
+		    }else{//true new chr
+			hetResToAdd.chrBreak   = true;			
+		    }
+		    previousChrWritten = dataToWrite->rangeGen.getChrName();
+		}else{//same chr
+		    hetResToAdd.chrBreak   = false;		
+		}
+		
+		//hetResToAdd
+		//heteroEstResults.push_back( dataToWrite->hetEstResults );
 		
 		if(dataToWrite->hetEstResults.hasConverged){
-		    long double h     = dataToWrite->hetEstResults.h;
-		    long double hLow  = dataToWrite->hetEstResults.hLow;
-		    long double hHigh = dataToWrite->hetEstResults.hHigh;
+		    hetResToAdd.undef  = false;		
+		    long double h      = dataToWrite->hetEstResults.h;
+		    long double hLow   = dataToWrite->hetEstResults.hLow;
+		    long double hHigh  = dataToWrite->hetEstResults.hHigh;
+		    hetResToAdd.plow   = hLow;
+		    hetResToAdd.phigh  = hHigh;
+		    
 		    if(h<0)      h     = 0;
 		    if(hLow<0)   hLow  = 0;
 		    if(hHigh<0)  hHigh = 0;
 		    
 		    strToWrite+=stringify( h )+"\t"+stringify( hLow )+"\t"+stringify( hHigh )+"\n";
 		}else{
+		    hetResToAdd.undef  = true;		
 		    strToWrite+="NA\tNA\tNA\n";
 		}
+		heteroEstResults.push_back(hetResToAdd);
+				
 		// cerr<<"writing "<<strToWrite<<endl;
 		bgzipWriterHest.Write(strToWrite.c_str(), strToWrite.size());
 
@@ -3793,9 +3835,146 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
+
+
+    
  beginhmm:
+    //heteroEstResults contains the results
+    
+
+    //computing the min/max segsites per chunk
+    int minSegSitesPerChunk;
+    int maxSegSitesPerChunk;
+    if(sizeChunk == 1000000){
+	minSegSitesPerChunk = minSegSitesPer1M;	
+	maxSegSitesPerChunk = maxSegSitesPer1M;
+    }else{
+	minSegSitesPerChunk = int( (double(minSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+	maxSegSitesPerChunk = int( (double(maxSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+    }
+    
+    Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
+    
+    cerr<<"Begin running HMM"<<endl;
+    cerr<<"generating a random set"<<endl;
+    vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
+
+    
+    //vector<emissionUndef>  eTestUndef;
+    cerr<<"done"<<endl;
 
 
+    //BEGIN MCMC chain
+    //init to random settings
+    long double partition= (long double)(stepHMM);
+    int accept=0;
+    long double x_i    ;
+    long double x_i_1  ;
+    
+    //het rate
+    //int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
+    int sitesPer1M     = 1000;// 1000 sites per million
+    long double h_i    = double(       sitesPer1M )/double(1000000);
+    long double h_i_1;
+
+    long double hlower = double( minSegSitesPer1M )/double(1000000);
+    long double hupper = double( maxSegSitesPer1M )/double(1000000);
+    
+    //transition rate
+    long double pTlowerFirstHalf  =    0.5;//overestimate the transition probability 
+    long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+	
+    long double pTlower = pTlowerFirstHalf;	
+    long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+
+    //generate a random initial probability between pTlower and pTupper
+    long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
+    long double pT_i_1;
+    //long double pTlower =       numeric_limits<double>::epsilon();
+        
+    random_device rd;
+    default_random_engine dre (rd());
+    //int maxChains = 100000;
+    int maxChains   =  50000;
+    //chain 0
+
+    hmm.setHetRateForNonROH(h_i);
+    hmm.setTransprob(pT_i);
+    //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
+    x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
+    for(int chain=1;chain<=maxChains;chain++){
+
+	//computing new state
+	normal_distribution<long double> distribution_h(h_i,  (hupper-hlower)/partition  );
+	h_i_1      = distribution_h(dre);
+	if(h_i_1 <= hlower       ||  h_i_1 >= hupper     ){
+	    h_i_1      = h_i;
+	}
+
+
+	normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
+	pT_i_1      = distribution_pT(dre);
+	if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
+	    pT_i_1      = pT_i;
+	}
+
+
+	//set new model parameters
+	hmm.setHetRateForNonROH(h_i_1);
+	hmm.setTransprob(pT_i_1);
+
+	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
+	//compute new likelihood
+	x_i_1=forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+
+	if(chain>(maxChains/4)){
+	    pTlower = pTlowerSecondHalf;
+	}
+
+	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
+	if( (long double)(randomProb()) < acceptance){
+	    h_i           =  h_i_1;
+	    pT_i          =  pT_i_1;
+	    x_i           =  x_i_1;
+	    accept++;
+	    cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+	}else{
+	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	}
+	//chain++;
+	//sleep(0.1);
+    }
+    cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+
+	
+    //cerr<<"Baum Welch"<<endl;
+    //baum_welch(&hmm,&emittedH);
+	
+    cerr<<"HMM done"<<endl;
+    //////////////////////////////////
+    //                              //
+    //  END HMM                     //
+    //                              //
+    //////////////////////////////////
+
+    //////////////////////////////////
+    //                              //
+    // BEGIN h global               //
+    //                              //
+    //////////////////////////////////
+    
+    //produce plot libharu?
+    //write out h estimate
+
+    //////////////////////////////////
+    //                              //
+    //  END h global                //
+    //                              //
+    //////////////////////////////////
+
+    
 
 #ifdef TESTHMMSIMS
     //calculating min/max number of sites per sizeChunk
@@ -3941,28 +4120,8 @@ int main (int argc, char *argv[]) {
     //baum_welch(&hmm,&emittedH);
 	
     cerr<<"HMM done"<<endl;
-#ifdef ENDIF
+#endif 
 
-    //////////////////////////////////
-    //                              //
-    //  END HMM                     //
-    //                              //
-    //////////////////////////////////
-
-    //////////////////////////////////
-    //                              //
-    // BEGIN h global               //
-    //                              //
-    //////////////////////////////////
-
-//produce plot libharu?
-//
-
-    //////////////////////////////////
-    //                              //
-    //  END h global                //
-    //                              //
-    //////////////////////////////////
 
     
     delete(cov2ProbSite);
