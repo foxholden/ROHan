@@ -1931,7 +1931,8 @@ public:
 	    int rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
 
-	    cerr<<"Thread#"<<m_threadID<<" reading: "<<m_references[m_refID].RefName<<":"<<pileupData.Position<<" valid sites:\t"<<thousandSeparator(totalSites)<<endl;
+	    if(verboseHETest)
+		cerr<<"Thread#"<<m_threadID<<" reading: "<<m_references[m_refID].RefName<<":"<<pileupData.Position<<" valid sites:\t"<<thousandSeparator(totalSites)<<endl;
 
 	    rc = pthread_mutex_unlock(&mutexCERR);
 	    checkResults("pthread_mutex_unlock()\n", rc);
@@ -2259,14 +2260,17 @@ void *mainHeteroComputationThread(void * argc){
 
     bool setRegionRes=reader.SetRegion( bregion   );
 
+    if(verboseHETest){
+	rc = pthread_mutex_lock(&mutexCERR);
+	checkResults("pthread_mutex_lock()\n", rc);
+    
+	cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
+
+
+	rc = pthread_mutex_unlock(&mutexCERR);
+	checkResults("pthread_mutex_unlock()\n", rc);
+    }
 #ifdef HETVERBOSE
-    rc = pthread_mutex_lock(&mutexCERR);
-    checkResults("pthread_mutex_lock()\n", rc);
-
-    cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
-
-    rc = pthread_mutex_unlock(&mutexCERR);
-    checkResults("pthread_mutex_unlock()\n", rc);
 
 #endif
 
