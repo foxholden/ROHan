@@ -3057,13 +3057,14 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
-	if( (string(argv[i]) == "-v") || (string(argv[i]) == "--verbose") ){
-	    skipToHMM=false;
+	if( (string(argv[i]) == "-v") || 
+	    (string(argv[i]) == "--verbose") ){
+	    verboseHETest=true;
             continue;
 	}
 
         if( string(argv[i]) == "--hmm"  ){
-	    verboseHETest=true;
+	    skipToHMM=false;
             continue;
         }
 	
@@ -3748,7 +3749,7 @@ int main (int argc, char *argv[]) {
 		rc = pthread_mutex_unlock(&mutexQueueToWrite);
 		checkResults("pthread_mutex_unlock()\n", rc);
 
-		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<dataToWrite->vecPositionResults->size()<<" records"<<endl;
+		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<thousandSeparator(dataToWrite->vecPositionResults->size())<<" records"<<endl;
 
 		string strToWrite=dataToWrite->rangeGen.asBed()+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
 		emissionUndef hetResToAdd;
