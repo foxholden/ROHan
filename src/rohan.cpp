@@ -2949,7 +2949,7 @@ int main (int argc, char *argv[]) {
     int lastWrittenChunk=-1;   
     string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\thLow\thHigh\n";
     Internal::BgzfStream  bgzipWriterInfo;
-    string stringinfo= stringify(rateForPoissonCov)+"\n";
+    string stringinfo ;
     vector<emissionUndef> heteroEstResults;
     Internal::BgzfStream  bgzipWriterHest;
     unsigned int      rank  = 0;
@@ -3391,13 +3391,14 @@ int main (int argc, char *argv[]) {
 	cerr<<"Final computation:" <<" bases="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda coverrage="<<rateForPoissonCov<<endl;
 	//pthread_exit(NULL);	
 	//	cerr<<"Lambda coverage: " <<rateForPoissonCov<<endl;	
-       
+	stringinfo= stringify(rateForPoissonCov)+"\n";       
 	
 	bgzipWriterInfo.Open(outFilePrefix+".rginfo.gz", IBamIODevice::WriteOnly);
 	if(!bgzipWriterInfo.IsOpen()){
 	    cerr<<"Cannot open file "<<(outFilePrefix+".rginfo.gz")<<" in bgzip writer"<<endl;
 	    return 1;
 	}
+	
 	
 	for (map<string,rgInfo>::iterator it=rg2info.begin(); it!=rg2info.end(); ++it){
 	    string s = stringify(it->first)+"\t"+stringify(it->second.isPe)+"\t"+stringify(it->second.maxReadLength)+"\n";
@@ -3411,7 +3412,7 @@ int main (int argc, char *argv[]) {
 	bgzipWriterInfo.Write(stringinfo.c_str(), stringinfo.size());
 
 	bgzipWriterInfo.Close();
-
+	exit(1);
     }else{ //not lambdaCovSpecified
 	//use the rate specified via the command line
 
@@ -3424,8 +3425,10 @@ int main (int argc, char *argv[]) {
 
 	if (infoFilePreComputed.good()){
 	    string l;
+	    //retrieving coverage
 	    getline (infoFilePreComputed,l);
 	    rateForPoissonCov = destringify<long double>(l);
+
 	    cerr<<"lambda coverage="<<rateForPoissonCov<<endl;
 	    while ( getline (infoFilePreComputed,l)){		
 		vector<string> tempv = allTokens(l,'\t');		
