@@ -2362,7 +2362,7 @@ void *mainHeteroComputationThread(void * argc){
     checkResults("pthread_mutex_lock()\n", rc);
 	
 
-    cerr<<"Thread #"<<rankThread <<" bases="<<thousandSeparator(hv->getTotalBases())<<"\tsites="<<thousandSeparator(hv->getTotalSites())<<"\t"<<double(hv->getTotalBases())/double(hv->getTotalSites())<<endl;
+    cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(hv->getTotalBases())<<" bases on "<<thousandSeparator(hv->getTotalSites())<<" sites average coverage: "<<double(hv->getTotalBases())/double(hv->getTotalSites())<<endl;
 
     rc = pthread_mutex_unlock(&mutexCERR);
     checkResults("pthread_mutex_unlock()\n", rc);
