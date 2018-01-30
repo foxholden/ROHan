@@ -155,12 +155,16 @@ string PositionResult::toString(const RefVector  * references, const int & refID
 		    altB = stringify(hetBase.second);
 		else
 		    altB = stringify(hetBase.first);
+		pl<<setprecision(0) << fixed << -1.0*ll[mostLikelyGenoIdx]<<","
+		  <<setprecision(0) << fixed << -1.0*ll[bases2hetIndex(refB,altB[0])]<<","
+		  <<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(altB[0])];
+		
 	    }else{
 		cerr<<"ERROR at site "<<references->at(refID).RefName<<":"<<pos<<"\t"<<mostLikelyGenoIdx<<"\t"<<refB<<"\t"<<altB<<endl;
+		pl<<"NA"<<","
+		  <<"NA"<<","
+		  <<"NA"<<"1="<<hetBase.first<<"#2="<<hetBase.second<<"#";
 	    }
-	    pl<<setprecision(0) << fixed << -1.0*ll[mostLikelyGenoIdx]<<","
-	      <<setprecision(0) << fixed << -1.0*ll[bases2hetIndex(refB,altB[0])]<<","
-	      <<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(altB[0])];
 
 	}
     }

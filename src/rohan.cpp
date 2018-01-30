@@ -2260,16 +2260,16 @@ void *mainHeteroComputationThread(void * argc){
 
     bool setRegionRes=reader.SetRegion( bregion   );
 
-    if(verboseHETest){
-	rc = pthread_mutex_lock(&mutexCERR);
-	checkResults("pthread_mutex_lock()\n", rc);
+    //if(verboseHETest){
+    rc = pthread_mutex_lock(&mutexCERR);
+    checkResults("pthread_mutex_lock()\n", rc);
     
-	cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
+    cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
 
 
-	rc = pthread_mutex_unlock(&mutexCERR);
-	checkResults("pthread_mutex_unlock()\n", rc);
-    }
+    rc = pthread_mutex_unlock(&mutexCERR);
+    checkResults("pthread_mutex_unlock()\n", rc);
+	//}
 #ifdef HETVERBOSE
 
 #endif
