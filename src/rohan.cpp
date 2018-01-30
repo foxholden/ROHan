@@ -3412,7 +3412,7 @@ int main (int argc, char *argv[]) {
 	bgzipWriterInfo.Write(stringinfo.c_str(), stringinfo.size());
 
 	bgzipWriterInfo.Close();
-	exit(1);
+	//exit(1);
     }else{ //not lambdaCovSpecified
 	//use the rate specified via the command line
 
