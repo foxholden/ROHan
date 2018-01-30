@@ -65,7 +65,7 @@ using namespace BamTools;
 
 
 
-#define HETVERBOSE
+//#define HETVERBOSE
 //#define COVERAGETVERBOSE
 //#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
@@ -2109,7 +2109,8 @@ private:
 
 */				
 void *mainHeteroComputationThread(void * argc){
-    cerr<<"mainHeteroComputationThread started"<<endl;
+    if(verboseHETest)
+	cerr<<"mainHeteroComputationThread started"<<endl;
 
     int   rc;
 
@@ -2117,18 +2118,20 @@ void *mainHeteroComputationThread(void * argc){
     int rankThread=0;
     //#endif
 
-    cerr<<"mainHeteroComputationThread mutex1"<<endl;
+    if(verboseHETest)    
+	cerr<<"mainHeteroComputationThread mutex1"<<endl;
 
     rc = pthread_mutex_lock(&mutexRank);
     checkResults("pthread_mutex_lock()\n", rc);
-
-    cerr<<"mainHeteroComputationThread mutex21 ID="<<(*(int *)pthread_self())<<endl;    
-    cerr<<"mainHeteroComputationThread mutex22 ID="<<(threadID2Rank.size()+1)<<endl;
+    //     if(verboseHETest)
+    //     cerr<<"mainHeteroComputationThread mutex21 ID="<<(*(int *)pthread_self())<<endl;    
+    //     cerr<<"mainHeteroComputationThread mutex22 ID="<<(threadID2Rank.size()+1)<<endl;
+    // }
     //cerr<<"mainHeteroComputationThread mutex2"<<endl;    
 
     threadID2Rank[*(int *)pthread_self()]  = threadID2Rank.size()+1;
 
-    cerr<<"mainHeteroComputationThread mutex3"<<endl;
+    //cerr<<"mainHeteroComputationThread mutex3"<<endl;
     //#ifdef HETVERBOSE    
     rankThread = threadID2Rank[*(int *)pthread_self()];
     //#endif
@@ -2151,7 +2154,8 @@ void *mainHeteroComputationThread(void * argc){
     rc = pthread_mutex_lock(&mutexCERR);
     checkResults("pthread_mutex_lock()\n", rc);
 
-    cerr<<"Thread #"<<rankThread <<" started and is requesting data"<<endl;
+    if(verboseHETest)    
+	cerr<<"Thread #"<<rankThread <<" started and is requesting data"<<endl;
 
     rc = pthread_mutex_unlock(&mutexCERR);
     checkResults("pthread_mutex_unlock()\n", rc);
@@ -2169,7 +2173,8 @@ void *mainHeteroComputationThread(void * argc){
 	rc = pthread_mutex_lock(&mutexCERR);
 	checkResults("pthread_mutex_lock()\n", rc);
 
- 	cerr<<"Thread #"<<rankThread<<" is reading chunk rank#"<<currentChunk->rank<<endl;
+	if(verboseHETest)    
+	    cerr<<"Thread #"<<rankThread<<" is reading chunk rank#"<<currentChunk->rank<<endl;
 
 	rc = pthread_mutex_unlock(&mutexCERR);
 	checkResults("pthread_mutex_unlock()\n", rc);
