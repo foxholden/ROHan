@@ -39,7 +39,7 @@ using namespace BamTools;
 //#define MIN(a,b) (((a)<(b))?(a):(b))
 //#define MAX(a,b) (((a)>(b))?(a):(b))
 
-#define DEBUGFIRSTWINDOWS 3
+//#define DEBUGFIRSTWINDOWS 3
 #define CORRECTCOV
 //#define ONLYUSECOV 12
 // #define ONLYUSECOVMIN 5
@@ -138,6 +138,7 @@ string fastaIndex;
 
 map<string,rgInfo> rg2info;
 bool specifiedDeam=false;
+bool verboseHETest=false;
 
 // 1D: mapping quality 
 // 2D: length of fragment
@@ -1417,8 +1418,10 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     rc = pthread_mutex_lock(&mutexCERR);
     checkResults("pthread_mutex_lock()\n", rc);
 
-    cerr<<"Thread#"<<threadID<<" starting pre-computations size of window: "<<thousandSeparator(piForGenomicWindow->size())<<endl;
-
+    if(verboseHETest){
+	cerr<<"Thread#"<<threadID<<" starting pre-computations size of window: "<<thousandSeparator(piForGenomicWindow->size())<<endl;
+    }
+    
     rc = pthread_mutex_unlock(&mutexCERR);
     checkResults("pthread_mutex_unlock()\n", rc);
 
@@ -1449,8 +1452,10 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     rc = pthread_mutex_lock(&mutexCERR);
     checkResults("pthread_mutex_lock()\n", rc);
 
-    cerr<<"Thread#"<<threadID<<" done pre-computing computing "<<endl;
-
+    if(verboseHETest){
+	cerr<<"Thread#"<<threadID<<" done pre-computing computing "<<endl;
+    }
+    
     rc = pthread_mutex_unlock(&mutexCERR);
     checkResults("pthread_mutex_unlock()\n", rc);
 
@@ -1785,8 +1790,10 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	rc = pthread_mutex_lock(&mutexCERR);
 	checkResults("pthread_mutex_lock()\n", rc);
 
-	cerr<<"Thread#"<<threadID<<setprecision(14)<<"\t"<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\te="<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\thnew="<<hnew<<"\tz="<<z<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdP<<"\t"<<hp<<"\t"<<alpha_<<"\t"<<beta_<<endl;
-
+	if(verboseHETest){
+	    cerr<<"Thread#"<<threadID<<setprecision(14)<<"\t"<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\te="<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\thnew="<<hnew<<"\tz="<<z<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdP<<"\t"<<hp<<"\t"<<alpha_<<"\t"<<beta_<<endl;
+	}
+	
 	rc = pthread_mutex_unlock(&mutexCERR);
 	checkResults("pthread_mutex_unlock()\n", rc);
 
@@ -1846,8 +1853,10 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
 
-	    cerr<<"Thread#"<<threadID<<" did not converge"<<endl;
-
+	    if(verboseHETest){
+		cerr<<"Thread#"<<threadID<<" did not converge"<<endl;
+	    }
+	    
 	    rc = pthread_mutex_unlock(&mutexCERR);
 	    checkResults("pthread_mutex_unlock()\n", rc);
 
@@ -2928,7 +2937,7 @@ int main (int argc, char *argv[]) {
     bool   outFilePrefixFlag=false;
 
     string sampleName        = "sample";
-    bool   useVCFoutput      = false;
+    // bool   useVCFoutput      = false;
     int lastOpt=1;
 
         // double lambdaCov=0;
@@ -2953,13 +2962,18 @@ int main (int argc, char *argv[]) {
     BamReader reader;
     string previousChrWritten="###";
     bool skipToHMM=false;
+    ifstream myFileFAI;
+    string filenameFAI;
+    string headerVCFFile;
+    Internal::BgzfStream  bgzipWriterGL;
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
     
 
     
-    const string usage=string("\nThis program co-estimates heterozygosity rates and runs of homozygosity\n\n\t"+
+    const string usage=string("\nThis program co-estimates heterozygosity rates and runs of homozygosity\n")+
+                              "for modern and ancient samples\n\n"+
                               string(argv[0])+                        
                               " [options] [fasta file] [bam file]  "+"\n\n"+
 			      "\twhere:\n"+
@@ -2970,19 +2984,22 @@ int main (int argc, char *argv[]) {
                               "\n\tI/O options:\n"+
 			      "\t\t"+"-o"+","+"--out"  + "\t\t"   +    "[out prefix]" +"\t\t"+"Output prefix  (default: none)"+"\n"+
 			      "\t\t"+""  +""+"--name" + "\t\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
-			      "\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
+			      //"\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
 			      //"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
+			      "\t\t"+"-v"  +","+"--verbose"+"\t\t"    + ""       +"\t\t\t"+"Print extensive info about the heterozygosity estimate (default: "+booleanAsString(verboseHETest)+")"+"\n"+  
 
+			      
 			      "\n\tComputation options:\n"+
                               "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
-			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t\t"+"Size of windows in bp  (default: "+stringify(sizeChunk)+")"+"\n"+	      
+			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
 			      //			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
+			      "\n\t\tHMM:\n"+
 			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
-			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]" +"\t\t\t"+"Steps used for MCMC sampling (default: "+stringify(stepHMM)+")"+"\n"+  
+			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]" +"\t\t\t"+"Steps used for MCMC sampling (default: "+thousandSeparator(stepHMM)+")"+"\n"+  
 			      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""       +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
 			      "\t\t"+""  +""+""           +"\t\t\t"    + ""       +"\t\t\t"+"read the previous het. rates from files and skip to HMM"+"\n"+  
-			      
+
 			      
                               // "\n\tSample options:\n"+
                               // "\t\t"+""  +""+"--cont"  +"\t\t\t"    +  "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
@@ -2997,7 +3014,7 @@ int main (int argc, char *argv[]) {
 			      "\t\t"+""  +""+"--err\t\t\t"    +"[.prof file]"+"\t\t"    +"Illumina error profile (default: "+illuminafreq+")"+"\n"+
 			      "\t\t"+""  +""+"--base\t\t\t"   +"[.freq file]"+"\t\t"    +"Frequency of DNA bases in the genome (default: "+dnafreqFile+")"+"\n"+
 
-                              "");
+                              "";
 
     if( (argc== 1) ||
         (argc== 2 && string(argv[1]) == "-h") ||
@@ -3031,8 +3048,13 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
-        if( string(argv[i]) == "--hmm"  ){
+	if( (string(argv[i]) == "-v") || (string(argv[i]) == "--verbose") ){
 	    skipToHMM=false;
+            continue;
+	}
+
+        if( string(argv[i]) == "--hmm"  ){
+	    verboseHETest=true;
             continue;
         }
 	
@@ -3042,10 +3064,10 @@ int main (int argc, char *argv[]) {
             continue;
         }
 	
-        if( string(argv[i]) == "--vcf"  ){
-	    useVCFoutput=true;
-            continue;
-        }
+        // if( string(argv[i]) == "--vcf"  ){
+	//     useVCFoutput=true;
+        //     continue;
+        // }
 
         if( string(argv[i]) == "--name"  ){
             sampleName=string(argv[i+1]);
@@ -3053,6 +3075,7 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
+	
 
         if( string(argv[i]) == "-t"  ){
             numberOfThreads=destringify<int>(argv[i+1]);
@@ -3624,8 +3647,8 @@ int main (int argc, char *argv[]) {
     
 
 #ifndef DEBUGFIRSTWINDOWS
-
-    Internal::BgzfStream  bgzipWriterGL;
+    
+    
 
     bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
     if(!bgzipWriterGL.IsOpen()){
@@ -3640,9 +3663,8 @@ int main (int argc, char *argv[]) {
     // 	    cerr<<"Cannot open file "<<outFileSiteLL<<" in bgzip writer"<<endl;
     // 	    return 1;
     // 	}
-    
 
-    string headerVCFFile;
+    
     headerVCFFile=string("")+
 	"##fileformat=VCFv4.2\n";
     headerVCFFile+="##ROHanVersion="+returnGitHubVersion(argv[0],"")+"\n";
@@ -3656,8 +3678,7 @@ int main (int argc, char *argv[]) {
     // 	    headerOutFile="#CHROM\tPOS\tA\tC\tG\tT\tGENO\tGENOS\tQualL\tCovL\tAA\tAC\tAG\tAT\tCC\tCG\tCT\tGG\tGT\tTT\n";	
     // 	}
 
-    string filenameFAI = fastaIndex;
-    ifstream myFileFAI;
+    filenameFAI = fastaIndex;
 
     myFileFAI.open(filenameFAI.c_str(), ios::in);
 
@@ -3676,7 +3697,6 @@ int main (int argc, char *argv[]) {
        cerr << "Unable to open fasta fai file "<<filenameFAI<<endl;
        return 1;
     }
-
 
 
     headerVCFFile+="##ALT=<ID=NON_REF,Description=\"Represents any possible alternative allele at this location\">\n";
