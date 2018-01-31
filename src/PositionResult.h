@@ -34,7 +34,7 @@ class PositionResult{
     int         baseC[4];
     /* int          refC; */
     /* int          altC; */
-
+    // 0  1  2  3  4  5  6  7  8  9
     //AA,AC,AG,AT,CC,CG,CT,GG,GT,TT
     long double  ll[10];
     

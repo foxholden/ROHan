@@ -100,8 +100,8 @@ string PositionResult::toString(const RefVector  * references, const int & refID
     // cerr<<refID<<endl;
     //string toReturn="";
 
-    cerr<<references->at(refID).RefName<<"\t";
-    cerr<<pos<<"\t";
+    // cerr<<references->at(refID).RefName<<"\t";
+    // cerr<<pos<<"\t";
 
     s<<references->at(refID).RefName<<"\t";
     s<<pos<<"\t";
@@ -110,18 +110,17 @@ string PositionResult::toString(const RefVector  * references, const int & refID
     // 	s<<baseC[n]<<"\t";
     //REF
     s<<refB<<"\t";
-    cerr<<refB<<"\t";
+    //cerr<<refB<<"\t";
 
     string altB;
     string gt="./.";
     stringstream pl;
-    cerr<<mostLikelyGenoIdx<<"\t"<<mostLikelyGenoHetIdx<<"\t";
+    //cerr<<"mostLikelyGenoIdx="<<mostLikelyGenoIdx<<"\tmostLikelyGenoHetIdx="<<mostLikelyGenoHetIdx<<"\t";
     
     if(mostLikelyGenoIdx ==  mostLikelyGenoHetIdx){//heterozygous
 	bool hasRefAsAlt=false;
 	pair<char,char> hetBase = hetIndex2Bases();
 	hasRefAsAlt = (refB == hetBase.first) || (refB == hetBase.second) ;
-	cerr<<"1="<<hetBase.first<<" 2="<<hetBase.second<<"\t"<<hasRefAsAlt<<"\t";
 	
 	if(hasRefAsAlt){
 	    gt="0/1";
@@ -147,6 +146,8 @@ string PositionResult::toString(const RefVector  * references, const int & refID
     }else{//homozygous
 	char bhomo=homoIndex2Base();
 	bool hasRefAsAlt=false;
+	//cerr<<"bhomo "<<bhomo<<" "<<"\t";
+
 	if(bhomo != refB){ //is homo not reference
 	    altB = stringify(bhomo);
 	    gt="1/1";
@@ -157,9 +158,11 @@ string PositionResult::toString(const RefVector  * references, const int & refID
 
 	}else{//is homo reference
 	    gt="0/0";
-	    pair<char,char> hetBase = hetIndex2Bases();
+	    pair<char,char> hetBase = hetIndex2Bases();//we are homozygous but finding the most likely heterozygous state
+	    
 	    hasRefAsAlt = (refB == hetBase.first) || (refB == hetBase.second) ;
-	    if(hasRefAsAlt){
+
+	    if(hasRefAsAlt){//if the most likely het state has the ref
 		if( refB == hetBase.first )
 		    altB = stringify(hetBase.second);
 		else
@@ -168,14 +171,25 @@ string PositionResult::toString(const RefVector  * references, const int & refID
 		  <<setprecision(0) << fixed << -1.0*ll[bases2hetIndex(refB,altB[0])]<<","
 		  <<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(altB[0])];
 		
-	    }else{
-		cerr<<"ERROR at site "<<references->at(refID).RefName<<":"<<pos<<"\t"<<mostLikelyGenoIdx<<"\t"<<refB<<"\t"<<altB<<endl;
-		pl<<"NA"<<","
-		  <<"NA"<<","
-		  <<"NA"<<"1="<<hetBase.first<<"#2="<<hetBase.second<<"#";
+	    }else{ //extreme corner case if homo ref but the most likely het. state does not have the ref. likely due to a statistical tie
+		//neither the hetBase.first nor the hetBase.secondselecting the a random 
+		if( randomProb() )
+		    altB = stringify(hetBase.second);
+		else
+		    altB = stringify(hetBase.first);
+		
+		pl<<setprecision(0) << fixed << -1.0*ll[mostLikelyGenoIdx]<<","
+		  <<setprecision(0) << fixed << -1.0*ll[bases2hetIndex(refB,altB[0])]<<","
+		  <<setprecision(0) << fixed << -1.0*ll[base2HomoIndex(altB[0])];
+		
+		// cerr<<"ERROR at site "<<references->at(refID).RefName<<":"<<pos<<"\t"<<mostLikelyGenoIdx<<"\t"<<refB<<"\t"<<altB<<endl;
+		// pl<<"NA"<<","
+		//   <<"NA"<<","
+		//   <<"NA"<<"1="<<hetBase.first<<"#2="<<hetBase.second<<"#";
 	    }
 
 	}
+	//cerr<<endl;
     }
 
     //find if has ref
