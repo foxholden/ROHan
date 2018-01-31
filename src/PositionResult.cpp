@@ -99,6 +99,10 @@ string PositionResult::toString(const RefVector  * references, const int & refID
     s.precision(13);
     // cerr<<refID<<endl;
     //string toReturn="";
+
+    cerr<<references->at(refID).RefName<<"\t";
+    cerr<<pos<<"\t";
+
     s<<references->at(refID).RefName<<"\t";
     s<<pos<<"\t";
 
@@ -106,14 +110,19 @@ string PositionResult::toString(const RefVector  * references, const int & refID
     // 	s<<baseC[n]<<"\t";
     //REF
     s<<refB<<"\t";
+    cerr<<refB<<"\t";
 
     string altB;
     string gt="./.";
     stringstream pl;
+    cerr<<mostLikelyGenoIdx<<"\t"<<mostLikelyGenoHetIdx<<"\t";
+    
     if(mostLikelyGenoIdx ==  mostLikelyGenoHetIdx){//heterozygous
 	bool hasRefAsAlt=false;
 	pair<char,char> hetBase = hetIndex2Bases();
 	hasRefAsAlt = (refB == hetBase.first) || (refB == hetBase.second) ;
+	cerr<<"1="<<hetBase.first<<" 2="<<hetBase.second<<"\t"<<hasRefAsAlt<<"\t";
+	
 	if(hasRefAsAlt){
 	    gt="0/1";
 	    if( refB == hetBase.first )
