@@ -1,5 +1,6 @@
 # ROHan
 
+sudo apt-get install libtool
 
 #MacOS installation
 

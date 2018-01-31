@@ -30,7 +30,7 @@ rohan:       rohan.o Hmm.o HmmState.o DataChunk.o DataToWrite.o GenoResults.o Po
 ../lib/libgab/utils.h:
 	rm -rfv ../lib/libgab/
 	mkdir ../lib/libgab/
-	git clone --recursive https://github.com/grenaud/libgab.git ../lib/libgab/
+	git clone --depth 1 https://github.com/grenaud/libgab.git ../lib/libgab/
 
 ref2DNAprof.o:	ref2DNAprof.cpp
 	${CXX} ${CXXFLAGS} ref2DNAprof.cpp
@@ -47,10 +47,18 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 ../lib/bamtools/src/api/BamAlignment.h:
 	rm -rf ../lib/bamtools/
 	mkdir ../lib/bamtools/
-	git clone --recursive https://github.com/pezmaster31/bamtools.git ../lib/bamtools/
+	git clone --depth 1 https://github.com/pezmaster31/bamtools.git ../lib/bamtools/
 
 ../lib/bamtools/build/src/api/libbamtools.a: ../lib/bamtools/src/api/BamAlignment.h
 	cd ../lib/bamtools/ && mkdir -p build/  && cd build/ && cmake .. && make && cd ../..
+
+../lib/libharu/include/hpdf.h:
+	rm -rf ../lib/libharu/
+	mkdir ../lib/libharu/
+	git clone --depth 1 https://github.com/libharu/libharu.git ../lib/libharu/
+
+../lib/libharu/src/libhpdf.la: ../lib/libharu/include/hpdf.h
+	./buildconf.sh && ./configure && make
 
 clean :
 	rm -f *.o testComp  testCompCont  refPlusSegToGeno sitesPlusGeno  testPrior  rohan  ref2DNAprof
