@@ -25,7 +25,7 @@
 // #include "api/BamWriter.h"
 // #include "api/BamAux.h"
 
-#include "PdfWriter.h"
+//#include "PdfWriter.h"
 #include "GenomicWindows.h"
 #include "Hmm.h"
 
@@ -2986,6 +2986,7 @@ int main (int argc, char *argv[]) {
     string headerVCFFile;
     Internal::BgzfStream  bgzipWriterGL;
     int maxChains   =  50000;
+    string bedFile;
 
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
@@ -3014,6 +3015,7 @@ int main (int argc, char *argv[]) {
                               "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 			      "\t\t"+""  +""+"--size"   +"\t\t\t"  + "[window size]"+"\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
+			      "\t\t"+""  +""+"--bed"    +"\t\t\t"  + "[bed file]"+"\t\t"+"Only use the regions in the bed file  (default: none)"+"\n"+	      
 			      //			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
 			      "\n\t\tHMM:\n"+
 			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
@@ -3089,6 +3091,12 @@ int main (int argc, char *argv[]) {
 	
         if( string(argv[i]) == "--size"  ){
 	    sizeChunk=destringify<unsigned int>(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if( string(argv[i]) == "--bed"  ){
+	    bedFile=string(argv[i+1]);
             i++;
             continue;
         }
@@ -3219,6 +3227,12 @@ int main (int argc, char *argv[]) {
 	return 1;	
     }
 
+    if( !bedFile.empty() ){
+	if( !isFile(bedFile) ){
+	    cerr<<"The supplied BED file "<<bedFile<<"  does not exist"<<endl;
+	    return 1;	
+	}
+    }
 
     //    if(outFilePrefixFlag)
 
@@ -3336,8 +3350,17 @@ int main (int argc, char *argv[]) {
     rw = GenomicWindows  (fastaIndex,false);
 
 
-    v = rw.getGenomicWindows(bpToExtract,0);
-    if( v.size() == 0 ){    cerr<<"No range found using these chr/loci settings"<<endl; return 1;}
+
+    if( !bedFile.empty() ){
+	v = readBEDfile(bedFile);
+    }else{
+	v = rw.getGenomicWindows(bpToExtract,0);
+    }
+
+    if( v.size() == 0 ){    
+	cerr<<"No range found using these chr/loci settings"<<endl; 
+	return 1;
+    }
     
     //unsigned int sizeGenome = 0;
 
@@ -4015,7 +4038,7 @@ int main (int argc, char *argv[]) {
     // BEGIN h global               //
     //                              //
     //////////////////////////////////
-    PdfWriter pdfwriter (outFilePrefix+".het.pdf");
+    //    PdfWriter pdfwriter (outFilePrefix+".het.pdf");
     
     //produce plot libharoutFilePrefix+".vcf.gz"u?
     //write out h estimate

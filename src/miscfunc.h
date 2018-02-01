@@ -271,6 +271,46 @@ void populatedCoverateVectorSingle(vector<long double> * cov2ProbSite, long doub
 /* void readMTConsensus(const string consensusFile,map<int, PHREDgeno> & pos2phredgeno,int & sizeGenome,vector<int> & posOfIndels); */
 /* void readMTAlleleFreq(const string freqFile,	map<int, alleleFrequency> & pos2allelefreq); */
 
+//! Simple method to read a bed file 
+/*!
+ *
+ * This method does not check for the records being ordered
+  \param filetoread : String with the full path to the file to read
+  \return           : Return(stack) the  value of a vector of GenomicRange objects
+  \sa  readBEDSortedfile()
+*/
+
+vector<GenomicRange> readBEDfile(string filetoread){
+    vector<GenomicRange> toReturn;
+    ifstream myFile;
+    myFile.open(filetoread.c_str(), ios::in);
+    string line;
+
+    if (myFile.is_open()){
+	while ( getline (myFile,line)){	    
+	    string chrName;
+	    uint64_t startCoord;
+	    uint64_t endCoord;
+	    vector<string> temp=allTokens(line,'\t');
+	    if(temp.size() < 3){
+		cerr << "Error in readBEDfile(): the following line does not have at least 3 fields"<<line<<endl;
+		exit(1);		
+	    }
+
+	    chrName     = destringify<string>(temp[0]);
+	    startCoord  = destringify<uint64_t>(temp[1])+1; //the left coordinate is zero based
+	    endCoord    = destringify<uint64_t>(temp[2]);
+	    GenomicRange toadd (chrName,startCoord,endCoord);
+	    toReturn.push_back(toadd);
+	}
+	myFile.close();
+    }else{
+	cerr << "Error in readBEDfile(): Unable to open file "<<filetoread<<endl;
+	exit(1);
+    }
+
+    return toReturn;
+}
 
 /* long double computeLL(const int                   al1Current    , */
 /* 		      const int                   al2Current    ,		       */
