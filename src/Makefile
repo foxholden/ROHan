@@ -2,12 +2,12 @@
 CXX      = g++ -std=c++11 #-fpermissive #-g # -pg
 LIBGAB   = ../lib/libgab/
 
-CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c
+CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/libharu/include/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c
 LDFLAGS  = -lgsl -lgslcblas -lz  -lpthread 
 LDLIBS   = ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../lib/bamtools/build/src/api/libbamtools.a
 
 
-all: ../lib/bamtools/build/src/api/libbamtools.a ../lib/libgab/utils.o  rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
+all: ../lib/bamtools/build/src/api/libbamtools.a ../lib/libgab/utils.o ../lib/libharu/src/libhpdf.la rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
 
 %.o: %.cpp #../lib/libgab/utils.o  
 	${CXX} ${CXXFLAGS} $^ -o $@
@@ -24,7 +24,7 @@ refPlusSegToGeno:	refPlusSegToGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstr
 sitesPlusGeno:	sitesPlusGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-rohan:       rohan.o Hmm.o HmmState.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o ../lib/bamtools/build/src/api/libbamtools.a GenomicWindows.o GenomicRange.o  ../lib/libgab/FastQObj.o ../lib/libgab/FastQParser.o ../lib/libgab/utils.o  ../lib/libgab/gzstream/libgzstream.a 
+rohan:       rohan.o PdfWriter.o Hmm.o HmmState.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o ../lib/bamtools/build/src/api/libbamtools.a GenomicWindows.o GenomicRange.o  ../lib/libgab/FastQObj.o ../lib/libgab/FastQParser.o ../lib/libharu/src/.libs/libhpdf.a ../lib/libgab/utils.o  ../lib/libgab/gzstream/libgzstream.a 
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 ../lib/libgab/utils.h:
@@ -57,8 +57,8 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 	mkdir ../lib/libharu/
 	git clone --depth 1 https://github.com/libharu/libharu.git ../lib/libharu/
 
-../lib/libharu/src/libhpdf.la: ../lib/libharu/include/hpdf.h
-	./buildconf.sh && ./configure && make
+../lib/libharu/src/.libs/libhpdf.a: ../lib/libharu/include/hpdf.h
+	cd ../lib/libharu/ && ./buildconf.sh && ./configure && make
 
 clean :
 	rm -f *.o testComp  testCompCont  refPlusSegToGeno sitesPlusGeno  testPrior  rohan  ref2DNAprof

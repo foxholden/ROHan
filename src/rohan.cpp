@@ -25,6 +25,7 @@
 // #include "api/BamWriter.h"
 // #include "api/BamAux.h"
 
+#include "PdfWriter.h"
 #include "GenomicWindows.h"
 #include "Hmm.h"
 
@@ -1996,6 +1997,10 @@ public:
 	    	continue;
 	    }
 
+	    //skip reads that were QC failed
+	    if(  pileupData.PileupAlignments[i].Alignment.IsFailedQC() ){
+		continue;
+	    }
 
 	    if(i>=MAXCOV){
 		break;
@@ -2522,6 +2527,11 @@ public:
 	//cout<<m_leftCoord<<"\t"<<m_rightCoord<<"\t"<<pileupData.Position<<endl;
 
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
+	    //skip reads that were QC failed
+	    if(  pileupData.PileupAlignments[i].Alignment.IsFailedQC() ){
+		continue;
+	    }
+
 	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
 	    	pileupData.PileupAlignments[i].IsNextInsertion ){
 	    	continue;
@@ -2975,6 +2985,8 @@ int main (int argc, char *argv[]) {
     string filenameFAI;
     string headerVCFFile;
     Internal::BgzfStream  bgzipWriterGL;
+    int maxChains   =  50000;
+
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
@@ -3001,11 +3013,12 @@ int main (int argc, char *argv[]) {
 			      "\n\tComputation options:\n"+
                               "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
                               "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
-			      "\t\t"+""  +""+"--size"       +"\t\t\t"    + "[window size]" +"\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
+			      "\t\t"+""  +""+"--size"   +"\t\t\t"  + "[window size]"+"\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
 			      //			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
 			      "\n\t\tHMM:\n"+
 			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
 			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]" +"\t\t\t"+"Steps used for MCMC sampling (default: "+thousandSeparator(stepHMM)+")"+"\n"+  
+			      "\t\t"+""  +""+"--chains"   +"\t\t\t"    +"[chains]"+"\t\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
 			      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""       +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
 			      "\t\t"+""  +""+""           +"\t\t\t"    + ""       +"\t\t\t"+"read the previous het. rates from files and skip to HMM"+"\n"+  
 
@@ -3053,6 +3066,12 @@ int main (int argc, char *argv[]) {
 	
         if( string(argv[i]) == "--step"  ){
 	    stepHMM=destringify<long double>(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if( string(argv[i]) == "--chains"  ){
+	    maxChains=destringify<int>(argv[i+1]);
             i++;
             continue;
         }
@@ -3928,7 +3947,6 @@ int main (int argc, char *argv[]) {
     random_device rd;
     default_random_engine dre (rd());
     //int maxChains = 100000;
-    int maxChains   =  50000;
     //chain 0
 
     hmm.setHetRateForNonROH(h_i);
@@ -3997,8 +4015,9 @@ int main (int argc, char *argv[]) {
     // BEGIN h global               //
     //                              //
     //////////////////////////////////
+    PdfWriter pdfwriter (outFilePrefix+".het.pdf");
     
-    //produce plot libharu?
+    //produce plot libharoutFilePrefix+".vcf.gz"u?
     //write out h estimate
 
     //////////////////////////////////
@@ -4007,6 +4026,10 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
+    delete cov2ProbSite;
+    
+    return 0;
+}
     
 
 #ifdef TESTHMMSIMS
@@ -4156,11 +4179,7 @@ int main (int argc, char *argv[]) {
 #endif 
 
 
-    
-    delete(cov2ProbSite);
-    
-    return 0;
-}
+
 
 
 
