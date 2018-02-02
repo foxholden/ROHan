@@ -25,7 +25,7 @@
 // #include "api/BamWriter.h"
 // #include "api/BamAux.h"
 
-//#include "PdfWriter.h"
+#include "PdfWriter.h"
 #include "GenomicWindows.h"
 #include "Hmm.h"
 
@@ -75,7 +75,7 @@ using namespace BamTools;
 
 
 //#define MAXMAPPINGQUAL        257     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
-#define MAXMAPPINGQUAL          37     // maximal mapping quality, should be sufficient as mapping qualities are encoded using 8 bits
+#define MAXMAPPINGQUAL          37     // maximal mapping quality
 #define MAXBASEQUAL             64      // maximal base quality score, greater qual score do not make a lot of sense
 
 //#define MAXMAPPINGBASEQUAL    64      // maximal base quality score, should be sufficient as mapping qualities are encoded using 8 bits
@@ -3020,9 +3020,9 @@ int main (int argc, char *argv[]) {
 			      "\n\t\tHMM:\n"+
 			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
 			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]" +"\t\t\t"+"Steps used for MCMC sampling (default: "+thousandSeparator(stepHMM)+")"+"\n"+  
-			      "\t\t"+""  +""+"--chains"   +"\t\t\t"    +"[chains]"+"\t\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
+			      "\t\t"+""  +""+"--chains"   +"\t\t"    +"[chains]"+"\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
 			      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""       +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
-			      "\t\t"+""  +""+""           +"\t\t\t"    + ""       +"\t\t\t"+"read the previous het. rates from files and skip to HMM"+"\n"+  
+			      "\t\t"+""  +""+""           +"\t\t\t"    + ""       +"\t\t\t"+"read the previous het. rates [out prefix].hEst.gz and skip to HMM"+"\n"+  
 
 			      
                               // "\n\tSample options:\n"+
@@ -4038,7 +4038,7 @@ int main (int argc, char *argv[]) {
     // BEGIN h global               //
     //                              //
     //////////////////////////////////
-    //    PdfWriter pdfwriter (outFilePrefix+".het.pdf");
+    PdfWriter pdfwriter (outFilePrefix+".het.pdf");
     
     //produce plot libharoutFilePrefix+".vcf.gz"u?
     //write out h estimate
