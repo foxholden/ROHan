@@ -41,6 +41,9 @@ typedef struct{
 
 class PdfWriter{
  private:
+    string fname;
+    HPDF_Doc  pdf;
+
     void draw_rect (HPDF_Page     page,
 		    double        x,
 		    double        y,

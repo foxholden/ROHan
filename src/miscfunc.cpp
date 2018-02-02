@@ -123,6 +123,7 @@ void readNucSubstitionFreq(const string filename,vector<probSubstition> & subVec
 	    
 	    fields = allTokens(line,'\t');
 
+	    
 	    if(fields.size() != 12){
 		cerr << "line from error profile does not have 12 fields "<<line<<endl;
 		exit(1);

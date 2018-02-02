@@ -22,13 +22,12 @@ error_handler  (HPDF_STATUS   error_no,
     longjmp(env, 1);
 }
 
-PdfWriter::PdfWriter(const string fname){
-
+PdfWriter::PdfWriter(const string fname_){
+     fname = fname_;
 
     //string fname      = string(argv[indexOflastOpt]);
      string page_title = "";
 
-     HPDF_Doc  pdf;
      HPDF_Font font;
      HPDF_Page page;
      HPDF_ExtGState gstate;
@@ -76,6 +75,13 @@ PdfWriter::PdfWriter(const string fname){
 }
 
 PdfWriter::~PdfWriter(){
+    
+     /* save the document to a file */
+    cerr<<"Saving file "<<fname<<endl;
+    HPDF_SaveToFile (pdf, fname.c_str());
+
+     /* clean up */
+     HPDF_Free (pdf);
 
 }
 

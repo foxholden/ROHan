@@ -14,7 +14,9 @@
 #include <string>
 #include <gzstream.h>
 
+
 #include "utils.h"
+#include "GenomicRange.h"
 
 #define DEBUGCOV
 using namespace std;
@@ -280,7 +282,7 @@ void populatedCoverateVectorSingle(vector<long double> * cov2ProbSite, long doub
   \sa  readBEDSortedfile()
 */
 
-vector<GenomicRange> readBEDfile(string filetoread){
+inline vector<GenomicRange> readBEDfile(string filetoread){
     vector<GenomicRange> toReturn;
     ifstream myFile;
     myFile.open(filetoread.c_str(), ios::in);

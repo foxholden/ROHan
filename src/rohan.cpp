@@ -3085,7 +3085,7 @@ int main (int argc, char *argv[]) {
 	}
 
         if( string(argv[i]) == "--hmm"  ){
-	    skipToHMM=false;
+	    skipToHMM=true;
             continue;
         }
 	
@@ -3912,9 +3912,75 @@ int main (int argc, char *argv[]) {
 
 
 
+
+    
     
  beginhmm:
     //heteroEstResults contains the results
+    if(skipToHMM){//skip het computations read from file
+	string hEstFileToRead = outFilePrefix+".hEst.gz";
+	cerr<<"reading previous est. of h from "<<hEstFileToRead<<endl;
+	igzstream hEstFileSt;
+
+	hEstFileSt.open(hEstFileToRead.c_str(), ios::in);
+	string  previousChrWritten = "###";
+	if (hEstFileSt.good()){
+	    vector<string> fields;
+	    string line;
+	    getline (hEstFileSt,line) ; 		//header
+
+	    while (getline (hEstFileSt,line) ){
+	    
+		fields = allTokens(line,'\t');
+
+		if(fields.size() != 7){
+		    cerr << "ERROR: line from previous h est. does not have 8 fields ("<<(fields.size()+1)<<") "<<line<<endl;
+		    return 1;
+		}
+
+
+	    	emissionUndef hetResToAdd;
+		
+		if(     previousChrWritten != fields[0]){
+		    if(previousChrWritten == "###"){//first chr
+			hetResToAdd.chrBreak   = false;//not a true chr break
+		    }else{//true new chr
+			hetResToAdd.chrBreak   = true;			
+		    }
+		    previousChrWritten = fields[0];
+		}else{//same chr
+		    hetResToAdd.chrBreak   = false;		
+		}
+	    
+		if(fields[4] != "NA"){
+		    hetResToAdd.undef  = false;		
+		    //long double h      = destringify<long double>( fields[4]);
+		    long double hLow   = destringify<long double>( fields[5]);
+		    long double hHigh  = destringify<long double>( fields[6]);
+		    hetResToAdd.plow   = hLow;
+		    hetResToAdd.phigh  = hHigh;
+		    
+		    // if(h<0)      h     = 0;
+		    // if(hLow<0)   hLow  = 0;
+		    // if(hHigh<0)  hHigh = 0;
+		    
+		}else{
+		    hetResToAdd.undef  = true;		
+		}
+		heteroEstResults.push_back(hetResToAdd);
+	    }           
+	    hEstFileSt.close();
+	}else{//not able to open
+	    cerr << "Unable to open file "<<hEstFileToRead<<endl;
+	    exit(1);
+	}
+
+
+    } //end if skipToHMM
+
+
+	
+
     
 
     //computing the min/max segsites per chunk
@@ -3931,12 +3997,12 @@ int main (int argc, char *argv[]) {
     Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
     
     cerr<<"Begin running HMM"<<endl;
-    cerr<<"generating a random set"<<endl;
-    vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
+    // cerr<<"generating a random set"<<endl;
+    // vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
 
     
     //vector<emissionUndef>  eTestUndef;
-    cerr<<"done"<<endl;
+    //cerr<<"done"<<endl;
 
 
     //BEGIN MCMC chain
@@ -4038,6 +4104,7 @@ int main (int argc, char *argv[]) {
     // BEGIN h global               //
     //                              //
     //////////////////////////////////
+    //cerr<<"writing plot"<<endl;
     PdfWriter pdfwriter (outFilePrefix+".het.pdf");
     
     //produce plot libharoutFilePrefix+".vcf.gz"u?
