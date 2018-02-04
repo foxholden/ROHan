@@ -28,10 +28,6 @@ PdfWriter::PdfWriter(const string fname_){
     //string fname      = string(argv[indexOflastOpt]);
      string page_title = "";
 
-     HPDF_Font font;
-     HPDF_Page page;
-     HPDF_ExtGState gstate;
-     float tw;
  
 
      pdf = HPDF_New (error_handler, NULL);
@@ -155,4 +151,98 @@ inline void PdfWriter::addRangeCov(HPDF_Page & page,double begin,double end, con
 		     chrInfToUse.lengthScreen * ((end-begin)/chrInfToUse.length) );			     
     // cout<<line<<endl;
     HPDF_Page_Fill (page);
+}
+
+
+int PdfWriter::drawFrame(const string & fastaIndex){
+    
+     string line;
+     igzstream myFaidxFile;
+     // bool oneChr=false;
+     // string oneChrName="";
+
+     myFaidxFile.open(fastaIndex.c_str(), ios::in);
+
+
+     vector<chrinfo> chrFound;
+     unsigned int  genomeLength=0;
+     unsigned int  maxLengthFound=0;
+     if (myFaidxFile.good()){
+	 while ( getline (myFaidxFile,line)){
+	     chrinfo toadd;
+	     vector<string> fields = allTokens(line,'\t');
+
+	     toadd.name         =fields[0];
+	     toadd.startIndexChr=genomeLength+1;
+	     toadd.length       =destringify<unsigned int>(fields[1]);
+	     if(toadd.length> maxLengthFound){
+		 maxLengthFound = toadd.length;
+	     }
+	     toadd.endIndexChr  =genomeLength+toadd.length;
+	     chrFound.push_back(toadd);
+
+	 }
+	 myFaidxFile.close();
+     }else{
+	 cerr << "Unable to open fasta index file "<<fastaIndex<<endl;
+	 return 1;
+     }
+
+
+     //bool found=false;
+     // if(oneChr){
+     // 	 for(unsigned int i=0;
+     // 	     i<chrFound.size();
+     // 	     i++){
+     // 	     if(chrFound[i].name == oneChrName){
+     // 		 found=true;
+     // 		 maxLengthFound=chrFound[i].length;
+     // 	     }
+     // 	 }
+
+     // 	 if(!found){
+     // 	     cerr<<"Chromosome you entered "<<oneChrName<<" was not found"<<endl;
+     // 	     return 1;
+     // 	 }
+     // }
+
+
+     double sizeToUse=HPDF_Page_GetHeight(page)/double(2.0*chrFound.size());
+
+     map<string, chrScreenInfo>  name2chrScreenInfo;
+
+     double widthScreen= (HPDF_Page_GetWidth(page)-10.0);    
+     for(unsigned int i=0;
+	 i<chrFound.size();
+	 i++){
+
+	 double yOffset=sizeToUse*double(i*2);
+	 // if(oneChr){
+	 //     if(chrFound[i].name != oneChrName)
+	 // 	 continue;
+	 //     yOffset=0;
+	 // }
+	
+	 draw_rect (page, 
+		    10 , //x
+		    HPDF_Page_GetHeight(page) - yOffset, //y
+		    widthScreen  * (double(chrFound[i].length)/double(maxLengthFound)),     //length
+		    chrFound[i].name.c_str());
+
+	 name2chrScreenInfo[ chrFound[i].name.c_str() ].y            = HPDF_Page_GetHeight(page) -yOffset; //y offset
+	 name2chrScreenInfo[ chrFound[i].name.c_str() ].length       = double(chrFound[i].length);   //length
+
+	 name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen = ( (HPDF_Page_GetWidth(page)-10.0)  * (double(chrFound[i].length)/double(maxLengthFound)) );     //length on screen
+	 HPDF_Page_Stroke (page);
+     }
+
+
+
+
+     HPDF_Page_GSave (page);
+     gstate = HPDF_CreateExtGState (pdf);
+     HPDF_ExtGState_SetAlphaFill (gstate, alpha);
+     HPDF_Page_SetExtGState (page, gstate);
+
+     return 0;
 }

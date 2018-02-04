@@ -2982,7 +2982,7 @@ int main (int argc, char *argv[]) {
     string previousChrWritten="###";
     bool skipToHMM=false;
     ifstream myFileFAI;
-    string filenameFAI;
+    //string filenameFAI;
     string headerVCFFile;
     Internal::BgzfStream  bgzipWriterGL;
     int maxChains   =  50000;
@@ -3200,9 +3200,6 @@ int main (int argc, char *argv[]) {
 
     pthread_t             threadCov[numberOfThreads];//coverage threads
     pthread_t             threadHet[numberOfThreads];//het      threads
-    if(skipToHMM){//skip het computations
-	goto beginhmm;
-    }
     
     if(!outFilePrefixFlag){
 	cerr<<"The output file has to be defined"<<endl;
@@ -3214,6 +3211,10 @@ int main (int argc, char *argv[]) {
     fastaFile         = string(argv[lastOpt]);
     bamFileToOpen     = string(argv[lastOpt+1]);
     fastaIndex        = fastaFile+".fai";
+
+    if(skipToHMM){//skip het computations
+	goto beginhmm;
+    }
 
     cerr<<"Parsing arguments ...";
 
@@ -3733,9 +3734,9 @@ int main (int argc, char *argv[]) {
     // 	    headerOutFile="#CHROM\tPOS\tA\tC\tG\tT\tGENO\tGENOS\tQualL\tCovL\tAA\tAC\tAG\tAT\tCC\tCG\tCT\tGG\tGT\tTT\n";	
     // 	}
 
-    filenameFAI = fastaIndex;
+    //filenameFAI = fastaIndex;
 
-    myFileFAI.open(filenameFAI.c_str(), ios::in);
+    myFileFAI.open(fastaIndex.c_str(), ios::in);
 
    if (myFileFAI.is_open()){
        string l;
@@ -3749,7 +3750,7 @@ int main (int argc, char *argv[]) {
        }
        myFileFAI.close();
    }else{
-       cerr << "Unable to open fasta fai file "<<filenameFAI<<endl;
+       cerr << "Unable to open fasta fai file "<<fastaIndex<<endl;
        return 1;
     }
 
@@ -3927,10 +3928,11 @@ int main (int argc, char *argv[]) {
 	if (hEstFileSt.good()){
 	    vector<string> fields;
 	    string line;
-	    getline (hEstFileSt,line) ; 		//header
-
-	    while (getline (hEstFileSt,line) ){
 	    
+	    getline (hEstFileSt,line) ; 		//header
+	    //cerr<<line<<endl;
+	    while (getline (hEstFileSt,line) ){
+		//cerr<<line<<endl;	    
 		fields = allTokens(line,'\t');
 
 		if(fields.size() != 7){
@@ -3967,6 +3969,9 @@ int main (int argc, char *argv[]) {
 		}else{
 		    hetResToAdd.undef  = true;		
 		}
+
+		//cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.plow<<"\t"<<hetResToAdd.phigh<<endl;
+
 		heteroEstResults.push_back(hetResToAdd);
 	    }           
 	    hEstFileSt.close();
@@ -3977,7 +3982,7 @@ int main (int argc, char *argv[]) {
 
 
     } //end if skipToHMM
-
+    //return 1;
 
 	
 
@@ -4105,8 +4110,15 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
     //cerr<<"writing plot"<<endl;
+
+
     PdfWriter pdfwriter (outFilePrefix+".het.pdf");
-    
+    if(pdfwriter.drawFrame(fastaIndex) == 1){
+	cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
+	return 1;
+    }
+
+
     //produce plot libharoutFilePrefix+".vcf.gz"u?
     //write out h estimate
 

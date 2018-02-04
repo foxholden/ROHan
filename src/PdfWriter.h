@@ -15,9 +15,10 @@ using namespace std;
 #include <fstream>
 #include <gzstream.h>
 #include <setjmp.h>
+#include <vector>
 
 #include "hpdf.h"
-
+#include "GenomicWindows.h"
 
 
 
@@ -43,6 +44,11 @@ class PdfWriter{
  private:
     string fname;
     HPDF_Doc  pdf;
+    HPDF_Font font;
+    HPDF_Page page;
+    HPDF_ExtGState gstate;
+    float tw;
+    double alpha=0.8;
 
     void draw_rect (HPDF_Page     page,
 		    double        x,
@@ -62,7 +68,8 @@ class PdfWriter{
     PdfWriter(const PdfWriter & other);
     ~PdfWriter();
     PdfWriter & operator= (const PdfWriter & other);
-
+    int drawFrame(const string & fastaIndex);
+    
 };
 
 
