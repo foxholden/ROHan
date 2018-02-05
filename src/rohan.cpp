@@ -2986,6 +2986,8 @@ int main (int argc, char *argv[]) {
     string headerVCFFile;
     Internal::BgzfStream  bgzipWriterGL;
     int maxChains   =  50000;
+    double fracChainsBurnin   =  0.1;
+
     string bedFile;
 
     ////////////////////////////////////
@@ -3012,17 +3014,18 @@ int main (int argc, char *argv[]) {
 
 			      
 			      "\n\tComputation options:\n"+
-                              "\t\t"+"-t"+"\t"+""       +"\t\t"    +    "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
-                              "\t\t"+""  +""+"--phred64"+"\t\t\t"  +    ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
+                              "\t\t"+"-t"+"\t"+""       +"\t\t"    + "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
+                              "\t\t"+""  +""+"--phred64"+"\t\t\t"  + ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 			      "\t\t"+""  +""+"--size"   +"\t\t\t"  + "[window size]"+"\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
 			      "\t\t"+""  +""+"--bed"    +"\t\t\t"  + "[bed file]"+"\t\t"+"Only use the regions in the bed file  (default: none)"+"\n"+	      
 			      //			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
 			      "\n\t\tHMM:\n"+
-			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]" +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
-			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]" +"\t\t\t"+"Steps used for MCMC sampling (default: "+thousandSeparator(stepHMM)+")"+"\n"+  
-			      "\t\t"+""  +""+"--chains"   +"\t\t"    +"[chains]"+"\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
-			      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""       +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
-			      "\t\t"+""  +""+""           +"\t\t\t"    + ""       +"\t\t\t"+"read the previous het. rates [out prefix].hEst.gz and skip to HMM"+"\n"+  
+			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
+			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]"  +"\t\t\t"+"Steps used for MCMC sampling (default: "+thousandSeparator(stepHMM)+")"+"\n"+  
+			      "\t\t"+""  +""+"--chains"   +"\t\t"      + "[chains]"+"\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
+			      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""        +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
+			      "\t\t"+""  +""+""           +"\t\t\t"    + ""        +"\t\t\t"+"read the previous het. rates [out prefix].hEst.gz and skip to HMM"+"\n"+  
+                              "\t\t"+""  +""+"--burnin"   +"\t\t"      + "[frac ]" +"\t\t"+"Fraction of the number of chains for MCMC  (default: "+stringify(fracChainsBurnin)+")"+"\n"+  
 
 			      
                               // "\n\tSample options:\n"+
@@ -3074,6 +3077,12 @@ int main (int argc, char *argv[]) {
 
         if( string(argv[i]) == "--chains"  ){
 	    maxChains=destringify<int>(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if( string(argv[i]) == "--burnin"  ){
+	    fracChainsBurnin=destringify<double>(argv[i+1]);
             i++;
             continue;
         }
@@ -3235,12 +3244,17 @@ int main (int argc, char *argv[]) {
 	}
     }
 
+    if(	   (0<fracChainsBurnin) ||
+	   (fracChainsBurnin>1) ){
+	cerr<<"The supplied fraction of burnins  "<<fracChainsBurnin<<"  should be between 0 and 1"<<endl;
+	return 1;	
+    }
     //    if(outFilePrefixFlag)
-
-	// if( !strEndsWith(outFilePrefix,".gz")){
-	//     cerr<<"The output file "<<outFilePrefix<<" must end with .gz"<<endl;
-	//     return 1;	
-	// }
+    
+    // if( !strEndsWith(outFilePrefix,".gz")){
+    //     cerr<<"The output file "<<outFilePrefix<<" must end with .gz"<<endl;
+    //     return 1;	
+    // }
 
 
 
@@ -3264,6 +3278,8 @@ int main (int argc, char *argv[]) {
 
     reader.Close();
 
+
+    
     ////////////////////////////////////
     //   END Parsing arguments        //
     ////////////////////////////////////
@@ -3797,6 +3813,8 @@ int main (int argc, char *argv[]) {
 		string strToWrite=dataToWrite->rangeGen.asBed()+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
 		emissionUndef hetResToAdd;
 		
+		hetResToAdd.rangeGen=dataToWrite->rangeGen;
+		
 		if(     previousChrWritten != dataToWrite->rangeGen.getChrName()){
 		    if(previousChrWritten == "###"){//first chr
 			hetResToAdd.chrBreak   = false;//not a true chr break
@@ -3942,6 +3960,9 @@ int main (int argc, char *argv[]) {
 
 
 	    	emissionUndef hetResToAdd;
+		hetResToAdd.rangeGen.setChrName( fields[0] );
+		hetResToAdd.rangeGen.setStartCoord(  destringify<unsigned int>( fields[1]) );
+		hetResToAdd.rangeGen.setEndCoord(    destringify<unsigned int>( fields[2]) );
 		
 		if(     previousChrWritten != fields[0]){
 		    if(previousChrWritten == "###"){//first chr
@@ -4047,7 +4068,10 @@ int main (int argc, char *argv[]) {
     hmm.setTransprob(pT_i);
     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
     x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
-    cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
+    cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+    vector<long double> hvector;
+    vector<long double> pvector;
+    
     for(int chain=1;chain<=maxChains;chain++){
 
 	//computing new state
@@ -4082,6 +4106,12 @@ int main (int argc, char *argv[]) {
 	    h_i           =  h_i_1;
 	    pT_i          =  pT_i_1;
 	    x_i           =  x_i_1;
+
+	    if( (chain>=(maxChains*(1.0-fracChainsBurnin)))){
+		hvector.push_back(h_i);
+		pvector.push_back(pT_i);
+	    }
+	    
 	    accept++;
 	    cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
@@ -4098,6 +4128,34 @@ int main (int argc, char *argv[]) {
     //baum_welch(&hmm,&emittedH);
 	
     cerr<<"HMM done"<<endl;
+
+    //hvector and pvector contain the values
+    long double hSum=0.0;
+    long double pSum=0.0;
+    long double hAvg=0.0;
+    long double pAvg=0.0;
+    long double hMin=1.0;
+    long double hMax=0.0;
+
+    
+    for(unsigned int i=0;i<hvector.size();i++){
+	hSum += hvector[i];
+	pSum += pvector[i];
+	if(hvector[i] < hMin)
+	    hMin = hvector[i] ;
+	if(hvector[i] > hMax)
+	    hMax = hvector[i] ;	
+    }
+
+    hAvg = hSum/( (long double)hvector.size() );
+    pAvg = pSum/( (long double)pvector.size() );
+
+
+    //to remove
+    // hMin = 0.00070;
+    // hAvg = 0.0007467025205; 
+    // hMax = 0.0008;
+    
     //////////////////////////////////
     //                              //
     //  END HMM                     //
@@ -4111,17 +4169,48 @@ int main (int argc, char *argv[]) {
     //////////////////////////////////
     //cerr<<"writing plot"<<endl;
 
+    double heightChr=45;
+    PdfWriter pdfwriter (outFilePrefix+".het.pdf",heightChr);
 
-    PdfWriter pdfwriter (outFilePrefix+".het.pdf");
     if(pdfwriter.drawFrame(fastaIndex) == 1){
 	cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 	return 1;
     }
 
+    //pdfwriter.drawHorizontalLine(100,100,102);
+    long double maxHFoundPlotting= numeric_limits<double>::epsilon();
+    for(unsigned int c=0;c<heteroEstResults.size();c++){
+	if( heteroEstResults[c].phigh > maxHFoundPlotting){
+	    maxHFoundPlotting = heteroEstResults[c].phigh;
+	}
 
+    }
+    
+    for(unsigned int c=0;c<heteroEstResults.size();c++){
+	if(heteroEstResults[c].undef)
+	    continue;
+	if(    pdfwriter.drawHEst(heteroEstResults[c].rangeGen,
+				  ( (heteroEstResults[c].plow+heteroEstResults[c].phigh)/2.0 ),
+				  heteroEstResults[c].plow,
+				  heteroEstResults[c].phigh,
+				  double( minSegSitesPer1M )/double(1000000),
+				  maxHFoundPlotting // 0.00500    = 4*2e-8*62500
+				  )  != 0 ){
+	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
+	    return 1;
+	}
+    }
     //produce plot libharoutFilePrefix+".vcf.gz"u?
-    //write out h estimate
 
+    //write out h estimate
+    pdfwriter.drawGlobalHEst(hAvg,
+			     hMin,
+			     hMax,			     
+			     double( minSegSitesPer1M )/double(1000000),
+			     maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
+    
+    cerr<<"h est. "<<hAvg<<" hMin "<<hMin<<" hMax "<<hMax<<endl;
+    
     //////////////////////////////////
     //                              //
     //  END h global                //

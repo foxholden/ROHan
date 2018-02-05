@@ -12,6 +12,9 @@
 #include <vector>
 #include "HmmState.h"
 
+
+#include "GenomicRange.h"
+
 #include "utils.h"
 
 #define NBRSTATES 2
@@ -122,6 +125,7 @@ typedef struct {
     long double phigh;
     bool undef;     //0 = defined,    1 = undefined
     bool chrBreak;  //0 = continuous, 1 = break
+    GenomicRange rangeGen;
 } emissionUndef;
 
 

@@ -42,7 +42,13 @@ public:
 
 
     friend std::ostream & operator<<(std::ostream & os, const GenomicRange & ct);
-
+    GenomicRange& operator=(const GenomicRange & other){
+	chrName    = other.chrName;
+	startCoord = other.startCoord;
+	endCoord   = other.endCoord;
+	
+        return *this;
+    }
 
 
 };
