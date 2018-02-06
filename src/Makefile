@@ -7,7 +7,7 @@ LDFLAGS  = -lgsl -lgslcblas -lz  -lpthread
 LDLIBS   = ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../lib/bamtools/build/src/api/libbamtools.a
 
 
-all: ../lib/bamtools/build/src/api/libbamtools.a ../lib/libgab/utils.o ../lib/libharu/src/libhpdf.la rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
+all: ../lib/bamtools/build/src/api/libbamtools.a ../lib/libgab/utils.o ../lib/libharu/src/.libs/libhpdf.a rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
 
 %.o: %.cpp #../lib/libgab/utils.o  
 	${CXX} ${CXXFLAGS} $^ -o $@
