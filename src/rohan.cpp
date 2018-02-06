@@ -617,9 +617,10 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 
 
     for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){     //for each fragment length
-	if( (L%8)==0){
-	    cerr<<".";
-	}
+	printprogressBarCerr( float(L-MINLENGTHFRAGMENT)/float(MAXLENGTHFRAGMENT-MINLENGTHFRAGMENT) );
+	// if( (L%8)==0){
+	//     cerr<<".";
+	// }
 	//vector<alleleFrequency > defaultDNA;
 	vector<probSubstition> subDeam_;
 	vector<diNucleotideProb> subDeamDiNuc_;
@@ -644,8 +645,8 @@ void initDeamProbabilities(const string & deam5pfreqE,const string & deam3pfreqE
 	subDeam.push_back(      subDeam_      );
 	subDeamDiNuc.push_back( subDeamDiNuc_ );       
     }
-
-
+    cerr<<endl; //flushing progress bar
+    
 
 
 #ifdef DEBUGDEAM
@@ -790,10 +791,11 @@ void initDefaultBaseFreq(const string & dnafreqFile){
     }
 
     for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){     //for each fragment length
-	if( (L%8)==0){
-	    cerr<<".";
-	}
-
+	// if( (L%8)==0){
+	//     cerr<<".";
+	// }
+	printprogressBarCerr( float(L-MINLENGTHFRAGMENT)/float(MAXLENGTHFRAGMENT-MINLENGTHFRAGMENT) );
+	
 	vector<alleleFrequency > defaultDNA;
 	for(unsigned int l=0;l<L;l++){     //position
 
@@ -830,6 +832,7 @@ void initDefaultBaseFreq(const string & dnafreqFile){
     
 	defaultDNAFragmentLength.push_back(defaultDNA);
     }
+    cerr<<endl; //flushing progress bar
     //exit(1);
 }//end initDefaultBaseFreq 
 
@@ -856,9 +859,10 @@ void initLikelihoodScores(){
 
     
     for(int L=int(MINLENGTHFRAGMENT);L<=int(MAXLENGTHFRAGMENT);L++){//for each fragment length
-	if( (L%8)==0){
-	    cerr<<".";
-	}
+	// if( (L%8)==0){
+	//     cerr<<".";
+	// }
+	printprogressBarCerr( float(L-MINLENGTHFRAGMENT)/float(MAXLENGTHFRAGMENT-MINLENGTHFRAGMENT) );
 
 	vector< mpq2bsq2submatrix  > pos2mpq2BaseQual2SubMatrix;
 
@@ -938,7 +942,7 @@ void initLikelihoodScores(){
 	length2pos2mpq2bsq2submatrix.push_back(pos2mpq2BaseQual2SubMatrix);	
 
     }//for each fragment length L
-    
+    cerr<<endl; //flushing progress bar
 
     // cerr<<setprecision(20)<<"TEST2 AT 38 "<<pos2mpq2BaseQual2SubMatrix5p[  12  ][37][38].p[0][3]<<"\tL2P="<<length2pos2mpq2bsq2submatrix[113][12]->at(37)[38].p[0][3]<<endl ;
     // cerr<<setprecision(20)<<"TEST2 AT 18 "<<pos2mpq2BaseQual2SubMatrix5p[  12  ][37][18].p[0][3]<<"\tL2P="<<length2pos2mpq2bsq2submatrix[113][12]->at(37)[18].p[0][3]<<endl ;
@@ -1487,7 +1491,11 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 
     int iterationsMax     = 100;
     int iterationsGrad    = 1;
+    int iterationWithMinHRate    =  0;
+    int maxiterationWithMinHRate = 10;
+    double minHRateNonROH = double(minSegSitesPer1M)/double(1000000);
 
+    
     while( iterationsGrad<iterationsMax){
 
 	//mu = 1.0 - double(3.0)/(5+double(iterationsGrad));
@@ -1788,19 +1796,21 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	z = beta_*z + loglikelihoodForEveryPositionForEveryBaBdD1;
 	long double hnew = h + alpha_*z;
 
-	rc = pthread_mutex_lock(&mutexCERR);
-	checkResults("pthread_mutex_lock()\n", rc);
-
 	if(verboseHETest){
+	    rc = pthread_mutex_lock(&mutexCERR);
+	    checkResults("pthread_mutex_lock()\n", rc);
+	    
 	    cerr<<"Thread#"<<threadID<<setprecision(14)<<"\t"<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\te="<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\thnew="<<hnew<<"\tz="<<z<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdP<<"\t"<<hp<<"\t"<<alpha_<<"\t"<<beta_<<endl;
+	    
+	
+	    rc = pthread_mutex_unlock(&mutexCERR);
+	    checkResults("pthread_mutex_unlock()\n", rc);
 	}
 	
-	rc = pthread_mutex_unlock(&mutexCERR);
-	checkResults("pthread_mutex_unlock()\n", rc);
-
 	if(lastIteration){//was set at the previous loop
 	    break;
 	}
+	
 	//if(abs(hnew-h)<hPrecision){
 	if(fabsl(loglikelihoodForEveryPositionForEveryBaBdD1)<100){
 
@@ -1817,6 +1827,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    //break;
 	}
 
+	//setting h to hnew
 	if(loglikelihoodForEveryPositionForEveryBaBdP == LDBL_MAX){
 	    loglikelihoodForEveryPositionForEveryBaBdP = loglikelihoodForEveryPositionForEveryBaBd;
 	    hp = h;
@@ -1841,15 +1852,51 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	}
 
 	if(h<0){
-            h     = 1.0e-11;
+	    if(verboseHETest){
+		rc = pthread_mutex_lock(&mutexCERR);
+		checkResults("pthread_mutex_lock()\n", rc);
+		
+		cerr<<"Thread#"<<threadID<<setprecision(14)<<"\tnew proposed h is less than 0 "<<h<<"\t"<<alpha_<<"\t"<<beta_<<endl;
+		
+		
+		rc = pthread_mutex_unlock(&mutexCERR);
+		checkResults("pthread_mutex_unlock()\n", rc);
+	    }
+
+
+	    //h     = 1.0e-11;
+	    h = hp;//resetting to previous h
 	    alpha_ = alpha_/2.0;
+	}else{
+
+	    if(h>0.1){
+		h     = 0.1-1.0e-11;
+		alpha_ = alpha_/2.0;                        
+	    }
+	}
+	
+	if( h < minHRateNonROH){
+	    iterationWithMinHRate++;
+	}else{
+	    iterationWithMinHRate=0;
 	}
 
-	if(h>0.1){
-	    h     = 0.1-1.0e-11;
-	    alpha_ = alpha_/2.0;                        
-        }
-                  
+	if(iterationWithMinHRate == maxiterationWithMinHRate ){
+	    hasConverged =true;
+	    lastIteration=true;
+	    
+	    if(verboseHETest){
+		rc = pthread_mutex_lock(&mutexCERR);
+		checkResults("pthread_mutex_lock()\n", rc);
+		
+		cerr<<"Thread#"<<threadID<<setprecision(14)<<"\thas reached the bottom limit ("<<minHRateNonROH<<") for "<<iterationWithMinHRate<<" iterations now"<<endl;		
+		
+		rc = pthread_mutex_unlock(&mutexCERR);
+		checkResults("pthread_mutex_unlock()\n", rc);
+	    }
+
+	}
+	
 	if(iterationsGrad == (iterationsMax-2)){
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
@@ -3244,7 +3291,7 @@ int main (int argc, char *argv[]) {
 	}
     }
 
-    if(	   (0<fracChainsBurnin) ||
+    if(	   (0>fracChainsBurnin) ||
 	   (fracChainsBurnin>1) ){
 	cerr<<"The supplied fraction of burnins  "<<fracChainsBurnin<<"  should be between 0 and 1"<<endl;
 	return 1;	
@@ -3603,9 +3650,11 @@ int main (int argc, char *argv[]) {
     //
     ////////////////////////////////////////////////////////////////////////
     
-    cerr<<"Begin computing deamination substitution rates.";
+    cerr<<"Begin computing deamination substitution rates."<<endl;
+    
     initDeamProbabilities(deam5pfreqE,deam3pfreqE);
-    cerr<<".done"<<endl;
+
+    cerr<<"done"<<endl;
 
     ////////////////////////////////////////////////////////////////////////
     //
@@ -3624,10 +3673,10 @@ int main (int argc, char *argv[]) {
     // BEGIN DNA BASE FREQUENCY
     //
     ////////////////////////////////////////////////////////////////////////
-    cerr<<"Begin computing default base frequencies post-deamination.";
+    cerr<<"Begin computing default base frequencies post-deamination."<<endl;
     //initDefaultBaseFreq_(dnafreqFile);
     initDefaultBaseFreq(dnafreqFile);
-    cerr<<".done"<<endl;
+    cerr<<"done"<<endl;
 
     ////////////////////////////////////////////////////////////////////////
     //
@@ -3646,9 +3695,9 @@ int main (int argc, char *argv[]) {
     //
     ////////////////////////////////////////////////////////////////////////
 
-    cerr<<"Begin computing substitution probabilities.";
+    cerr<<"Begin computing substitution probabilities."<<endl;
     initLikelihoodScores();
-    cerr<<".done"<<endl;
+    cerr<<"done"<<endl;
 
     // exit(1);
     // initLikelihoodScores();
@@ -3678,7 +3727,7 @@ int main (int argc, char *argv[]) {
     threadID2Rank=map<unsigned int, int> ();
 
 
-    cerr<<"Creating threads for heterozygosity calculation"<<endl;
+    cerr<<"Creating "<<numberOfThreads<<" thread(s) for heterozygosity calculation"<<endl;
     pthread_mutex_init(&mutexQueueToRead,   NULL);
     pthread_mutex_init(&mutexQueueToWrite,  NULL);
     pthread_mutex_init(&mutexRank,          NULL);
@@ -3805,11 +3854,26 @@ int main (int argc, char *argv[]) {
 
 	    if( lastWrittenChunk == (dataToWrite->rank-1) ){ 	    //correct order
 		queueDataTowrite.pop();
+
+
+
+		
+		rc = pthread_mutex_lock(&mutexCERR);
+		checkResults("pthread_mutex_lock()\n", rc);
+
+		// if(verboseHETest){
+		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<thousandSeparator(dataToWrite->vecPositionResults->size())<<" records, "<<(queueDataTowrite.size())<<" chunk(s) left in queue"<<endl;
+		
+		// }
+		
+		rc = pthread_mutex_unlock(&mutexCERR);
+		checkResults("pthread_mutex_unlock()\n", rc);
+
 		rc = pthread_mutex_unlock(&mutexQueueToWrite);
 		checkResults("pthread_mutex_unlock()\n", rc);
 
-		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<thousandSeparator(dataToWrite->vecPositionResults->size())<<" records"<<endl;
 
+		
 		string strToWrite=dataToWrite->rangeGen.asBed()+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
 		emissionUndef hetResToAdd;
 		
@@ -4136,6 +4200,8 @@ int main (int argc, char *argv[]) {
     long double pAvg=0.0;
     long double hMin=1.0;
     long double hMax=0.0;
+    long double pMin=1.0;
+    long double pMax=0.0;
 
     
     for(unsigned int i=0;i<hvector.size();i++){
@@ -4144,7 +4210,13 @@ int main (int argc, char *argv[]) {
 	if(hvector[i] < hMin)
 	    hMin = hvector[i] ;
 	if(hvector[i] > hMax)
-	    hMax = hvector[i] ;	
+	    hMax = hvector[i] ;
+	
+	if(pvector[i] < pMin)
+	    pMin = pvector[i] ;
+	if(pvector[i] > pMax)
+	    pMax = pvector[i] ;
+	
     }
 
     hAvg = hSum/( (long double)hvector.size() );
@@ -4209,7 +4281,7 @@ int main (int argc, char *argv[]) {
 			     double( minSegSitesPer1M )/double(1000000),
 			     maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
     
-    cerr<<"h est. "<<hAvg<<" hMin "<<hMin<<" hMax "<<hMax<<endl;
+    cerr<<"h est. "<<hAvg<<" hMin "<<hMin<<" hMax "<<hMax<<" p avg. "<<pAvg<<" pMin "<<pMin<<" pMax "<<pMax<<endl;
     
     //////////////////////////////////
     //                              //
@@ -4360,7 +4432,7 @@ int main (int argc, char *argv[]) {
 	//chain++;
 	//sleep(0.1);
     }
-    cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
 
 	
     //cerr<<"Baum Welch"<<endl;
