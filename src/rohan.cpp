@@ -6,6 +6,10 @@
 #include <random>
 
 //TODO
+// fix when h=0
+// forward algorithm for posterior prob
+// plot prob of HMM
+// 
 // global estimate
 // add mappability track?
 // ?
@@ -30,6 +34,7 @@
 #include "Hmm.h"
 
 #define MAXCOV             50     // maximal coverage
+//#define TESTHMMSIMS
 
 #include "miscfunc.h"
 #include "utils.h"
@@ -3027,7 +3032,8 @@ int main (int argc, char *argv[]) {
     RefVector  references;
     BamReader reader;
     string previousChrWritten="###";
-    bool skipToHMM=false;
+    bool skipToHMM =false;
+    bool skipTheHMM=false;
     ifstream myFileFAI;
     //string filenameFAI;
     string headerVCFFile;
@@ -3070,8 +3076,12 @@ int main (int argc, char *argv[]) {
 			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
 			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]"  +"\t\t\t"+"Steps used for MCMC sampling (default: "+thousandSeparator(stepHMM)+")"+"\n"+  
 			      "\t\t"+""  +""+"--chains"   +"\t\t"      + "[chains]"+"\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
-			      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""        +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
-			      "\t\t"+""  +""+""           +"\t\t\t"    + ""        +"\t\t\t"+"read the previous het. rates [out prefix].hEst.gz and skip to HMM"+"\n"+  
+
+	                      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""        +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
+			      "\t\t"+""  +""+""           +"\t\t\t"    + ""        +"\t\t\t"+"read the previous het. rates [out prefix].hEst.gz and skip to HMM"+"\n"+
+
+	                      "\t\t"+""  +""+"--nohmm"    +"\t\t\t"    + ""        +"\t\t\t"+"Skip the HMM              (default: "+stringify(skipTheHMM)+")"+"\n"+
+	
                               "\t\t"+""  +""+"--burnin"   +"\t\t"      + "[frac ]" +"\t\t"+"Fraction of the number of chains for MCMC  (default: "+stringify(fracChainsBurnin)+")"+"\n"+  
 
 			      
@@ -3142,6 +3152,11 @@ int main (int argc, char *argv[]) {
 
         if( string(argv[i]) == "--hmm"  ){
 	    skipToHMM=true;
+            continue;
+        }
+
+        if( string(argv[i]) == "--nohmm"  ){
+	    skipTheHMM=true;
             continue;
         }
 	
@@ -3898,8 +3913,9 @@ int main (int argc, char *argv[]) {
 		    long double h      = dataToWrite->hetEstResults.h;
 		    long double hLow   = dataToWrite->hetEstResults.hLow;
 		    long double hHigh  = dataToWrite->hetEstResults.hHigh;
-		    hetResToAdd.plow   = hLow;
-		    hetResToAdd.phigh  = hHigh;
+		    hetResToAdd.h      = h;
+		    hetResToAdd.hlow   = hLow;
+		    hetResToAdd.hhigh  = hHigh;
 		    
 		    if(h<0)      h     = 0;
 		    if(hLow<0)   hLow  = 0;
@@ -3980,11 +3996,13 @@ int main (int argc, char *argv[]) {
     //end Writing data out/
     ///////////////////////
     bgzipWriterHest.Close();
+
 #ifndef DEBUGFIRSTWINDOWS
 
     bgzipWriterGL.Close();
 
 #endif
+
     cerr<<"done writing data"<<endl;
 
     //////////////////////////////////
@@ -3993,6 +4011,9 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
+    if(skipTheHMM){
+	//goto endhmm;
+    }
 
 
 
@@ -4041,11 +4062,12 @@ int main (int argc, char *argv[]) {
 	    
 		if(fields[4] != "NA"){
 		    hetResToAdd.undef  = false;		
-		    //long double h      = destringify<long double>( fields[4]);
+		    long double h      = destringify<long double>( fields[4]);
 		    long double hLow   = destringify<long double>( fields[5]);
 		    long double hHigh  = destringify<long double>( fields[6]);
-		    hetResToAdd.plow   = hLow;
-		    hetResToAdd.phigh  = hHigh;
+		    hetResToAdd.h      = h;
+		    hetResToAdd.hlow   = hLow;
+		    hetResToAdd.hhigh  = hHigh;
 		    
 		    // if(h<0)      h     = 0;
 		    // if(hLow<0)   hLow  = 0;
@@ -4071,6 +4093,8 @@ int main (int argc, char *argv[]) {
 
 	
 
+
+    
     
 
     //computing the min/max segsites per chunk
@@ -4234,6 +4258,7 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
+    
     //////////////////////////////////
     //                              //
     // BEGIN h global               //
@@ -4252,28 +4277,36 @@ int main (int argc, char *argv[]) {
     //pdfwriter.drawHorizontalLine(100,100,102);
     long double maxHFoundPlotting= numeric_limits<double>::epsilon();
     for(unsigned int c=0;c<heteroEstResults.size();c++){
-	if( heteroEstResults[c].phigh > maxHFoundPlotting){
-	    maxHFoundPlotting = heteroEstResults[c].phigh;
+	if( heteroEstResults[c].hhigh > maxHFoundPlotting){
+	    maxHFoundPlotting = heteroEstResults[c].hhigh;
 	}
-
     }
+    cerr<<"maxHFoundPlotting "<<maxHFoundPlotting<<endl;
+    //maxHFoundPlotting=0.0015;
+    maxHFoundPlotting = double( maxSegSitesPer1M )/double(1000000);
     
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	if(heteroEstResults[c].undef)
 	    continue;
 	if(    pdfwriter.drawHEst(heteroEstResults[c].rangeGen,
-				  ( (heteroEstResults[c].plow+heteroEstResults[c].phigh)/2.0 ),
-				  heteroEstResults[c].plow,
-				  heteroEstResults[c].phigh,
-				  double( minSegSitesPer1M )/double(1000000),
+				  (heteroEstResults[c].h ),
+				  // ( (heteroEstResults[c].h )-6.0188e-05),
+				  // ( (heteroEstResults[c].h )+6.0188e-05),
+
+				  //TODO to put back
+				  heteroEstResults[c].hlow,
+				  heteroEstResults[c].hhigh,
+				  0.0,//double( minSegSitesPer1M )/double(1000000),
 				  maxHFoundPlotting // 0.00500    = 4*2e-8*62500
-				  )  != 0 ){
+	)  != 0 ){
 	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 	    return 1;
 	}
     }
     //produce plot libharoutFilePrefix+".vcf.gz"u?
-
+    cerr<<"h est. "<<hAvg<<" hMin "<<hMin<<" hMax "<<hMax<<" p avg. "<<pAvg<<" pMin "<<pMin<<" pMax "<<pMax<<endl;
+    
+    // endhmm:
     //write out h estimate
     pdfwriter.drawGlobalHEst(hAvg,
 			     hMin,
@@ -4281,20 +4314,10 @@ int main (int argc, char *argv[]) {
 			     double( minSegSitesPer1M )/double(1000000),
 			     maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
     
-    cerr<<"h est. "<<hAvg<<" hMin "<<hMin<<" hMax "<<hMax<<" p avg. "<<pAvg<<" pMin "<<pMin<<" pMax "<<pMax<<endl;
-    
-    //////////////////////////////////
-    //                              //
-    //  END h global                //
-    //                              //
-    //////////////////////////////////
 
-    delete cov2ProbSite;
-    
-    return 0;
-}
-    
 
+
+    //#endif
 #ifdef TESTHMMSIMS
     //calculating min/max number of sites per sizeChunk
     int minSegSitesPerChunk;
@@ -4332,21 +4355,23 @@ int main (int argc, char *argv[]) {
     // 	//     emittedH.push_back( heteroEstResults[i].h );
     // 	// }
     // }
-    //long double uncertainty = 0.000000000001;
+    long double uncertainty = 0.000000000001;
     //                        0.00072
     //                        0.00005
     //                        0.00001
-    long double uncertainty = 0.00001000;
+    //long double uncertainty = 0.00001000;
     for(unsigned int i=0;i<eTest.size();i++){
 
 	emittedH.push_back( eTest[i].p );
 	emissionUndef e;
-	e.plow     = eTest[i].p - uncertainty;
-	if(e.plow < 0) e.plow=0.0;
-	e.phigh    = eTest[i].p + uncertainty;
+	e.hlow     = eTest[i].p - uncertainty;
+	if(e.hlow < 0)
+	    e.hlow=0.0;
+	e.hhigh    = eTest[i].p + uncertainty;
+	
 	e.undef    = false;
 	e.chrBreak = false;
-	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<"\t"<<e.plow<<" "<<e.phigh<<" "<<e.undef<<" "<<e.chrBreak <<endl;	
+	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<"\t"<<e.hlow<<" "<<e.hhigh<<" "<<e.undef<<" "<<e.chrBreak <<endl;	
 	eTestUndef.push_back( e );
     }
 
@@ -4382,7 +4407,7 @@ int main (int argc, char *argv[]) {
     random_device rd;
     default_random_engine dre (rd());
     //int maxChains = 100000;
-    int maxChains   =  50000;
+    //int maxChains   =  50000;
     //chain 0
 
     hmm.setHetRateForNonROH(h_i);
@@ -4439,7 +4464,21 @@ cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<e
     //baum_welch(&hmm,&emittedH);
 	
     cerr<<"HMM done"<<endl;
-#endif 
+#endif
+
+    
+    //////////////////////////////////
+    //                              //
+    //  END h global                //
+    //                              //
+    //////////////////////////////////
+
+    delete cov2ProbSite;
+    
+    return 0;
+}
+    
+
 
 
 

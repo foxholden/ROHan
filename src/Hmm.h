@@ -121,8 +121,9 @@ inline long double forwardProb (Hmm * hmm, const vector<long double> & observed,
 }
 
 typedef struct { 
-    long double plow;
-    long double phigh;
+    long double h;
+    long double hlow;
+    long double hhigh;
     bool undef;     //0 = defined,    1 = undefined
     bool chrBreak;  //0 = continuous, 1 = break
     GenomicRange rangeGen;
@@ -145,8 +146,8 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 		/* logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[0].plow+observed[0].phigh)/2.0 *sizeChunk), */
 		/* 					       sizeChunk)	); //emitting observed[0] by state */
 
-		logRobust(hmm->hmmstates[state]->probEmissionRange( (unsigned int)(observed[0].plow *sizeChunk),
-								    (unsigned int)(observed[0].phigh*sizeChunk),
+		logRobust(hmm->hmmstates[state]->probEmissionRange( (unsigned int)(observed[0].hlow *sizeChunk),
+								    (unsigned int)(observed[0].hhigh*sizeChunk),
 								    sizeChunk)	); //emitting observed[0] by state
 	}
     }
@@ -179,8 +180,8 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 		    f[state][k] =
 			/* logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[k].plow+observed[k].phigh)/2.0 *sizeChunk)  , */
 			/* 						sizeChunk) ) +  //emission probability by state */
-			logRobust( hmm->hmmstates[state]->probEmissionRange( (unsigned int)(observed[k].plow *sizeChunk)  ,
-									     (unsigned int)(observed[k].phigh*sizeChunk)  ,
+			logRobust( hmm->hmmstates[state]->probEmissionRange( (unsigned int)(observed[k].hlow *sizeChunk)  ,
+									     (unsigned int)(observed[k].hhigh*sizeChunk)  ,
 									     sizeChunk) ) +  //emission probability by state
 			logsum;                                                              //sum of all probs for ev
 		}

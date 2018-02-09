@@ -76,8 +76,21 @@ class PdfWriter{
     ~PdfWriter();
     PdfWriter & operator= (const PdfWriter & other);
     int drawFrame(const string & fastaIndex);
-    int drawHorizontalLine(const double x,const double y1,const double y2);
-    int drawVerticalLine(const double x1,const double x2,const double y);
+    int drawVerticalLine(const double x,
+			 const double y1,
+			 const double y2,
+			 double r=0.0,
+			 double g=0.0,
+			 double b=0.0,
+			 double w=1.0
+    );
+
+    int drawHorizontalLine(const double x1,const double x2,const double y,
+			   double r=0.0,
+			   double g=0.0,
+			   double b=0.0,
+			   double w=1.0
+    );
 
     int drawHEst(const GenomicRange  cr,
 		 const long double   h,
