@@ -6,10 +6,9 @@
 #include <random>
 
 //TODO
-// fix when h=0
 // forward algorithm for posterior prob
+// fix when h=0
 // plot prob of HMM
-// 
 // global estimate
 // add mappability track?
 // ?
@@ -4269,13 +4268,15 @@ int main (int argc, char *argv[]) {
     double heightChr=45;
     PdfWriter pdfwriter (outFilePrefix+".het.pdf",heightChr);
 
-    if(pdfwriter.drawFrame(fastaIndex) == 1){
+    if( pdfwriter.drawFrame(fastaIndex,sizeChunk) == 1 ){
 	cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 	return 1;
     }
 
     //pdfwriter.drawHorizontalLine(100,100,102);
-    long double maxHFoundPlotting= numeric_limits<double>::epsilon();
+    long double minHFoundPlotting = 0.0;
+    long double maxHFoundPlotting = numeric_limits<double>::epsilon();
+    
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	if( heteroEstResults[c].hhigh > maxHFoundPlotting){
 	    maxHFoundPlotting = heteroEstResults[c].hhigh;
@@ -4284,7 +4285,12 @@ int main (int argc, char *argv[]) {
     cerr<<"maxHFoundPlotting "<<maxHFoundPlotting<<endl;
     //maxHFoundPlotting=0.0015;
     maxHFoundPlotting = double( maxSegSitesPer1M )/double(1000000);
-    
+
+    if( pdfwriter.drawYLabels(minHFoundPlotting,maxHFoundPlotting) == 1 ){
+	cerr<<"ERROR writing y labels to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
+	return 1;
+    }
+
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	if(heteroEstResults[c].undef)
 	    continue;
@@ -4296,8 +4302,9 @@ int main (int argc, char *argv[]) {
 				  //TODO to put back
 				  heteroEstResults[c].hlow,
 				  heteroEstResults[c].hhigh,
-				  0.0,//double( minSegSitesPer1M )/double(1000000),
-				  maxHFoundPlotting // 0.00500    = 4*2e-8*62500
+				  minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+				  maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
+				  sizeChunk
 	)  != 0 ){
 	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 	    return 1;

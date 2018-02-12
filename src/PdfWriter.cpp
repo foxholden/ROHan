@@ -31,8 +31,13 @@ PdfWriter::PdfWriter(const string fname_,
     //string fname      = string(argv[indexOflastOpt]);
      string page_title = "";
 
- 
-
+     //gray = {0.6,0.6,0.6};
+     // gray[0]  = 0.6;
+     // gray[1]  = 0.6;
+     // gray[2]  = 0.6;
+     // cerr<<"test gray"<<endl;
+     
+	 
      pdf = HPDF_New (error_handler, NULL);
      if (!pdf) {
 	 cerr<<"error: cannot create PdfDoc object for file="<<fname<<endl;
@@ -89,17 +94,33 @@ void PdfWriter::draw_rect (HPDF_Page     page,
 			   double        y,
 			   double length,
 			   const char   *label){    
-    HPDF_Page_BeginText (page);
+    
+    cerr<<"draw_rect "<<x<<","<<y<<" l = "<<length<<" label="<<label<<" "<<GRAY<<endl;
     //text pos
+    HPDF_Page_BeginText (page);
     HPDF_Page_MoveTextPos (page, x, y - 10);
     HPDF_Page_ShowText (page, label);
     HPDF_Page_EndText (page);
+    
     //rectangle
+    HPDF_Page_SetRGBStroke  (page,
+    			     GRAY,// GRAY,// gray[0],
+    			     GRAY,// GRAY,// gray[1],
+    			     GRAY// GRAY// gray[2]
+    );
+    cerr<<"set1 "<<endl;
     HPDF_Page_Rectangle(page,
 			x,             //x
 			y - (heightChr+heightLabel),  //y  offset minus the heightLabel and height
 			length,  //width
 			heightChr);     //height
+    cerr<<"set2 "<<endl;
+     // HPDF_Page_SetRGBStroke  (page,
+     // 			      0,// 0.0,
+     // 			      0,// 0.0,
+     // 			      0);// 0.0);
+    cerr<<"done"<<endl;
+    // HPDF_Page_Fill (page);
 }
 
 
@@ -161,7 +182,8 @@ inline void PdfWriter::addRangeCov(HPDF_Page & page,double begin,double end, con
 }
 
 
-int PdfWriter::drawFrame(const string & fastaIndex){
+int PdfWriter::drawFrame(const string & fastaIndex,
+			 const double   windowSizeForHest){
     
      string line;
      igzstream myFaidxFile;
@@ -186,6 +208,7 @@ int PdfWriter::drawFrame(const string & fastaIndex){
 		 maxLengthFound = toadd.length;
 	     }
 	     toadd.endIndexChr  =genomeLength+toadd.length;
+
 	     chrFound.push_back(toadd);
 
 	 }
@@ -196,6 +219,7 @@ int PdfWriter::drawFrame(const string & fastaIndex){
      }
 
 
+     
      //bool found=false;
      // if(oneChr){
      // 	 for(unsigned int i=0;
@@ -223,7 +247,7 @@ int PdfWriter::drawFrame(const string & fastaIndex){
 	 i++){
 
 	 double yOffset=sizeToUse*double(i*2);
-	 cerr<<i<<"\t"<<yOffset<<endl;
+	 cerr<<"i1 ="<<i<<"\t"<<yOffset<<endl;
 	 // if(oneChr){
 	 //     if(chrFound[i].name != oneChrName)
 	 // 	 continue;
@@ -236,23 +260,238 @@ int PdfWriter::drawFrame(const string & fastaIndex){
 		    widthScreen  * (double(chrFound[i].length)/double(maxLengthFound)),     //length
 		    //heightChr,//height
 		    chrFound[i].name.c_str());
-
+	 cerr<<"i2 ="<<i<<"\t"<<yOffset<<endl;	 
 	 name2chrScreenInfo[ chrFound[i].name.c_str() ].y            = HPDF_Page_GetHeight(page) -yOffset; //y offset
 	 name2chrScreenInfo[ chrFound[i].name.c_str() ].length       = double(chrFound[i].length);   //actual length in bases 
 	 name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen = ( (HPDF_Page_GetWidth(page)-10.0)  * (double(chrFound[i].length)/double(maxLengthFound)) );     //length on screen in pixel
+
+	 cerr<<"i3 ="<<i<<"\t"<<yOffset<<endl;
+
+
+
+	 //top corner minus height label + height chr drawing
+
 	 HPDF_Page_Stroke (page);
+	 //cerr<<
      }
 
-
-
+     cerr<<"test "<<endl;
+     
 
      HPDF_Page_GSave (page);
      gstate = HPDF_CreateExtGState (pdf);
      HPDF_ExtGState_SetAlphaFill (gstate, alpha);
      HPDF_Page_SetExtGState (page, gstate);
 
+
+     //write out x labels
+     for(unsigned int i=0;
+	 i<chrFound.size();
+	 i++){
+	 unsigned int mark = 100000000;
+	 while(mark>=1){
+	     //cerr<<"mark "<<mark<<endl;
+	     if( name2chrScreenInfo[ chrFound[i].name.c_str() ].length > mark){
+		 name2chrScreenInfo[ chrFound[i].name.c_str() ].markings = mark;
+		 break;
+	     }else{
+		 mark           = mark / 10;
+	     }
+	 }
+	 //cerr<<"mark "<<mark<<endl;
+	 //draw markings
+
+	 for(unsigned int m=0;m<name2chrScreenInfo[ chrFound[i].name.c_str() ].length;m+=mark ){
+	     //name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel)
+	     double xfraction = ( m  /(name2chrScreenInfo[ chrFound[i].name.c_str() ].length+windowSizeForHest));
+	     double x = xmargin +   xfraction*name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen ;
+	     double y1 = name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel);
+	     double y2 = name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel)-heightLabel/5.0;//1/5 of the height label
+	     
+	     cerr<<"x "<<x<<" m "<<m<<" "<<(name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel))<<endl;
+
+	     // HPDF_Page_SetRGBStroke  (page,
+	     // 			      gray[0],
+	     // 			      gray[1],
+	     // 			      gray[2]);
+	     
+	     drawVerticalLine( x,                                                                                                             // x offset
+	      		       y1,  // baseline
+	     		       y2,
+	     		       GRAY,// gray[0],
+	     		       GRAY,// gray[1],
+	     		       GRAY,// gray[2],
+	     		       1.0//widthtouse/3.0
+	     ); // baseline
+
+	     //text pos
+	     string labl ;
+	     if(m==0){
+		 labl = "0";
+	     }else{
+		 if(m > 1000000){
+		     labl     = stringify(m/1000000)+"Mb";
+		 }else{
+		     if(m > 1000){
+			 labl = stringify(m/1000)   +"kb";
+		     }else{
+			 labl = stringify(m)        + "b";
+		     }
+		 }
+		 //labl = "0";
+	     }
+	     
+	     cerr<<"labl "<<labl<<endl;
+	     double fontsize =5;
+	     HPDF_Page_SetFontAndSize (page, font, 5);
+
+	     HPDF_Page_BeginText   (page);
+	     HPDF_Page_MoveTextPos (page, x - double(labl.size())/2.0, y2-fontsize);
+	     HPDF_Page_ShowText    (page, labl.c_str() );
+	     HPDF_Page_EndText     (page);
+	     
+	 }
+     }
+
+    
      return 0;
 }
+
+int PdfWriter::drawYLabels(const long double minHFoundPlotting,
+			   const long double maxHFoundPlotting){
+    
+    //write out y labels
+    for(map<string , chrScreenInfo>::iterator it = name2chrScreenInfo.begin(); it != name2chrScreenInfo.end(); ++it) {
+
+	
+	// for(unsigned int i=0;
+	//  	 i<chrFound.size();
+	//  	 i++){
+	
+	// double xfraction = ( m  /(name2chrScreenInfo[ chrFound[i].name.c_str() ].length+windowSizeForHest));
+	// double x = xmargin +   xfraction*name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen ;
+	double x  = xmargin;
+	double y1 = name2chrScreenInfo[ it->first ].y - (          heightLabel); //top
+	double y2 = name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel); //bottom
+
+	cerr<<"drawYLabels "<<x<<" "<<y1<<" "<<y2<<endl;
+	double fontsize =2;
+	stringstream stream;
+	string labl;
+	
+	//labl=stringify(minHFoundPlotting);
+	stream<<minHFoundPlotting;
+	labl=stream.str();
+	cout<<"labl min "<<labl<<endl;
+	HPDF_Page_SetFontAndSize (page, font, fontsize);
+
+	
+	HPDF_Page_BeginText   (page);
+	HPDF_Page_MoveTextPos (page, x - double(labl.size())*fontsize*2, y2-fontsize/2.0); // x - double(labl.size())/2.
+	HPDF_Page_ShowText    (page, labl.c_str() );
+	HPDF_Page_EndText     (page);
+
+	drawHorizontalLine((x - x/4.0), //0,//x/2.0  ,
+			   x,
+			   y1,
+			   GRAY,
+			   GRAY,
+			   GRAY,
+			   1.0       );
+
+	//labl=stringify(maxHFoundPlotting);
+	char buf[64];
+	sprintf(buf,"%.0e\n", double(maxHFoundPlotting));
+	
+	labl = string(buf);
+	cout<<"labl max "<<labl<<endl;
+	HPDF_Page_SetFontAndSize (page, font, fontsize);
+	
+	HPDF_Page_BeginText   (page);
+	HPDF_Page_MoveTextPos (page, x - double(labl.size())*1.5, y1-fontsize/4.0);
+	HPDF_Page_ShowText    (page, labl.c_str() );
+	HPDF_Page_EndText     (page);
+	
+	
+	drawHorizontalLine((x - x/4.0), //0,//x/2.0  ,
+			   x,
+			   y2,
+			   GRAY,
+			   GRAY,
+			   GRAY,
+			   1.0       );
+
+
+
+	double factor=double(1)/double(3.0);
+	double y3 = name2chrScreenInfo[ it->first ].y - (heightChr*(1-factor)+heightLabel); //bottom
+
+	sprintf(buf,"%.0e\n", double(maxHFoundPlotting*factor));
+	
+	labl = string(buf);
+	cout<<"labl max "<<labl<<endl;
+	HPDF_Page_SetFontAndSize (page, font, fontsize);
+	
+	HPDF_Page_BeginText   (page);
+	HPDF_Page_MoveTextPos (page, x - double(labl.size())*1.5, y3-fontsize/4.0);
+	HPDF_Page_ShowText    (page, labl.c_str() );
+	HPDF_Page_EndText     (page);
+	
+	
+	drawHorizontalLine((x - x/4.0), //0,//x/2.0  ,
+			   x,
+			   y3,
+			   GRAY,
+			   GRAY,
+			   GRAY,
+			   1.0       );
+
+
+	factor=double(2)/double(3.0);
+	double y4 = name2chrScreenInfo[ it->first ].y - (heightChr*(1-factor)+heightLabel); //bottom
+
+	sprintf(buf,"%.0e\n", double(maxHFoundPlotting*factor));
+	
+	labl = string(buf);
+	cout<<"labl max "<<labl<<endl;
+	HPDF_Page_SetFontAndSize (page, font, fontsize);
+	
+	HPDF_Page_BeginText   (page);
+	HPDF_Page_MoveTextPos (page, x - double(labl.size())*1.5, y4-fontsize/4.0);
+	HPDF_Page_ShowText    (page, labl.c_str() );
+	HPDF_Page_EndText     (page);
+	
+	
+	drawHorizontalLine((x - x/4.0), //0,//x/2.0  ,
+			   x,
+			   y4,
+			   GRAY,
+			   GRAY,
+			   GRAY,
+			   1.0       );
+
+
+	
+
+	
+	// cerr<<"x "<<x<<" m "<<m<<" "<<(name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel))<<endl;	 
+	// // HPDF_Page_SetRGBStroke  (page,
+	// // 			      gray[0],
+	// // 			      gray[1],
+	// // 			      gray[2]);	
+	// drawVerticalLine( x,                                                                                                             // x offset
+	//  		       y1,  // baseline
+	// 		       y2,
+	// 		       GRAY,// gray[0],
+	// 		       GRAY,// gray[1],
+	// 		       GRAY,// gray[2],
+	// 		       1.0//widthtouse/3.0
+	
+    }
+    return 0;
+}
+   
+
 
 int PdfWriter::drawVerticalLine(const double x,
 				const double y1,
@@ -268,15 +507,13 @@ int PdfWriter::drawVerticalLine(const double x,
     // HPDF_Page_EndText (page);
     cerr<<"drawHorizontalLine "<<x<<" "<<y1<<" "<<y2<<endl;
 
-
     HPDF_Page_SetRGBStroke (page, r, g, b);//set color
     HPDF_Page_SetLineWidth (page, w); //set line width
-
+    
     HPDF_Page_MoveTo (page, x,   y1);
     HPDF_Page_LineTo (page, x,   y2);
     HPDF_Page_Stroke (page);
     
-
     HPDF_Page_SetRGBStroke (page, 0, 0, 0); //unset color
     HPDF_Page_SetLineWidth (page, 1.0); //unset line width
     
@@ -289,7 +526,8 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
 			const long double   hlow_,       // lower  conf. int. for h
 			const long double   hhigh_,      // higher conf. int. for h
 			const double        hLimLow,    // lower  limit for the h plot 
-			const double        hLimHigh){  // higher limit for the h plot 
+			const double        hLimHigh,
+			const double        windowSizeForHest){  // higher limit for the h plot 
     // HPDF_Page_BeginText (page);
     // HPDF_Page_MoveTextPos (page, x, y - 10);
     // HPDF_Page_ShowText (page, label);
@@ -309,7 +547,8 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
 	return 1;	
     }
 
-    double xfraction = ( ( (cr.getEndCoord()+cr.getStartCoord())/2.0 )/name2chrScreenInfo[ cr.getChrName() ].length);
+    double xfraction = ( ( (cr.getEndCoord()+cr.getStartCoord())/2.0 )/(name2chrScreenInfo[ cr.getChrName() ].length+windowSizeForHest));
+    
     cerr<<"drawHEst2 "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<name2chrScreenInfo[ cr.getChrName() ].y<<" l="<<name2chrScreenInfo[ cr.getChrName() ].length<<" "<<name2chrScreenInfo[ cr.getChrName() ].lengthScreen<<" "<<(( (h-hLimLow)/hLimHigh) ) <<" xf="<<xfraction<<endl;
 
     double x = xmargin +   xfraction*name2chrScreenInfo[ cr.getChrName() ].lengthScreen ;
@@ -328,15 +567,40 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
     // 			0.5,
     // 			0.0
     // ); // baseline
+    //cerr<<name2chrScreenInfo[ cr.getChrName() ].le
+    double widthtouse = name2chrScreenInfo[ cr.getChrName() ].lengthScreen/(name2chrScreenInfo[ cr.getChrName() ].length/windowSizeForHest);
 
-    
+
     drawVerticalLine( x,                                                                                                             // x offset
 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,  // baseline
 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hhigh-hLimLow)/hLimHigh),
+		      0.9,
 		      0,
 		      0,
-		      0.5,
-		      0.0
+		      0.0//widthtouse/3.0
+    ); // baseline
+
+    cerr<<"val "<<name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) <<endl;
+
+
+    drawHorizontalLine( x-widthtouse/2.0,                                                                                                             // x offset
+			x+widthtouse/2.0,                                                                                                             // x offset			
+			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),                   // baseline
+			0,
+			0,
+			0,
+			0.2);
+			
+
+
+    // lower estimate
+    drawVerticalLine( x,                                                                                                             // x offset
+		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hlow -hLimLow)/hLimHigh) ,  // baseline
+		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,
+		      0.9,
+		      0.0,
+		      0.0,
+		      0.0//widthtouse/3.0
     ); // baseline
 
     // drawHorizontalLine( x,                                                                                                             // x offset
@@ -348,19 +612,21 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
     // 			2.0
     // ); // baseline
 
-    
-
-
-    // lower estimate
-    drawVerticalLine( x,                                                                                                             // x offset
-		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hlow -hLimLow)/hLimHigh) ,  // baseline
-		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,
-		      0.0,
-		      0.5,
-		      0.0,
-		      0.0
-    ); // baseline
-
+    //  			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)-1 ,  // baseline
+    //  			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)+1,
+    // 			0,
+    // 			0,
+    // 			0.9,
+    // 			2.0
+    // ); 
+    // drawVerticalLine( x,                                                                                                             // x offset
+    // 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),  // baseline
+    // 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),
+    // 		      0.9,
+    // 		      0,
+    // 		      0,
+    // 		      widthtouse
+    // ); // baseline
 
     //name2chrScreenInfo[ chrFound[i].name.c_str() ].length       = double(chrFound[i].length);   //length
     // HPDF_Page_MoveTo (page, x,   y1);
@@ -391,12 +657,13 @@ int PdfWriter::drawGlobalHEst(//string chrname,
 	// 		 name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (hlow  -hLimLow)/hLimHigh) );//baseline
 	//middle
 	drawHorizontalLine(xmargin,
-			   name2chrScreenInfo[ it->first ].lengthScreen,
+			   xmargin+name2chrScreenInfo[ it->first ].lengthScreen,
 			   name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (h     -hLimLow)/hLimHigh),
 			   0.0,
 			   0.0,
-			   0.0,
-			   0.5
+			   0.7,
+			   0.3,
+			   false
 
 	);//baseline
 	// //high
@@ -410,13 +677,16 @@ int PdfWriter::drawGlobalHEst(//string chrname,
 }
 
 int PdfWriter::drawHorizontalLine(const double x1,const double x2,const double y,
-				double r,
-				double g,
-				double b,
-				double w
+				  double r,
+				  double g,
+				  double b,
+				  double w,
+				  bool   dash
 ){
 
-    HPDF_Page_SetDash (page, DASH_MODE1, 1, 1);//set line dash
+    if(dash){
+	HPDF_Page_SetDash (page, DASH_MODE1, 1, 1);//set line dash
+    }
     HPDF_Page_SetRGBStroke (page, r, g, b);//set color
     HPDF_Page_SetLineWidth (page, w); //set line width
 
@@ -424,7 +694,9 @@ int PdfWriter::drawHorizontalLine(const double x1,const double x2,const double y
     HPDF_Page_LineTo (page, x2,   y);
     HPDF_Page_Stroke (page);
 
+    //if(dash){
     HPDF_Page_SetDash (page, NULL, 0, 0); //unset line dash
+    //}
     HPDF_Page_SetRGBStroke (page, 0.0, 0.0, 0.0 );//unset color
     HPDF_Page_SetLineWidth (page, 1.0); //unset line width
 

@@ -20,7 +20,7 @@ using namespace std;
 #include "hpdf.h"
 #include "GenomicWindows.h"
 
-
+#define GRAY 0.6
 
 
 
@@ -37,9 +37,11 @@ typedef struct{
     double  y;
     double  length;
     double  lengthScreen;
+    unsigned int markings;
 } chrScreenInfo;
 
 const HPDF_UINT16 DASH_MODE1[] = {3};
+
 class PdfWriter{
  private:
     string fname;
@@ -52,7 +54,7 @@ class PdfWriter{
     double xmargin=10;
     double heightLabel=15;//height of label
     double heightChr  =15;//height of label
-
+    //double gray [3] = {0.6,0.6,0.6};
 
     map<string, chrScreenInfo>  name2chrScreenInfo;
 
@@ -75,7 +77,10 @@ class PdfWriter{
     PdfWriter(const PdfWriter & other);
     ~PdfWriter();
     PdfWriter & operator= (const PdfWriter & other);
-    int drawFrame(const string & fastaIndex);
+    int drawFrame(const string & fastaIndex,const double   windowSizeForHest);
+    int drawYLabels(const long double minHFoundPlotting,
+		    const long double maxHFoundPlotting);
+
     int drawVerticalLine(const double x,
 			 const double y1,
 			 const double y2,
@@ -85,11 +90,14 @@ class PdfWriter{
 			 double w=1.0
     );
 
-    int drawHorizontalLine(const double x1,const double x2,const double y,
+    int drawHorizontalLine(const double x1,
+			   const double x2,
+			   const double y,
 			   double r=0.0,
 			   double g=0.0,
 			   double b=0.0,
-			   double w=1.0
+			   double w=1.0,
+			   bool   dash=false
     );
 
     int drawHEst(const GenomicRange  cr,
@@ -97,7 +105,8 @@ class PdfWriter{
 		 const long double   hlow,
 		 const long double   hhigh,
 		 const double hLimLow,
-		 const double hLimHigh    );
+		 const double hLimHigh,
+		 const double windowSizeForHest);
 
     int drawGlobalHEst(const long double   h,
 		       const long double   hlow,
