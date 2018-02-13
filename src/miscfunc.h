@@ -33,11 +33,12 @@ typedef struct {
  } rgInfo;
 
 typedef struct { 
-    long double h;
-    long double hLow;
-    long double hHigh;
+    long double  h;
+    long double  hLow;
+    long double  hHigh;
+    long double  errb;   
     unsigned int sites;
-    bool hasConverged;
+    bool         hasConverged;
  } hResults;
 
 

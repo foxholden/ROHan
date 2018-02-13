@@ -63,7 +63,7 @@ void HmmState::setSecond(HmmState * second_){
     second = second_;
 }
 
-long double HmmState::probEmission(unsigned int mutations,unsigned int total) const{
+long double HmmState::probEmission(     const int mutations,                          const int total) const{//probEmission(unsigned int mutations,unsigned int total) const{
 
     // double noMut=gsl_ran_geometric_pdf  (1, rateGeom);
     // cout<<"no mut="<<noMut<<" "<<(1-noMut)<<" "<<rateGeom<<endl;
@@ -101,43 +101,47 @@ long double HmmState::probEmission(unsigned int mutations,unsigned int total) co
 
 
 //if we have a range to marginalize over using a uniform prior
-long double HmmState::probEmissionRange(unsigned int mutationsMin,unsigned int mutationsMax,unsigned int total) const{
+long double HmmState::probEmissionRange(const int mutationsMin,const int mutationsMax,const int total) const{
 
+    int mutationsMax_ = mutationsMax;
     //cerr<<"probEmissionRange "<<mutationsMin<<" "<<mutationsMax<<endl;
     // exit(1);
     if(int(total) != sizeChunk){
-	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax<<","<<total<<") is different than the pre-computed size of chunk "<<sizeChunk<<endl;
+	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax_<<","<<total<<") is different than the pre-computed size of chunk "<<sizeChunk<<endl;
 	exit(1);
     }
     
-    if(mutationsMin>mutationsMax){
-	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax<<","<<total<<") is different than the pre-computed size of chunk "<<sizeChunk<<endl;
+    if(mutationsMin>mutationsMax_){
+	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax_<<","<<total<<") is different than the pre-computed size of chunk "<<sizeChunk<<endl;
 	exit(1);
     }
 
     
-    if(mutationsMin<0){
-	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax<<","<<total<<") minimum is lower than the defined minimum "<<minSegSitesPerChunk<<endl;
-	exit(1);
+    // if(mutationsMin<0){
+    // 	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax_<<","<<total<<") minimum is lower than the defined minimum "<<minSegSitesPerChunk<<endl;
+    // 	exit(1);
+    // }
+
+    if(mutationsMin == mutationsMax_){
+	mutationsMax_ = mutationsMin+1;
     }
 
-    if(mutationsMin == mutationsMax){
-	mutationsMax = mutationsMin+1;
-    }
-
-    if(int(mutationsMax) > maxSegSitesPerChunk ){
-	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax<<","<<total<<") is higher than the defined minimum "<<maxSegSitesPerChunk<<endl;
+    if(int(mutationsMax_) > maxSegSitesPerChunk ){
+	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax_<<","<<total<<") is higher than the defined minimum "<<maxSegSitesPerChunk<<endl;
 	exit(1);	
     }
 
     long double sumPFE=0.0;
-    for(unsigned int m=mutationsMin;m<=mutationsMax;m++){
-	sumPFE += probablitiesForEmission->at( m );
+    for(int m=mutationsMin;m<=mutationsMax_;m++){
+	int m_  = m;
+	if(m_ <0)
+	    m_ = 0;//went under the limit, set to zero
+	sumPFE += probablitiesForEmission->at( m_ );
     }
     
     //cerr<<"probablitiesForEmission sumPFE = "<<sumPFE<<" return="<<(sumPFE / (mutationsMax-mutationsMin) )<<endl;
     //to test
-    return (sumPFE / (mutationsMax-mutationsMin) );
+    return (sumPFE / (mutationsMax_-mutationsMin) );
     //return probablitiesForEmission->at( (mutationsMax-mutationsMin)/2);
 }
 

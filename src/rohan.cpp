@@ -1925,9 +1925,9 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     hresToReturn.h            = h;
     hresToReturn.hLow         = h-errb;
     hresToReturn.hHigh        = h+errb;
+    hresToReturn.errb         = errb;
+    
     hresToReturn.hasConverged = hasConverged;
-
-
 
 
     return hresToReturn;
@@ -3017,7 +3017,7 @@ int main (int argc, char *argv[]) {
     // bool   genoFileAsInputFlag=false;
     bool wroteEverything=false;
     int lastWrittenChunk=-1;   
-    string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\thLow\thHigh\n";
+    string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\terr\thLow\thHigh\n";
     Internal::BgzfStream  bgzipWriterInfo;
     string stringinfo ;
     vector<emissionUndef> heteroEstResults;
@@ -3909,9 +3909,11 @@ int main (int argc, char *argv[]) {
 		
 		if(dataToWrite->hetEstResults.hasConverged){
 		    hetResToAdd.undef  = false;		
-		    long double h      = dataToWrite->hetEstResults.h;
-		    long double hLow   = dataToWrite->hetEstResults.hLow;
+		    long double h      = dataToWrite->hetEstResults.h    ;
+		    long double hLow   = dataToWrite->hetEstResults.hLow ;
 		    long double hHigh  = dataToWrite->hetEstResults.hHigh;
+		    long double errb   = dataToWrite->hetEstResults.errb ;
+		    
 		    hetResToAdd.h      = h;
 		    hetResToAdd.hlow   = hLow;
 		    hetResToAdd.hhigh  = hHigh;
@@ -3920,10 +3922,10 @@ int main (int argc, char *argv[]) {
 		    if(hLow<0)   hLow  = 0;
 		    if(hHigh<0)  hHigh = 0;
 		    
-		    strToWrite+=stringify( h )+"\t"+stringify( hLow )+"\t"+stringify( hHigh )+"\n";
+		    strToWrite+=stringify( h )+"\t"+stringify( errb )+"\t"+stringify( hLow )+"\t"+stringify( hHigh )+"\n";
 		}else{
 		    hetResToAdd.undef  = true;		
-		    strToWrite+="NA\tNA\tNA\n";
+		    strToWrite+="NA\tNA\tNA\tNA\n";
 		}
 		heteroEstResults.push_back(hetResToAdd);
 				
@@ -4037,8 +4039,8 @@ int main (int argc, char *argv[]) {
 		//cerr<<line<<endl;	    
 		fields = allTokens(line,'\t');
 
-		if(fields.size() != 7){
-		    cerr << "ERROR: line from previous h est. does not have 8 fields ("<<(fields.size()+1)<<") "<<line<<endl;
+		if(fields.size() != 8){
+		    cerr << "ERROR: line from previous h est. does not have 9 fields ("<<(fields.size()+1)<<") "<<line<<endl;
 		    return 1;
 		}
 
@@ -4062,11 +4064,20 @@ int main (int argc, char *argv[]) {
 		if(fields[4] != "NA"){
 		    hetResToAdd.undef  = false;		
 		    long double h      = destringify<long double>( fields[4]);
-		    long double hLow   = destringify<long double>( fields[5]);
-		    long double hHigh  = destringify<long double>( fields[6]);
+		    long double errb   = destringify<long double>( fields[5]);
+		    long double hLow   = destringify<long double>( fields[6]);
+		    long double hHigh  = destringify<long double>( fields[7]);
+		    
 		    hetResToAdd.h      = h;
+		    hetResToAdd.errb   = errb;
+		    
+		    if(hLow == 0){  //went under 0
+			hLow = h-errb;
+		    }
+		    
 		    hetResToAdd.hlow   = hLow;
 		    hetResToAdd.hhigh  = hHigh;
+		    
 		    
 		    // if(h<0)      h     = 0;
 		    // if(hLow<0)   hLow  = 0;
@@ -4300,7 +4311,7 @@ int main (int argc, char *argv[]) {
 				  // ( (heteroEstResults[c].h )+6.0188e-05),
 
 				  //TODO to put back
-				  heteroEstResults[c].hlow,
+				  MAX(heteroEstResults[c].hlow,0),
 				  heteroEstResults[c].hhigh,
 				  minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
 				  maxHFoundPlotting, // 0.00500    = 4*2e-8*62500

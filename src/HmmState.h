@@ -44,8 +44,8 @@ public:
 	
     /* } */
 
-    long double probEmission(unsigned int mutations,unsigned int total) const;
-    long double probEmissionRange(unsigned int mutationsMin,unsigned int mutationsMax,unsigned int total) const;
+    long double probEmission(     const int mutations,                          const int total) const;
+    long double probEmissionRange(const int mutationsMin,const int mutationsMax,const int total) const;
     
     unsigned int randomEmission(int total) const;
     int getIdx() const;
