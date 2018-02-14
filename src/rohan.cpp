@@ -6,8 +6,7 @@
 #include <random>
 
 //TODO
-// forward algorithm for posterior prob
-// fix when h=0
+// forward/backward algorithm for posterior prob
 // plot prob of HMM
 // global estimate
 // add mappability track?
@@ -4165,7 +4164,12 @@ int main (int argc, char *argv[]) {
     hmm.setHetRateForNonROH(h_i);
     hmm.setTransprob(pT_i);
     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
-    x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    fbreturnVal  tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    x_i  = tmpResFWD.llik;
+    // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+
+    return 1;
     cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
     vector<long double> hvector;
     vector<long double> pvector;
@@ -4193,8 +4197,10 @@ int main (int argc, char *argv[]) {
 
 	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
 	//compute new likelihood
-	x_i_1=forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
-
+	//x_i_1=forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+	tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+	x_i_1     = tmpResFWD.llik;
+	
 	if(chain>(maxChains/4)){
 	    pTlower = pTlowerSecondHalf;
 	}

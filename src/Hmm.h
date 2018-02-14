@@ -32,6 +32,15 @@ typedef struct {
     long double llik;
  } hmmpath;
 
+
+typedef struct { 
+    vector< vector<long double > > m;
+    long double llik;
+ } fbreturnVal;
+
+
+
+
 class Hmm{
 private:
     long double **trans;
@@ -132,8 +141,10 @@ typedef struct {
 } emissionUndef;
 
 
-inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
+inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
 
+
+    
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates();
     vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
@@ -202,12 +213,19 @@ inline long double forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 	temp = oplusInitnatl( temp ,  	    f[state][nObservations-1]  );
     }
 
-    return temp;
+    fbreturnVal toreturn;
+    toreturn.m    = f;//copy 
+    toreturn.llik = temp;
+    
+    //long double llik;
+
+    
+    return toreturn;
 }
 
 
 
-inline long double backwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
+inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
 
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates();
@@ -217,7 +235,7 @@ inline long double backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
    
 
     for (int k=(nObservations-2); k>=0; k--) {//each obs
-	//cout<<k<<" "<<observed[k]<<" "<<observed[k+1]<<" ";
+	/* cout<<k<<" "<<observed[k].h<<" "<<observed[k+1].h<<" "<<endl; */
 
 	for (int state=0; state<nStates; state++) {//each current state
 	    long double logsum             = -1.0*numeric_limits<long double>::infinity();
@@ -232,33 +250,34 @@ inline long double backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
 										 (int)(observed[k+1].hhigh*sizeChunk)  ,
 										 sizeChunk);		
 		long double temp;
-
+		
 		temp=
 		    b[nextState][k+1] + 
 		    logRobust(hmm->getTrans(state,nextState) ) +   //transition from state to nextState
 		    logRobust(p_e); //emission probability of state 
 		//cout<<"b["<<nextState<<"]["<<(k+1)<<"] "<<f[state][k]<<" = logRobust = "<<logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) << " logsum = "<<logsum<<endl;
-		
+		/* cout<<"p_e["<<nextState<<"] "<<p_e<<" "<<hmm->hmmstates[nextState]->getH()<<" "<<temp<<" "<<logRobust(hmm->getTrans(state,nextState)) <<endl; */
 		logsum             = oplusInitnatl( logsum,        temp             );
 		logsumNoTrans      = oplusInitnatl( logsumNoTrans, b[nextState][k+1]);//no transition prob and no emission
 		logsumNoTransStart = oplusInitnatl( logsumNoTrans, b[nextState][k+1]+ logRobust( hmm->startingState[nextState]));//no transition 
 		
 	    }//end each next state
-
+	    
 
 	    
 	    if( observed[k+1].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
-		/b[state][k]    =                   logsumNoTransStart; 
+		b[state][k]    =                   logsumNoTransStart; 
 	    }else{
 		if(observed[k].undef){
-		    b[state][k] =		    logsumNotrans;   //forego emission probability just count sum of all probs for every previous state
+		    b[state][k] =		   logsumNoTrans;   //forego emission probability just count sum of all probs for every previous state
 		}else{//not undefined and not break
-		    b[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
+		    b[state][k] =		   logsum;          //forego emission probability just count sum of all probs for every previous state
 		}
 	    }
 	    
-
+	    /* cout<<"b["<<state<<"][k] "<<b[state][k]<<" 1="<<logsum<<" 2="<<logsumNoTrans<<" 3="<<logsumNoTransStart<<" "<<endl; */
 	}//each state
+	cout<<endl;
 	//cout<<endl;
     }//end each obs
 
@@ -308,8 +327,21 @@ inline long double backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
     /* for (int state = 0; state < nStates; state++) {//each state */
     /* 	temp = oplusInitnatl( temp ,  	    f[state][nObservations-1]  ); */
     /* } */
+    long double temp=0;
+    for (int state = 0; state < nStates; state++) {//each state
+	temp = oplusInitnatl( temp ,  	    b[state][0]  );
+    }
 
-    return temp;
+    fbreturnVal toreturn;
+    toreturn.m    = b;//copy 
+    toreturn.llik = temp;
+    
+    //long double llik;
+
+    
+    return toreturn;
+
+    
 }
 
 
