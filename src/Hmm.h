@@ -345,6 +345,87 @@ inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
 }
 
 
+/* typedef struct {  */
+/*     vector< vector<long double > > m; */
+/*     long double llik; */
+/*  } fbreturnVal; */
+
+/* typedef struct {  */
+/*     long double h; */
+/*     long double hlow; */
+/*     long double hhigh; */
+/*     long double errb; */
+    
+/*     bool undef;     //0 = defined,    1 = undefined */
+/*     bool chrBreak;  //0 = continuous, 1 = break */
+/*     GenomicRange rangeGen; */
+/* } emissionUndef; */
+
+
+inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
+
+
+    /* cout<<"forwardBackward"<<endl; */
+    /* exit(1); */
+
+    int nObservations  = int(observed.size());
+    int nStates        = hmm->getNumberStates(); 
+
+    fbreturnVal  f = forwardProbUncertaintyMissing( hmm,  observed, sizeChunk);
+    fbreturnVal  b = backwardProbUncertaintyMissing(hmm,  observed, sizeChunk);
+    ///    exit(1);
+    vector< vector<long double> > postProb (nStates,vector<long double>(nObservations));
+
+    /* cout<<"FWBW test postprob"<<endl; */
+    for(int i=0;i<nObservations;i++){
+	long double temp = 0.0;
+	cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh;
+	for(int x=0;x<nStates;x++){	    
+	    postProb[x][i]   = f.m[x][i] + b.m[x][i];
+	    /* cout<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f[x][i] <<" b="<< b[x][i]<<" "; */
+	    cout<<" state#"<<x<<" p="<<postProb[x][i]<<" "<<temp<<" "; 
+
+	    temp             = oplusInitnatl(temp,postProb[x][i]);
+	    cout<<" "<<temp<<" ";
+	}
+	cout<<" sum"<<temp<<endl;
+	
+	for(int x=0;x<nStates;x++){
+	    postProb[x][i]  -= temp;
+	    cout<<"Norm. postProb#"<<x<<" p="<<postProb[x][i]<<" ";
+	}
+	cout<<endl;
+    }
+
+    //normalizing
+    long double sumProb=0.0;
+    for(int i=0;i<nObservations;i++){
+	cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh;
+	long double temp = 0.0;
+	for(int x=0;x<nStates;x++){
+	    cout<<" "<<x<<" "<<postProb[x][i]; 
+	    temp             = oplusInitnatl(temp,postProb[x][i]);
+	}
+	cout<<" "<<temp<<" ";
+	
+	for(int x=0;x<nStates;x++){
+	    postProb[x][i] = postProb[x][i]-temp;
+	    cout<<"postProb["<<x<<"]["<<i<<"] "<<exp(postProb[x][i])<<" ";
+	}
+	cout<<endl;
+	sumProb+=temp;
+    }
+
+    
+    fbreturnVal toreturn;
+    toreturn.m    = postProb;//copy 
+    toreturn.llik = sumProb;
+    
+    return toreturn;
+}
+
+
+
 inline vector< vector<long double> > forward (Hmm * hmm, const vector<long double> & observed, unsigned int sizeChunk){
     // hmm$transProbs[is.na(hmm$transProbs)]       = 0
     // hmm$emissionProbs[is.na(hmm$emissionProbs)] = 0

@@ -79,7 +79,8 @@ class PdfWriter{
     PdfWriter & operator= (const PdfWriter & other);
     int drawFrame(const string & fastaIndex,const double   windowSizeForHest);
     int drawYLabels(const long double minHFoundPlotting,
-		    const long double maxHFoundPlotting);
+		    const long double maxHFoundPlotting,
+		    const bool scientific);
 
     int drawVerticalLine(const double x,
 			 const double y1,
@@ -87,7 +88,8 @@ class PdfWriter{
 			 double r=0.0,
 			 double g=0.0,
 			 double b=0.0,
-			 double w=1.0
+			 double w=1.0,
+			 bool   dash=false
     );
 
     int drawHorizontalLine(const double x1,
@@ -108,6 +110,14 @@ class PdfWriter{
 		 const double hLimHigh,
 		 const double windowSizeForHest);
 
+    int drawHMM(const GenomicRange  cr,         // genomic range to plot
+		const long double   h_,          // value of h
+		const long double   hlow_,       // lower  conf. int. for h
+		const long double   hhigh_,      // higher conf. int. for h
+		const double        hLimLow,    // lower  limit for the h plot 
+		const double        hLimHigh,
+		const double        windowSizeForHest);  // higher 
+    
     int drawGlobalHEst(const long double   h,
 		       const long double   hlow,
 		       const long double   hhigh,

@@ -6,8 +6,8 @@
 #include <random>
 
 //TODO
-// forward/backward algorithm for posterior prob
-// plot prob of HMM
+
+
 // global estimate
 // add mappability track?
 // ?
@@ -3016,11 +3016,14 @@ int main (int argc, char *argv[]) {
     // bool   genoFileAsInputFlag=false;
     bool wroteEverything=false;
     int lastWrittenChunk=-1;   
-    string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\terr\thLow\thHigh\n";
+    string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\terr\thLow\thHigh\n";    
     Internal::BgzfStream  bgzipWriterInfo;
     string stringinfo ;
     vector<emissionUndef> heteroEstResults;
     Internal::BgzfStream  bgzipWriterHest;
+    string headerHMMMCMC;
+    Internal::BgzfStream  bgzipWriterMCMC;
+    
     unsigned int      rank  = 0;
     int          lastRank   =-1;
     vector<GenomicRange> v ;
@@ -4023,7 +4026,7 @@ int main (int argc, char *argv[]) {
     //heteroEstResults contains the results
     if(skipToHMM){//skip het computations read from file
 	string hEstFileToRead = outFilePrefix+".hEst.gz";
-	cerr<<"reading previous est. of h from "<<hEstFileToRead<<endl;
+	cerr<<"Reading previous est. of h from "<<hEstFileToRead<<".";
 	igzstream hEstFileSt;
 
 	hEstFileSt.open(hEstFileToRead.c_str(), ios::in);
@@ -4095,15 +4098,29 @@ int main (int argc, char *argv[]) {
 	    cerr << "Unable to open file "<<hEstFileToRead<<endl;
 	    exit(1);
 	}
-
-
+	cerr<<"..done";
+	
     } //end if skipToHMM
     //return 1;
 
 	
 
 
-    
+    //write chains to output
+    //bgzipWriterMCMC
+    headerHMMMCMC = "#llik\th\tp\taccepted\tchains\tacptrate\n";
+
+
+    bgzipWriterMCMC.Open(outFilePrefix+".hmmmcmc.gz", IBamIODevice::WriteOnly);
+    if(!bgzipWriterMCMC.IsOpen()){
+	cerr<<"Cannot open file "<<(outFilePrefix+".hmmmcmc.gz")<<" in bgzip writer"<<endl;
+	return 1;
+    }
+
+
+    bgzipWriterMCMC.Write(headerHMMMCMC.c_str(), headerHMMMCMC.size());
+
+
     
 
     //computing the min/max segsites per chunk
@@ -4119,7 +4136,7 @@ int main (int argc, char *argv[]) {
     
     Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
     
-    cerr<<"Begin running HMM"<<endl;
+    cerr<<"Begin running MCMC on HMM"<<endl;
     // cerr<<"generating a random set"<<endl;
     // vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
 
@@ -4169,11 +4186,11 @@ int main (int argc, char *argv[]) {
     // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
     // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
 
-    return 1;
-    cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+    //return 1;
+    //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
     vector<long double> hvector;
     vector<long double> pvector;
-    
+    cerr<<"Begin running MCMC on HMM using "<<maxChains<<endl;
     for(int chain=1;chain<=maxChains;chain++){
 
 	//computing new state
@@ -4214,14 +4231,19 @@ int main (int argc, char *argv[]) {
 	    if( (chain>=(maxChains*(1.0-fracChainsBurnin)))){
 		hvector.push_back(h_i);
 		pvector.push_back(pT_i);
+
+		string strToWrite = stringify( x_i )+"\t"+stringify( h_i )+"\t"+stringify( pT_i )+"\t"+stringify( accept )+"\t"+stringify( chain )+"\t"+stringify( double(accept)/double(chain) )+"\n";
+		bgzipWriterMCMC.Write(strToWrite.c_str(), strToWrite.size());
 	    }
 	    
 	    accept++;
-	    cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}else{
-	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}
+
+	printprogressBarCerr( float(chain)/float(maxChains) );
 	//chain++;
 	//sleep(0.1);
     }
@@ -4267,7 +4289,16 @@ int main (int argc, char *argv[]) {
     // hMin = 0.00070;
     // hAvg = 0.0007467025205; 
     // hMax = 0.0008;
-    
+
+    // computing assignment prob
+    //set average parameters
+    hmm.setHetRateForNonROH(hAvg);
+    hmm.setTransprob(pAvg);
+	
+    fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+
+
+    //return 1;
     //////////////////////////////////
     //                              //
     //  END HMM                     //
@@ -4283,9 +4314,9 @@ int main (int argc, char *argv[]) {
     //cerr<<"writing plot"<<endl;
 
     double heightChr=45;
-    PdfWriter pdfwriter (outFilePrefix+".het.pdf",heightChr);
+    PdfWriter pdfwriterH (outFilePrefix+".het.pdf",heightChr);
 
-    if( pdfwriter.drawFrame(fastaIndex,sizeChunk) == 1 ){
+    if( pdfwriterH.drawFrame(fastaIndex,sizeChunk) == 1 ){
 	cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 	return 1;
     }
@@ -4303,7 +4334,7 @@ int main (int argc, char *argv[]) {
     //maxHFoundPlotting=0.0015;
     maxHFoundPlotting = double( maxSegSitesPer1M )/double(1000000);
 
-    if( pdfwriter.drawYLabels(minHFoundPlotting,maxHFoundPlotting) == 1 ){
+    if( pdfwriterH.drawYLabels(minHFoundPlotting,maxHFoundPlotting,true) == 1 ){
 	cerr<<"ERROR writing y labels to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 	return 1;
     }
@@ -4311,17 +4342,17 @@ int main (int argc, char *argv[]) {
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	if(heteroEstResults[c].undef)
 	    continue;
-	if(    pdfwriter.drawHEst(heteroEstResults[c].rangeGen,
-				  (heteroEstResults[c].h ),
-				  // ( (heteroEstResults[c].h )-6.0188e-05),
-				  // ( (heteroEstResults[c].h )+6.0188e-05),
-
-				  //TODO to put back
-				  MAX(heteroEstResults[c].hlow,0),
-				  heteroEstResults[c].hhigh,
-				  minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
-				  maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
-				  sizeChunk
+	if(    pdfwriterH.drawHEst(heteroEstResults[c].rangeGen,
+				   (heteroEstResults[c].h ),
+				   // ( (heteroEstResults[c].h )-6.0188e-05),
+				   // ( (heteroEstResults[c].h )+6.0188e-05),
+				   
+				   //TODO to put back
+				   MAX(heteroEstResults[c].hlow,0),
+				   heteroEstResults[c].hhigh,
+				   minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+				   maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
+				   sizeChunk
 	)  != 0 ){
 	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 	    return 1;
@@ -4332,14 +4363,78 @@ int main (int argc, char *argv[]) {
     
     // endhmm:
     //write out h estimate
-    pdfwriter.drawGlobalHEst(hAvg,
-			     hMin,
-			     hMax,			     
-			     double( minSegSitesPer1M )/double(1000000),
-			     maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
+    pdfwriterH.drawGlobalHEst(hAvg,
+			      hMin,
+			      hMax,			     
+			      double( minSegSitesPer1M )/double(1000000),
+			      maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
     
 
 
+
+
+
+    PdfWriter pdfwriterHMM (outFilePrefix+".hmm.pdf",heightChr);
+    
+    if( pdfwriterHMM.drawFrame(fastaIndex,sizeChunk) == 1 ){
+	cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
+	return 1;
+    }
+
+    //pdfwriter.drawHorizontalLine(100,100,102);
+    long double minPPlotting = 0.0;
+    long double maxPPlotting = 1.0;   
+
+    if( pdfwriterHMM.drawYLabels(minPPlotting,maxPPlotting,false) == 1 ){
+	cerr<<"ERROR writing y labels to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
+	return 1;
+    }
+
+    for(unsigned int c=0;c<heteroEstResults.size();c++){
+	cerr<<c<<" "<<exp(postprob.m[0][c])<<" "<<exp(postprob.m[1][c])<<endl;
+	if(heteroEstResults[c].undef)
+	    continue;
+	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,
+				    exp(postprob.m[1][c]),
+				    exp(postprob.m[1][c]),
+				    exp(postprob.m[1][c]),
+				    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+				    maxPPlotting, // 0.00500    = 4*2e-8*62500
+				    sizeChunk
+	)  != 0 ){
+	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
+	    return 1;
+	}
+    }
+    // for(unsigned int c=0;c<postprob.m[0].size();c++){
+	
+    // }
+    
+    // for(unsigned int c=0;c<heteroEstResults.size();c++){
+    // 	if(heteroEstResults[c].undef)
+    // 	    continue;
+    // 	if(    pdfwriterH.drawHEst(heteroEstResults[c].rangeGen,
+    // 				   (heteroEstResults[c].h ),
+    // 				   // ( (heteroEstResults[c].h )-6.0188e-05),
+    // 				   // ( (heteroEstResults[c].h )+6.0188e-05),				   
+    // 				   //TODO to put back
+    // 				   MAX(heteroEstResults[c].hlow,0),
+    // 				   heteroEstResults[c].hhigh,
+    // 				   minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+    // 				   maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
+    // 				   sizeChunk
+    // 	)  != 0 ){
+    // 	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
+    // 	    return 1;
+    // 	}
+    // }
+
+
+
+
+
+
+    
 
     //#endif
 #ifdef TESTHMMSIMS
