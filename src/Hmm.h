@@ -73,7 +73,8 @@ public:
 inline long double logRobust(long double p_){
     long double p = p_;
     if(p == 0){
-	p=numeric_limits<long double>::epsilon();
+	//p=numeric_limits<long double>::epsilon();
+	p=numeric_limits<long double>::min();
     }
 
     return logl(p);

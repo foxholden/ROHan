@@ -4160,10 +4160,12 @@ int main (int argc, char *argv[]) {
     
     //transition rate
     long double pTlowerFirstHalf  =    0.5;//overestimate the transition probability 
-    long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+    //long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+    long double pTlowerSecondHalf =    numeric_limits<double>::min();
 	
     long double pTlower = pTlowerFirstHalf;	
-    long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+    //long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+    long double pTupper = 1.0 - numeric_limits<double>::min();
 
     //generate a random initial probability between pTlower and pTupper
     long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
@@ -4336,7 +4338,8 @@ int main (int argc, char *argv[]) {
 
     //pdfwriter.drawHorizontalLine(100,100,102);
     long double minHFoundPlotting = 0.0;
-    long double maxHFoundPlotting = numeric_limits<double>::epsilon();
+    //long double maxHFoundPlotting = numeric_limits<double>::epsilon();
+    long double maxHFoundPlotting = numeric_limits<double>::min();
     
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	if( heteroEstResults[c].hhigh > maxHFoundPlotting){
@@ -4551,11 +4554,14 @@ int main (int argc, char *argv[]) {
     long double hupper = double( maxSegSitesPer1M )/double(1000000);
     
     //transition rate
-    long double pTlowerFirstHalf  =    numeric_limits<double>::epsilon();//TODO put back 0.5 
-    long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+    // long double pTlowerFirstHalf  =    numeric_limits<double>::epsilon();//TODO put back 0.5 
+    // long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+    long double pTlowerFirstHalf  =    numeric_limits<double>::min();//TODO put back 0.5 
+    long double pTlowerSecondHalf =    numeric_limits<double>::min();
 	
     long double pTlower = pTlowerFirstHalf;	
-    long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+    //long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+    long double pTupper = 1.0 - numeric_limits<double>::min();
 
     long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
     long double pT_i_1;
