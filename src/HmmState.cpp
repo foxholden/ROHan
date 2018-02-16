@@ -91,7 +91,7 @@ long double HmmState::probEmission(     const int mutations,                    
     }
 
     
-    long double toReturn=probablitiesForEmission->at( mutations );
+    long double toReturn = probablitiesForEmission->at( mutations );
     // cerr<<h<<"\t"<<mutations<<"\t"<<normalVal<<"\t"<<toReturn<<endl;
     // if(normalVal != toReturn){
     // 	exit(1);

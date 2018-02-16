@@ -140,8 +140,9 @@ typedef struct {
     GenomicRange rangeGen;
 } emissionUndef;
 
+#define DEBUGFWD
 
-inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
+inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
 
 
     
@@ -163,6 +164,12 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 								    (int)(observed[0].hhigh*sizeChunk),
 								    sizeChunk)	); //emitting observed[0] by state
 	}
+	
+#ifdef DEBUGFWD
+	if(verbose)
+	    cout<<"INIT "<<"f["<<state<<"][0] ="<<f[state][0]<<" undef="<<observed[state].undef<<endl;
+#endif
+	
     }
 
 
@@ -188,9 +195,9 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 
 	    //logsum contains the sum of all probs from every previous state
 	    if( observed[k].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
-		f[state][k]     =		    logsumNotrans+       //previous probability without transition probability
-		    logRobust( p_e ) +                                   //emission probability by state
-		    logRobust( hmm->startingState[state]) ;              //probability of "re"starting at state "state"
+		f[state][k]     =		    logsumNotrans+                                       //previous probability without transition probability
+		                                    logRobust( p_e ) +                                   //emission probability by state
+		                                    logRobust( hmm->startingState[state]) ;              //probability of "re"starting at state "state"
 	    }else{
 		if(observed[k].undef){
 		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
@@ -203,6 +210,12 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 			logsum;                                                              //sum of all probs for ev
 		}
 	    }
+	    	
+#ifdef DEBUGFWD
+	    if(verbose)
+		cout<<""<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" p_e="<<p_e<<" p_e==0"<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" undef="<<observed[state].undef<<" chrb="<<observed[k].chrBreak<<endl;
+#endif
+
 	}//each state
 
     }//end each obs
@@ -362,7 +375,7 @@ inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
 /* } emissionUndef; */
 
 
-inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk){
+inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
 
 
     /* cout<<"forwardBackward"<<endl; */
@@ -371,7 +384,7 @@ inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vecto
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates(); 
 
-    fbreturnVal  f = forwardProbUncertaintyMissing( hmm,  observed, sizeChunk);
+    fbreturnVal  f = forwardProbUncertaintyMissing( hmm,  observed, sizeChunk, verbose);
     fbreturnVal  b = backwardProbUncertaintyMissing(hmm,  observed, sizeChunk);
     ///    exit(1);
     vector< vector<long double> > postProb (nStates,vector<long double>(nObservations));
@@ -382,8 +395,8 @@ inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vecto
 	cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh;
 	for(int x=0;x<nStates;x++){	    
 	    postProb[x][i]   = f.m[x][i] + b.m[x][i];
-	    /* cout<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f[x][i] <<" b="<< b[x][i]<<" "; */
-	    cout<<" state#"<<x<<" p="<<postProb[x][i]<<" "<<temp<<" "; 
+	    cout<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f.m[x][i] <<" b="<< b.m[x][i]<<" ";
+	    //cout<<" state#"<<x<<" p="<<postProb[x][i]<<" "<<temp<<" "; 
 
 	    temp             = oplusInitnatl(temp,postProb[x][i]);
 	    cout<<" "<<temp<<" ";
@@ -412,6 +425,14 @@ inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vecto
 	    postProb[x][i] = postProb[x][i]-temp;
 	    cout<<"postProb["<<x<<"]["<<i<<"] "<<exp(postProb[x][i])<<" ";
 	}
+
+	for(int x=0;x<nStates;x++){
+	    postProb[x][i] = postProb[x][i]-temp;
+	    cout<<"emission["<<x<<"]["<<i<<"] "<< hmm->hmmstates[x]->probEmissionRange( (int)(observed[i].hlow *sizeChunk),
+											(int)(observed[i].hhigh*sizeChunk),
+											sizeChunk)<<" ";
+	}
+	
 	cout<<endl;
 	sumProb+=temp;
     }

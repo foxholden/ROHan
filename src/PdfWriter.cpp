@@ -73,7 +73,7 @@ PdfWriter::PdfWriter(const string fname_,
      //HPDF_Page_ShowText (page, page_title.c_str());
      HPDF_Page_EndText (page);
      HPDF_Page_SetFontAndSize (page, font, 10);
-     cerr<<"Creating a page in file  "<<fname_<<"w="<<HPDF_Page_GetWidth(page)<<" h="<<HPDF_Page_GetHeight (page)<<endl;
+     //cerr<<"Creating a page in file  "<<fname_<<"w="<<HPDF_Page_GetWidth(page)<<" h="<<HPDF_Page_GetHeight (page)<<endl;
 
   
 }
@@ -81,7 +81,7 @@ PdfWriter::PdfWriter(const string fname_,
 PdfWriter::~PdfWriter(){
     
      /* save the document to a file */
-    cerr<<"Saving file "<<fname<<endl;
+    cerr<<"Saving PDF file "<<fname<<endl;
     HPDF_SaveToFile (pdf, fname.c_str());
 
      /* clean up */
@@ -95,7 +95,7 @@ void PdfWriter::draw_rect (HPDF_Page     page,
 			   double length,
 			   const char   *label){    
     
-    cerr<<"draw_rect "<<x<<","<<y<<" l = "<<length<<" label="<<label<<" "<<GRAY<<endl;
+    //cerr<<"draw_rect "<<x<<","<<y<<" l = "<<length<<" label="<<label<<" "<<GRAY<<endl;
     //text pos
     HPDF_Page_BeginText (page);
     HPDF_Page_MoveTextPos (page, x, y - 10);
@@ -108,18 +108,18 @@ void PdfWriter::draw_rect (HPDF_Page     page,
     			     GRAY,// GRAY,// gray[1],
     			     GRAY// GRAY// gray[2]
     );
-    cerr<<"set1 "<<endl;
+    //cerr<<"set1 "<<endl;
     HPDF_Page_Rectangle(page,
 			x,             //x
 			y - (heightChr+heightLabel),  //y  offset minus the heightLabel and height
 			length,  //width
 			heightChr);     //height
-    cerr<<"set2 "<<endl;
+    ///cerr<<"set2 "<<endl;
      // HPDF_Page_SetRGBStroke  (page,
      // 			      0,// 0.0,
      // 			      0,// 0.0,
      // 			      0);// 0.0);
-    cerr<<"done"<<endl;
+    //cerr<<"done"<<endl;
     // HPDF_Page_Fill (page);
 }
 
@@ -247,7 +247,7 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	 i++){
 
 	 double yOffset=sizeToUse*double(i*2);
-	 cerr<<"i1 ="<<i<<"\t"<<yOffset<<endl;
+	 //cerr<<"i1 ="<<i<<"\t"<<yOffset<<endl;
 	 // if(oneChr){
 	 //     if(chrFound[i].name != oneChrName)
 	 // 	 continue;
@@ -260,12 +260,12 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 		    widthScreen  * (double(chrFound[i].length)/double(maxLengthFound)),     //length
 		    //heightChr,//height
 		    chrFound[i].name.c_str());
-	 cerr<<"i2 ="<<i<<"\t"<<yOffset<<endl;	 
+	 //cerr<<"i2 ="<<i<<"\t"<<yOffset<<endl;	 
 	 name2chrScreenInfo[ chrFound[i].name.c_str() ].y            = HPDF_Page_GetHeight(page) -yOffset; //y offset
 	 name2chrScreenInfo[ chrFound[i].name.c_str() ].length       = double(chrFound[i].length);   //actual length in bases 
 	 name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen = ( (HPDF_Page_GetWidth(page)-10.0)  * (double(chrFound[i].length)/double(maxLengthFound)) );     //length on screen in pixel
 
-	 cerr<<"i3 ="<<i<<"\t"<<yOffset<<endl;
+	 //cerr<<"i3 ="<<i<<"\t"<<yOffset<<endl;
 
 
 
@@ -275,7 +275,7 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	 //cerr<<
      }
 
-     cerr<<"test "<<endl;
+     //cerr<<"test "<<endl;
      
 
      HPDF_Page_GSave (page);
@@ -308,7 +308,7 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	     double y1 = name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel);
 	     double y2 = name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel)-heightLabel/5.0;//1/5 of the height label
 	     
-	     cerr<<"x "<<x<<" m "<<m<<" "<<(name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel))<<endl;
+	     //cerr<<"x "<<x<<" m "<<m<<" "<<(name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel))<<endl;
 
 	     // HPDF_Page_SetRGBStroke  (page,
 	     // 			      gray[0],
@@ -341,7 +341,7 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 		 //labl = "0";
 	     }
 	     
-	     cerr<<"labl "<<labl<<endl;
+	     //cerr<<"labl "<<labl<<endl;
 	     double fontsize =5;
 	     HPDF_Page_SetFontAndSize (page, font, 5);
 
@@ -381,7 +381,7 @@ int PdfWriter::drawYLabels(const long double minHFoundPlotting,
 	double y1 = name2chrScreenInfo[ it->first ].y - (          heightLabel); //top
 	double y2 = name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel); //bottom
 
-	cerr<<"drawYLabels "<<x<<" "<<y1<<" "<<y2<<endl;
+	//cerr<<"drawYLabels "<<x<<" "<<y1<<" "<<y2<<endl;
 	double fontsize =2;
 	stringstream stream;
 	string labl;
@@ -389,7 +389,7 @@ int PdfWriter::drawYLabels(const long double minHFoundPlotting,
 	//labl=stringify(minHFoundPlotting);
 	stream<<minHFoundPlotting;
 	labl=stream.str();
-	cout<<"labl min "<<labl<<endl;
+	//cout<<"labl min "<<labl<<endl;
 	HPDF_Page_SetFontAndSize (page, font, fontsize);
 
 	
@@ -412,7 +412,7 @@ int PdfWriter::drawYLabels(const long double minHFoundPlotting,
 	sprintf(buf,formattouse.c_str(), double(maxHFoundPlotting));
 	
 	labl = string(buf);
-	cout<<"labl max "<<labl<<endl;
+	//cout<<"labl max "<<labl<<endl;
 	HPDF_Page_SetFontAndSize (page, font, fontsize);
 	
 	HPDF_Page_BeginText   (page);
@@ -438,7 +438,7 @@ int PdfWriter::drawYLabels(const long double minHFoundPlotting,
 	sprintf(buf,formattouse.c_str(), double(maxHFoundPlotting*factor));
 
 	labl = string(buf);
-	cout<<"labl max "<<labl<<endl;
+	//cout<<"labl max "<<labl<<endl;
 	HPDF_Page_SetFontAndSize (page, font, fontsize);
 	
 	HPDF_Page_BeginText   (page);
@@ -462,7 +462,7 @@ int PdfWriter::drawYLabels(const long double minHFoundPlotting,
 	sprintf(buf,formattouse.c_str(), double(maxHFoundPlotting*factor));
 	
 	labl = string(buf);
-	cout<<"labl max "<<labl<<endl;
+	//cout<<"labl max "<<labl<<endl;
 	HPDF_Page_SetFontAndSize (page, font, fontsize);
 	
 	HPDF_Page_BeginText   (page);
@@ -515,7 +515,7 @@ int PdfWriter::drawVerticalLine(const double x,
     // HPDF_Page_MoveTextPos (page, x, y - 10);
     // HPDF_Page_ShowText (page, label);
     // HPDF_Page_EndText (page);
-    cerr<<"drawHorizontalLine "<<x<<" "<<y1<<" "<<y2<<endl;
+    //cerr<<"drawHorizontalLine "<<x<<" "<<y1<<" "<<y2<<endl;
     if(dash){
 	HPDF_Page_SetDash (page, DASH_MODE1, 1, 1);//set line dash
     }
@@ -555,7 +555,7 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
     if(hhigh > hLimHigh){
 	hhigh  = hLimHigh;
     }
-    cerr<<"drawHEst "<<cr<<" "<<h<<" "<<hlow<<" "<<hhigh<<" hlims "<<hLimLow<<" "<<hLimHigh<<	endl;
+    //cerr<<"drawHEst "<<cr<<" "<<h<<" "<<hlow<<" "<<hhigh<<" hlims "<<hLimLow<<" "<<hLimHigh<<	endl;
 
     if( name2chrScreenInfo.find( cr.getChrName() ) == name2chrScreenInfo.end() ){
 	cerr<<"PdfWriter chromosome not found: "<<cr.getChrName()<<endl;
@@ -564,7 +564,7 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
 
     double xfraction = ( ( (cr.getEndCoord()+cr.getStartCoord())/2.0 )/(name2chrScreenInfo[ cr.getChrName() ].length+windowSizeForHest));
     
-    cerr<<"drawHEst2 "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<name2chrScreenInfo[ cr.getChrName() ].y<<" l="<<name2chrScreenInfo[ cr.getChrName() ].length<<" "<<name2chrScreenInfo[ cr.getChrName() ].lengthScreen<<" "<<(( (h-hLimLow)/hLimHigh) ) <<" xf="<<xfraction<<endl;
+    //cerr<<"drawHEst2 "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<name2chrScreenInfo[ cr.getChrName() ].y<<" l="<<name2chrScreenInfo[ cr.getChrName() ].length<<" "<<name2chrScreenInfo[ cr.getChrName() ].lengthScreen<<" "<<(( (h-hLimLow)/hLimHigh) ) <<" xf="<<xfraction<<endl;
 
     double x = xmargin +   xfraction*name2chrScreenInfo[ cr.getChrName() ].lengthScreen ;
 	
@@ -595,8 +595,8 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
 		      0.0//widthtouse/3.0
     ); // baseline
 
-    cerr<<"val "<<name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) <<endl;
-
+    //cerr<<"val "<<name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) <<endl;
+    
 
     drawHorizontalLine( x-widthtouse/2.0,                                                                                                             // x offset
 			x+widthtouse/2.0,                                                                                                             // x offset			
@@ -662,14 +662,14 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 		       const double        hLimHigh,
 		       const double        windowSizeForHest){  // higher limit for the h plot 
     long double   h     = h_;
-    long double   hlow  = hlow_;
+    //long double   hlow  = hlow_;
     long double   hhigh = hhigh_;
 
     //if the hLimHigh was bound to avoid large confidence interval
     if(hhigh > hLimHigh){
 	hhigh  = hLimHigh;
     }
-    cerr<<"drawHMM "<<cr<<" "<<h<<" "<<hlow<<" "<<hhigh<<" hlims "<<hLimLow<<" "<<hLimHigh<<	endl;
+    //cerr<<"drawHMM "<<cr<<" "<<h<<" "<<hlow<<" "<<hhigh<<" hlims "<<hLimLow<<" "<<hLimHigh<<	endl;
 
     if( name2chrScreenInfo.find( cr.getChrName() ) == name2chrScreenInfo.end() ){
 	cerr<<"PdfWriter chromosome not found: "<<cr.getChrName()<<endl;
@@ -707,7 +707,7 @@ int PdfWriter::drawGlobalHEst(//string chrname,
 			      const long double   hhigh,
 			      const double hLimLow,
 			      const double hLimHigh){
-    cerr<<"drawGlobalHEst "<<h<<" "<<hlow<<" "<<hhigh<<endl;
+    //cerr<<"drawGlobalHEst "<<h<<" "<<hlow<<" "<<hhigh<<endl;
     // if( name2chrScreenInfo.find( chrname ) == name2chrScreenInfo.end() ){
     // 	cerr<<"PdfWriter chromosome not found: "<<chrname<<endl;
     // 	return 1;	

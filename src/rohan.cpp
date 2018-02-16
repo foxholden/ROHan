@@ -3021,8 +3021,12 @@ int main (int argc, char *argv[]) {
     string stringinfo ;
     vector<emissionUndef> heteroEstResults;
     Internal::BgzfStream  bgzipWriterHest;
+
     string headerHMMMCMC;
     Internal::BgzfStream  bgzipWriterMCMC;
+
+    string headerHMMpost;
+    Internal::BgzfStream  bgzipWriterHMMpost;
     
     unsigned int      rank  = 0;
     int          lastRank   =-1;
@@ -4048,8 +4052,8 @@ int main (int argc, char *argv[]) {
 
 
 	    	emissionUndef hetResToAdd;
-		hetResToAdd.rangeGen.setChrName( fields[0] );
-		hetResToAdd.rangeGen.setStartCoord(  destringify<unsigned int>( fields[1]) );
+		hetResToAdd.rangeGen.setChrName(                                fields[0]  );
+		hetResToAdd.rangeGen.setStartCoord(  destringify<unsigned int>( fields[1])+1 );
 		hetResToAdd.rangeGen.setEndCoord(    destringify<unsigned int>( fields[2]) );
 		
 		if(     previousChrWritten != fields[0]){
@@ -4098,7 +4102,7 @@ int main (int argc, char *argv[]) {
 	    cerr << "Unable to open file "<<hEstFileToRead<<endl;
 	    exit(1);
 	}
-	cerr<<"..done";
+	cerr<<"..done"<<endl;
 	
     } //end if skipToHMM
     //return 1;
@@ -4110,18 +4114,11 @@ int main (int argc, char *argv[]) {
     //bgzipWriterMCMC
     headerHMMMCMC = "#llik\th\tp\taccepted\tchains\tacptrate\n";
 
-
     bgzipWriterMCMC.Open(outFilePrefix+".hmmmcmc.gz", IBamIODevice::WriteOnly);
     if(!bgzipWriterMCMC.IsOpen()){
 	cerr<<"Cannot open file "<<(outFilePrefix+".hmmmcmc.gz")<<" in bgzip writer"<<endl;
 	return 1;
     }
-
-
-    bgzipWriterMCMC.Write(headerHMMMCMC.c_str(), headerHMMMCMC.size());
-
-
-    
 
     //computing the min/max segsites per chunk
     int minSegSitesPerChunk;
@@ -4136,7 +4133,7 @@ int main (int argc, char *argv[]) {
     
     Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
     
-    cerr<<"Begin running MCMC on HMM"<<endl;
+    //cerr<<"Begin running MCMC on HMM"<<endl;
     // cerr<<"generating a random set"<<endl;
     // vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
 
@@ -4190,7 +4187,7 @@ int main (int argc, char *argv[]) {
     //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
     vector<long double> hvector;
     vector<long double> pvector;
-    cerr<<"Begin running MCMC on HMM using "<<maxChains<<endl;
+    cerr<<"Begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<endl;
     for(int chain=1;chain<=maxChains;chain++){
 
 	//computing new state
@@ -4247,8 +4244,10 @@ int main (int argc, char *argv[]) {
 	//chain++;
 	//sleep(0.1);
     }
+    cerr<<endl;
     cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
 
+    bgzipWriterMCMC.Close();    
 	
     //cerr<<"Baum Welch"<<endl;
     //baum_welch(&hmm,&emittedH);
@@ -4292,10 +4291,13 @@ int main (int argc, char *argv[]) {
 
     // computing assignment prob
     //set average parameters
+    hAvg = 0.0007467025205;
+    pAvg = 0.0960255;
+    
     hmm.setHetRateForNonROH(hAvg);
     hmm.setTransprob(pAvg);
 	
-    fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
 
 
     //return 1;
@@ -4305,6 +4307,17 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
+
+
+
+
+
+
+
+
+
+
+    
     
     //////////////////////////////////
     //                              //
@@ -4406,6 +4419,31 @@ int main (int argc, char *argv[]) {
 	    return 1;
 	}
     }
+
+    
+
+
+    headerHMMpost =   "#CHROM\tBEGIN\tEND\tp[ROH]\tp[nonROH]\n";
+
+    bgzipWriterHMMpost.Open(outFilePrefix+".hmmp.gz", IBamIODevice::WriteOnly);
+    if(!bgzipWriterHMMpost.IsOpen()){
+	cerr<<"Cannot open file "<<(outFilePrefix+".hmmp.gz")<<" in bgzip writer"<<endl;
+	return 1;
+    }
+    bgzipWriterHMMpost.Write(headerHMMpost.c_str(), headerHMMpost.size());
+
+    for(unsigned int c=0;c<heteroEstResults.size();c++){
+	string strToWrite=heteroEstResults[c].rangeGen.asBed()+"\t";//+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
+
+	if(heteroEstResults[c].undef){
+	    strToWrite+="NA\tNA\n";
+	}else{
+	    strToWrite+=stringify( exp(postprob.m[0][c]) )+"\t"+stringify( exp(postprob.m[1][c]) )+"\n";
+	}
+
+	bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());	
+    }
+    bgzipWriterHMMpost.Close();    
     // for(unsigned int c=0;c<postprob.m[0].size();c++){
 	
     // }
