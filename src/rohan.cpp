@@ -9,9 +9,6 @@
 
 
 // global estimate
-// add mappability track?
-// ?
-// profit
 
 
 #include "api/internal/io/BgzfStream_p.h"
@@ -3048,62 +3045,66 @@ int main (int argc, char *argv[]) {
 
     string bedFile;
 
+    string autosomeFile;
+
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
     
 
     
-    const string usage=string("\nThis program co-estimates heterozygosity rates and runs of homozygosity\n")+
-                              "for modern and ancient samples\n\n"+
-                              string(argv[0])+                        
-                              " [options] [fasta file] [bam file]  "+"\n\n"+
-			      "\twhere:\n"+
-			      "\t\t\t\t\t[fasta file]\t\tThe fasta file used for alignement\n"
-			      "\t\t\t\t\t[bam file]\t\tThe aligned and indexed BAM file\n"+
-			      "\n\n"
-			      
-                              "\n\tI/O options:\n"+
-			      "\t\t"+"-o"+","+"--out"  + "\t\t"   +    "[out prefix]" +"\t\t"+"Output prefix  (default: none)"+"\n"+
-			      "\t\t"+""  +""+"--name" + "\t\t\t"   +    "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
-			      //"\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
-			      //"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
-			      "\t\t"+"-v"  +","+"--verbose"+"\t\t"    + ""       +"\t\t\t"+"Print extensive info about the heterozygosity estimate (default: "+booleanAsString(verboseHETest)+")"+"\n"+  
-
-			      
-			      "\n\tComputation options:\n"+
-                              "\t\t"+"-t"+"\t"+""       +"\t\t"    + "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
-                              "\t\t"+""  +""+"--phred64"+"\t\t\t"  + ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
-			      "\t\t"+""  +""+"--size"   +"\t\t\t"  + "[window size]"+"\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
-			      "\t\t"+""  +""+"--bed"    +"\t\t\t"  + "[bed file]"+"\t\t"+"Only use the regions in the bed file  (default: none)"+"\n"+	      
-			      //			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
-			      "\n\t\tHMM:\n"+
-			      "\t\t"+""  +""+"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
-			      "\t\t"+""  +""+"--step"     +"\t\t\t"    + "[step]"  +"\t\t\t"+"Steps used for MCMC sampling (default: "+thousandSeparator(stepHMM)+")"+"\n"+  
-			      "\t\t"+""  +""+"--chains"   +"\t\t"      + "[chains]"+"\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
-
-	                      "\t\t"+""  +""+"--hmm"      +"\t\t\t"    + ""        +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
-			      "\t\t"+""  +""+""           +"\t\t\t"    + ""        +"\t\t\t"+"read the previous het. rates [out prefix].hEst.gz and skip to HMM"+"\n"+
-
-	                      "\t\t"+""  +""+"--nohmm"    +"\t\t\t"    + ""        +"\t\t\t"+"Skip the HMM              (default: "+stringify(skipTheHMM)+")"+"\n"+
+    const string usage=string("\nThis program co-estimates heterozygosity rates and large runs of homozygosity\n")+
+	"for modern and ancient samples\n\n"+
+	string(argv[0])+                        
+	" [options] [fasta file] [bam file]  "+"\n\n"+
+	"\twhere:\n"+
+	"\t\t\t\t\t[fasta file]\t\tThe fasta file used for alignement\n"
+	"\t\t\t\t\t[bam file]\t\tThe aligned and indexed BAM file\n"+
+	"\n\n"
 	
-                              "\t\t"+""  +""+"--burnin"   +"\t\t"      + "[frac ]" +"\t\t"+"Fraction of the number of chains for MCMC  (default: "+stringify(fracChainsBurnin)+")"+"\n"+  
+	"\n\tI/O options:\n"+
+	"\t\t"+"-o"+","+"--out"      + "\t\t"     + "[out prefix]" +"\t\t"+"Output prefix  (default: none)"+"\n"+
+	"\t\t"+""  +"" +"--name"     + "\t\t\t"   + "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
+	//"\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
+	//"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
+	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""        +"\t\t\t"+"Print extensive info about the heterozygosity estimate (default: "+booleanAsString(verboseHETest)+")"+"\n"+  
+	
+			      
+	"\n\tComputation options:\n"+	
+	"\t\t"+"-t"+"" +""           +"\t\t\t"    + "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
+	"\t\t"+""  +"" +"--phred64"  +"\t\t\t"    + ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
+	"\t\t"+""  +"" +"--size"     +"\t\t\t"    + "[bp]"      +"\t\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
+	"\t\t"+""  +"" +"--bed"      +"\t\t\t"    + "[bed file]"+"\t\t"+"Only use the regions in the bed file  (default: none)"+"\n"+	      
+	"\t\t"+""  +"" +"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
+	"\t\t"+""  +"" +"--auto"     +"\t\t\t"    + "[file]"  +"\t\t\t"+"Use only the chromosome/scaffolds in this file   (default: use every chromosome)"+"\n"+
+	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"this is done to avoid including sex chromosomes in the calculation"+"\n"+
+
+
+	//			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
+	"\n\t\tHMM:\n"+
+
+	"\t\t"+""  +"" +"--step"     +"\t\t\t"    + "[step]"  +"\t\t\t"+"Steps used for MCMC sampling (default: "+thousandSeparator(stepHMM)+")"+"\n"+ 
+	"\t\t"+""  +"" +"--chains"   +"\t\t"      + "[chains]"+"\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
+	"\t\t"+""  +"" +"--hmm"      +"\t\t\t"    + ""        +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
+	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"read the previous het. rates [out prefix].hEst.gz and skip to HMM"+"\n"+
+	"\t\t"+""  +"" +"--nohmm"    +"\t\t\t"    + ""        +"\t\t\t"+"Skip the HMM              (default: "+booleanAsString(skipTheHMM)+")"+"\n"+	
+	"\t\t"+""  +"" +"--burnin"   +"\t\t"      + "[frac ]" +"\t\t\t"+"Fraction of the number of chains for MCMC"+"\n"+  
+	"\t\t"+""  +"" +""   +"\t\t"      + "" +"\t\t\t\t"+"to use as burning  (default: "+stringify(fracChainsBurnin)+")"+"\n"+  
 
 			      
-                              // "\n\tSample options:\n"+
-                              // "\t\t"+""  +""+"--cont"  +"\t\t\t"    +  "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
-                              // // "\t\t"+"--phred64" +"\t\t\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
-			      
-			      
-                              "\n\tDeamination and error options:\n"+                                   
-                              "\t\t"+""  +""+"--deam5p\t\t"+"[.prof file]" +"\t\t"+"5p deamination frequency for the endogenous\n\t\t\t\t\t\t\t\t(default: "+deam5pfreqE+")"+"\n"+
-                              "\t\t"+""  +""+"--deam3p\t\t"+"[.prof file]" +"\t\t"+"3p deamination frequency for the endogenous\n\t\t\t\t\t\t\t\t(default: "+deam3pfreqE+")"+"\n"+
-                              // "\t\t"+"-deam5pc [.prof file]" +"\t\t"+"5p deamination frequency for the contaminant (default: "+deam5pfreqC+")"+"\n"+
-                              // "\t\t"+"-deam3pc [.prof file]" +"\t\t"+"3p deamination frequency for the contaminant (default: "+deam3pfreqC+")"+"\n"+			      
-			      "\t\t"+""  +""+"--err\t\t\t"    +"[.prof file]"+"\t\t"    +"Illumina error profile (default: "+illuminafreq+")"+"\n"+
-			      "\t\t"+""  +""+"--base\t\t\t"   +"[.freq file]"+"\t\t"    +"Frequency of DNA bases in the genome (default: "+dnafreqFile+")"+"\n"+
-
-                              "";
+	// "\n\tSample options:\n"+
+	// "\t\t"+""  +""+"--cont"  +"\t\t\t"    +  "[cont rate:0-1]" +"\t\t"+"Present-day human contamination rate (default: "+stringify(contrate)+")"+"\n"+
+	// // "\t\t"+"--phred64" +"\t\t\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
+	       		      
+	"\n\tDeamination and error options:\n"+                                   
+	"\t\t"+""  +"" +"--deam5p"   +"\t\t"      +"[.prof]"  +"\t\t\t"+"5p deamination frequency for the endogenous\n\t\t\t\t\t\t\t\t(default: "+deam5pfreqE+")"+"\n"+
+	"\t\t"+""  +"" +"--deam3p"   +"\t\t"      +"[.prof]"  +"\t\t\t"+"3p deamination frequency for the endogenous\n\t\t\t\t\t\t\t\t(default: "+deam3pfreqE+")"+"\n"+
+	// "\t\t"+"-deam5pc [.prof file]" +"\t\t"+"5p deamination frequency for the contaminant (default: "+deam5pfreqC+")"+"\n"+
+	// "\t\t"+"-deam3pc [.prof file]" +"\t\t"+"3p deamination frequency for the contaminant (default: "+deam3pfreqC+")"+"\n"+			      
+	"\t\t"+""  +"" +"--err"      +"\t\t\t"    +"[.prof]"  +"\t\t\t"+"Illumina error profile (default: "+illuminafreq+")"+"\n"+
+	"\t\t"+""  +"" +"--base"     +"\t\t\t"    +"[.freq]"  +"\t\t\t"+"Frequency of DNA bases in the genome (default: "+dnafreqFile+")"+"\n"+
+	
+	"";
 
     if( (argc== 1) ||
         (argc== 2 && string(argv[1]) == "-h") ||
@@ -3167,6 +3168,12 @@ int main (int argc, char *argv[]) {
 	
         if( string(argv[i]) == "--size"  ){
 	    sizeChunk=destringify<unsigned int>(argv[i+1]);
+            i++;
+            continue;
+        }
+
+        if( string(argv[i]) == "--auto"  ){
+	    autosomeFile=string(argv[i+1]);
             i++;
             continue;
         }
@@ -3439,6 +3446,34 @@ int main (int argc, char *argv[]) {
 	v = readBEDfile(bedFile);
     }else{
 	v = rw.getGenomicWindows(bpToExtract,0);
+    }
+
+    if( !autosomeFile.empty()){
+
+	vector<GenomicRange> newV;
+	ifstream myFileAUTO;
+	myFileAUTO.open(autosomeFile.c_str(), ios::in);
+	string line;
+	set<string> listAutosomes;
+	if (myFileAUTO.is_open()){
+	    while ( getline (myFileAUTO,line)){     
+		listAutosomes.insert(line);
+	    }
+	    myFileAUTO.close();	   
+	}else{
+	    cerr << "Error in reading list of autosomes: Unable to open file "<<autosomeFile<<endl;
+	    exit(1);
+	}
+	
+	for(unsigned int i=0;i<v.size();i++){
+	    if( listAutosomes.find( v[i].getChrName() ) == listAutosomes.end() ){//not found
+		
+	    }else{//found
+		newV.push_back( v[i] );
+	    }
+	}
+
+	v=newV;
     }
 
     if( v.size() == 0 ){    
@@ -4434,6 +4469,9 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
     bgzipWriterHMMpost.Write(headerHMMpost.c_str(), headerHMMpost.size());
+    uint64_t rohSegments   =0;
+    uint64_t nonrohSegments=0;
+    uint64_t unsureSegments=0;
 
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	string strToWrite=heteroEstResults[c].rangeGen.asBed()+"\t";//+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
@@ -4444,9 +4482,41 @@ int main (int argc, char *argv[]) {
 	    strToWrite+=stringify( exp(postprob.m[0][c]) )+"\t"+stringify( exp(postprob.m[1][c]) )+"\n";
 	}
 
+	if(     exp(postprob.m[0][c]) > 0.9){
+	    rohSegments        += sizeChunk;
+	}else{
+	    if( exp(postprob.m[1][c]) < 0.9){
+		nonrohSegments += sizeChunk;
+	    }else{
+		unsureSegments += sizeChunk;
+	    }
+	}
 	bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());	
     }
     bgzipWriterHMMpost.Close();    
+
+
+
+
+    ofstream fileSummary;
+    string filenameSummary = outFilePrefix+".summary.txt";
+    fileSummary.open(filenameSummary.c_str());
+    
+    if (fileSummary.is_open()){
+
+	fileSummary << "Global heterozygosity rate:\t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;
+	fileSummary << "Segments in ROH:\t"      <<rohSegments    <<"\t"<<100*double(rohSegments)/double(rohSegments+nonrohSegments)<<"\t"<<100*double(rohSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<endl;
+	fileSummary << "Segments in non-ROH:\t"  <<nonrohSegments <<"\t"<<100*double(nonrohSegments)/double(rohSegments+nonrohSegments)<<"\t"<<100*double(nonrohSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<endl;
+	fileSummary << "Segments unclassified:\t"<<unsureSegments <<"\t"<<100*double(unsureSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<endl;
+	
+    }else{
+	cerr << "Unable to print to file "<<filenameSummary<<endl;
+    }
+    fileSummary.close();
+    
+
+
+
     // for(unsigned int c=0;c<postprob.m[0].size();c++){
 	
     // }
