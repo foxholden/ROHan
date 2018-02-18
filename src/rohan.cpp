@@ -7,6 +7,8 @@
 
 //TODO
 
+//why missing values on few windows?
+//curves for HMM
 
 // global estimate
 
@@ -4144,7 +4146,7 @@ int main (int argc, char *argv[]) {
 
 	
 
-
+    cerr<<"Creating HMM..";
     //write chains to output
     //bgzipWriterMCMC
     headerHMMMCMC = "#llik\th\tp\taccepted\tchains\tacptrate\n";
@@ -4172,9 +4174,8 @@ int main (int argc, char *argv[]) {
     // cerr<<"generating a random set"<<endl;
     // vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
 
-    
+    cerr<<".";
     //vector<emissionUndef>  eTestUndef;
-    //cerr<<"done"<<endl;
 
 
     //BEGIN MCMC chain
@@ -4214,17 +4215,19 @@ int main (int argc, char *argv[]) {
 
     hmm.setHetRateForNonROH(h_i);
     hmm.setTransprob(pT_i);
+    cerr<<".";
     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
     fbreturnVal  tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
     x_i  = tmpResFWD.llik;
     // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
     // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    cerr<<"..done"<<endl;
 
     //return 1;
     //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
     vector<long double> hvector;
     vector<long double> pvector;
-    cerr<<"Begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<endl;
+    cerr<<"Begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<" chains"<<endl;
     for(int chain=1;chain<=maxChains;chain++){
 
 	//computing new state
@@ -4271,10 +4274,10 @@ int main (int argc, char *argv[]) {
 	    }
 	    
 	    accept++;
-	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}else{
-	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}
 
 	printprogressBarCerr( float(chain)/float(maxChains) );
@@ -4289,7 +4292,6 @@ int main (int argc, char *argv[]) {
     //cerr<<"Baum Welch"<<endl;
     //baum_welch(&hmm,&emittedH);
 	
-    cerr<<"HMM done"<<endl;
 
     //hvector and pvector contain the values
     long double hSum=0.0;
@@ -4328,6 +4330,7 @@ int main (int argc, char *argv[]) {
 
     // computing assignment prob
     //set average parameters
+    //TODO remove
     hAvg = 0.0007467025205;
     pAvg = 0.0960255;
     
@@ -4336,6 +4339,7 @@ int main (int argc, char *argv[]) {
 	
     fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
 
+    cerr<<"HMM done"<<endl;
 
     //return 1;
     //////////////////////////////////
@@ -4442,7 +4446,9 @@ int main (int argc, char *argv[]) {
     }
 
     for(unsigned int c=0;c<heteroEstResults.size();c++){
-	cerr<<c<<" "<<exp(postprob.m[0][c])<<" "<<exp(postprob.m[1][c])<<endl;
+	cerr<<c<<" plotting 0="<<exp(postprob.m[0][c])<<" 1="<<exp(postprob.m[1][c])<<endl;
+	//long double pROH = expl(postprob.m[0][c]);
+
 	if(heteroEstResults[c].undef)
 	    continue;
 	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,

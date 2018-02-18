@@ -1,5 +1,5 @@
 
-CXX      = g++ -std=c++11 #-fpermissive #-g # -pg
+CXX      = g++ -std=c++11 -g#-fpermissive #-g # -pg
 LIBGAB   = ../lib/libgab/
 
 CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/libharu/include/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c

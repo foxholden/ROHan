@@ -684,12 +684,12 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 	
     double widthtouse = name2chrScreenInfo[ cr.getChrName() ].lengthScreen/(name2chrScreenInfo[ cr.getChrName() ].length/windowSizeForHest);
 
+    
+    cerr<<"drawHMM "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<xfraction<<" "<<x<<" "<<widthtouse<<" "<<name2chrScreenInfo[ cr.getChrName() ].y <<" "<< (heightChr+heightLabel) <<" "<<heightChr <<" "<<  ( (h    -hLimLow)/hLimHigh)<<" "<<((name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)))<<endl;
 
-
-
-    drawHorizontalLine( x-widthtouse/2.0,                                                                                                             // x offset
-			x+widthtouse/2.0,                                                                                                             // x offset			
-			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),                   // baseline
+    drawHorizontalLine( x-widthtouse/2.0,// x offset
+			x+widthtouse/2.0,// x offset			
+			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh), // baseline
 			0,
 			1.0,
 			0,
@@ -753,6 +753,8 @@ int PdfWriter::drawHorizontalLine(const double x1,const double x2,const double y
     }
     HPDF_Page_SetRGBStroke (page, r, g, b);//set color
     HPDF_Page_SetLineWidth (page, w); //set line width
+
+    cerr<<"drawHorizontalLine "<<x1<<" "<<x2<<" "<<y<<" "<<r<<" "<<g<<" "<<b<<" "<<w<<" "<<dash<<endl;
 
     HPDF_Page_MoveTo (page, x1,   y);
     HPDF_Page_LineTo (page, x2,   y);
