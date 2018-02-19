@@ -139,7 +139,10 @@ long double HmmState::probEmissionRange(const int mutationsMin,const int mutatio
 	sumPFE += probablitiesForEmission->at( m_ );
     }
     
-    //cerr<<"probablitiesForEmission sumPFE = "<<sumPFE<<" return="<<(sumPFE / (mutationsMax-mutationsMin) )<<endl;
+    //if( (sumPFE / (mutationsMax-mutationsMin) ) == 1){
+    //cerr<<endl<<"probablitiesForEmission("<<h<<","<<idx<<") sumPFE = "<<sumPFE<<" "<<mutationsMin<<" "<<mutationsMax<<" "<<(mutationsMax-mutationsMin)<<" return="<<(sumPFE / (mutationsMax-mutationsMin) )<<endl;
+    // 	exit(1);
+    // }
     //to test
     return (sumPFE / (mutationsMax_-mutationsMin) );
     //return probablitiesForEmission->at( (mutationsMax-mutationsMin)/2);

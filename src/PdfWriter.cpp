@@ -74,7 +74,7 @@ PdfWriter::PdfWriter(const string fname_,
      HPDF_Page_EndText (page);
      HPDF_Page_SetFontAndSize (page, font, 10);
      //cerr<<"Creating a page in file  "<<fname_<<"w="<<HPDF_Page_GetWidth(page)<<" h="<<HPDF_Page_GetHeight (page)<<endl;
-
+     hmmPrevious = false;
   
 }
 
@@ -660,7 +660,8 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 		       const long double   hhigh_,      // higher conf. int. for h
 		       const double        hLimLow,    // lower  limit for the h plot 
 		       const double        hLimHigh,
-		       const double        windowSizeForHest){  // higher limit for the h plot 
+		       const double        windowSizeForHest,
+		       const bool          defined){  // higher limit for the h plot 
     long double   h     = h_;
     //long double   hlow  = hlow_;
     long double   hhigh = hhigh_;
@@ -685,20 +686,78 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
     double widthtouse = name2chrScreenInfo[ cr.getChrName() ].lengthScreen/(name2chrScreenInfo[ cr.getChrName() ].length/windowSizeForHest);
 
     
-    cerr<<"drawHMM "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<xfraction<<" "<<x<<" "<<widthtouse<<" "<<name2chrScreenInfo[ cr.getChrName() ].y <<" "<< (heightChr+heightLabel) <<" "<<heightChr <<" "<<  ( (h    -hLimLow)/hLimHigh)<<" "<<((name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)))<<endl;
+    // cerr<<"drawHMM "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<xfraction<<" "<<x<<" "<<widthtouse<<" "<<name2chrScreenInfo[ cr.getChrName() ].y <<" "<< (heightChr+heightLabel) <<" "<<heightChr <<" "<<  ( (h    -hLimLow)/hLimHigh)<<" "<<((name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)))<<endl;
 
-    drawHorizontalLine( x-widthtouse/2.0,// x offset
-			x+widthtouse/2.0,// x offset			
-			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh), // baseline
-			0,
-			1.0,
-			0,
-			1.0);
-			
+    double r,g,b,w;
+    if(defined){
+	r =   0;
+	g = 1.0;
+	b =   0;
+	w = 1.0;
+    }else{
+	r = 1.0;
+	g = 1.0;
+	b =   0;
+	w = 0.5;
+    }
 
+    widthtouse = 0.9*widthtouse;
+
+    double xlhmm = x-widthtouse/2.0;// x offset
+    double xrhmm = x+widthtouse/2.0;// x offset			
+    double yhmm  = (name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)); // baseline
+
+    drawHorizontalLine( xlhmm,
+			xrhmm,
+			yhmm ,
+			r,g,b,w);
+
+    if(hmmPrevious){
+	//cout<<"draw hmm previous "<<xlhmmPrevious<<" "<<xrhmmPrevious<<" "<<yhmmPrevious<<" "<<xlhmm<<" "<<xrhmm<<" "<<yhmm<<endl; 
+
+	//cout<<"1"<<endl;
+    	//draw connector to previous
+    	HPDF_Page_SetLineWidth(page, w/2);
+	
+	//cout<<"2"<<endl;
+	HPDF_Page_SetRGBStroke (page, r, g, b);//set color
+	
+	//cout<<"3"<<endl;
+	//current 
+	HPDF_Page_MoveTo(page,xrhmmPrevious,yhmmPrevious);
+	//cout<<"4"<<endl;
+
+	double curvature=1;
+	
+    	HPDF_Page_CurveTo( page,
+
+			   //first point for derivative
+    			   xrhmmPrevious+curvature,//xlhmm,        //x1
+    			   yhmmPrevious, //y1
+
+			   //second point for derivative
+			   xlhmm-curvature, //xrhmmPrevious,//x2
+    			   yhmm,         //y2
+
+			   //next connecting point
+    			   xlhmm,        //x3
+    			   yhmm);        //y3
+
+       	//cout<<"4"<<endl;
+    	HPDF_Page_Stroke (page);
+	//cout<<"5"<<endl;
+    }
     
+    xlhmmPrevious = xlhmm;
+    xrhmmPrevious = xrhmm;
+    yhmmPrevious  = yhmm;
+    
+    hmmPrevious   = true;
     return 0;
 }
+
+
+
 
 
 int PdfWriter::drawGlobalHEst(//string chrname,
@@ -740,7 +799,9 @@ int PdfWriter::drawGlobalHEst(//string chrname,
     return 0;
 }
 
-int PdfWriter::drawHorizontalLine(const double x1,const double x2,const double y,
+int PdfWriter::drawHorizontalLine(const double x1,
+				  const double x2,
+				  const double y,
 				  double r,
 				  double g,
 				  double b,
@@ -754,7 +815,7 @@ int PdfWriter::drawHorizontalLine(const double x1,const double x2,const double y
     HPDF_Page_SetRGBStroke (page, r, g, b);//set color
     HPDF_Page_SetLineWidth (page, w); //set line width
 
-    cerr<<"drawHorizontalLine "<<x1<<" "<<x2<<" "<<y<<" "<<r<<" "<<g<<" "<<b<<" "<<w<<" "<<dash<<endl;
+    //cerr<<"drawHorizontalLine "<<x1<<" "<<x2<<" "<<y<<" "<<r<<" "<<g<<" "<<b<<" "<<w<<" "<<dash<<endl;
 
     HPDF_Page_MoveTo (page, x1,   y);
     HPDF_Page_LineTo (page, x2,   y);

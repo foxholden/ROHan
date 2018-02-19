@@ -44,6 +44,11 @@ const HPDF_UINT16 DASH_MODE1[] = {3};
 
 class PdfWriter{
  private:
+    double xlhmmPrevious;
+    double xrhmmPrevious;
+    double yhmmPrevious;
+    
+    bool   hmmPrevious;
     string fname;
     HPDF_Doc  pdf;
     HPDF_Font font;
@@ -116,7 +121,8 @@ class PdfWriter{
 		const long double   hhigh_,      // higher conf. int. for h
 		const double        hLimLow,    // lower  limit for the h plot 
 		const double        hLimHigh,
-		const double        windowSizeForHest);  // higher 
+		const double        windowSizeForHest,
+		const bool          defined);  // higher 
     
     int drawGlobalHEst(const long double   h,
 		       const long double   hlow,

@@ -7,9 +7,8 @@
 
 //TODO
 
-//why missing values on few windows?
-//curves for HMM
-
+// why missing values on few windows?
+// does the HMM underestimate?
 // global estimate
 
 
@@ -4274,10 +4273,10 @@ int main (int argc, char *argv[]) {
 	    }
 	    
 	    accept++;
-	    cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}else{
-	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}
 
 	printprogressBarCerr( float(chain)/float(maxChains) );
@@ -4331,8 +4330,8 @@ int main (int argc, char *argv[]) {
     // computing assignment prob
     //set average parameters
     //TODO remove
-    hAvg = 0.0007467025205;
-    pAvg = 0.0960255;
+    // hAvg = 0.0007467025205;
+    // pAvg = 0.0960255;
     
     hmm.setHetRateForNonROH(hAvg);
     hmm.setTransprob(pAvg);
@@ -4385,7 +4384,7 @@ int main (int argc, char *argv[]) {
 	    maxHFoundPlotting = heteroEstResults[c].hhigh;
 	}
     }
-    cerr<<"maxHFoundPlotting "<<maxHFoundPlotting<<endl;
+    //cerr<<"maxHFoundPlotting "<<maxHFoundPlotting<<endl;
     //maxHFoundPlotting=0.0015;
     maxHFoundPlotting = double( maxSegSitesPer1M )/double(1000000);
 
@@ -4446,22 +4445,28 @@ int main (int argc, char *argv[]) {
     }
 
     for(unsigned int c=0;c<heteroEstResults.size();c++){
-	cerr<<c<<" plotting 0="<<exp(postprob.m[0][c])<<" 1="<<exp(postprob.m[1][c])<<endl;
+    //for(unsigned int c=0;c<150;c++){
+	//cerr<<c<<" plotting 0="<<exp(postprob.m[0][c])<<" 1="<<exp(postprob.m[1][c])<<endl;
 	//long double pROH = expl(postprob.m[0][c]);
 
-	if(heteroEstResults[c].undef)
-	    continue;
+	// if(heteroEstResults[c].undef)
+	//     continue;
 	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,
 				    exp(postprob.m[1][c]),
 				    exp(postprob.m[1][c]),
 				    exp(postprob.m[1][c]),
 				    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
 				    maxPPlotting, // 0.00500    = 4*2e-8*62500
-				    sizeChunk
+				    sizeChunk,
+				    !heteroEstResults[c].undef
 	)  != 0 ){
 	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
 	    return 1;
 	}
+
+
+
+	
     }
 
     
@@ -4500,7 +4505,7 @@ int main (int argc, char *argv[]) {
 	bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());	
     }
     bgzipWriterHMMpost.Close();    
-
+    cerr<<"Written trace to "<<(outFilePrefix+".hmmp.gz")<<endl;
 
 
 
@@ -4519,6 +4524,7 @@ int main (int argc, char *argv[]) {
 	cerr << "Unable to print to file "<<filenameSummary<<endl;
     }
     fileSummary.close();
+    cerr<<"final summary written to "<<filenameSummary<<endl;
     
 
 
@@ -4688,10 +4694,10 @@ int main (int argc, char *argv[]) {
 	    pT_i          =  pT_i_1;
 	    x_i           =  x_i_1;
 	    accept++;
-	    cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}else{
-	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	}
 	//chain++;
 	//sleep(0.1);
@@ -4713,6 +4719,8 @@ cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<e
     //////////////////////////////////
 
     delete cov2ProbSite;
+    
+    cerr<<"ROHan finished succesfully"<<endl;
     
     return 0;
 }

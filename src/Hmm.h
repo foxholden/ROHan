@@ -141,7 +141,7 @@ typedef struct {
     GenomicRange rangeGen;
 } emissionUndef;
 
-#define DEBUGFWD
+/* #define DEBUGFWD */
 
 inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
     int nObservations  = int(observed.size());
@@ -234,7 +234,7 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
     return toreturn;
 }
 
-#define DEBUGBWD
+/* #define DEBUGBWD */
 
 inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
 
@@ -401,48 +401,83 @@ inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vecto
     for(int i=0;i<nObservations;i++){
 	long double temp = 0.0;
 
-	cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh;
+	/* cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh; */
 	for(int x=0;x<nStates;x++){	    
 	    postProb[x][i]   = f.m[x][i] + b.m[x][i];
-	    cout<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f.m[x][i] <<" b="<< b.m[x][i]<<" ";
-	    //cout<<" state#"<<x<<" p="<<postProb[x][i]<<" "<<temp<<" "; 
-
+	    /* cout<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f.m[x][i] <<" b="<< b.m[x][i]<<" "; */
+	    /* //cout<<" state#"<<x<<" p="<<postProb[x][i]<<" "<<temp<<" ";  */
+	    
 	    temp             = oplusInitnatl(temp,postProb[x][i]);
-	    cout<<" "<<temp<<" ";
+	    /* cout<<" "<<temp<<" "; */
 	}
-	cout<<" sum"<<temp<<endl;
+	/* cout<<" sum"<<temp<<endl; */
+
+	//numerical overflow can occur if p1+p2 where p1>>p2
+	//in this case we just set the posterior prob to close to 1 
+	bool numericalOverflow  = false;
+	int  numericalOverflowi =-1;
 	
 	for(int x=0;x<nStates;x++){
-	    postProb[x][i]  -= temp;
-	    cout<<"Norm. postProb#"<<x<<" p="<<postProb[x][i]<<" ";
+	    if(postProb[x][i]  == temp){	       
+		numericalOverflow =true;
+		numericalOverflowi=x;
+	    }
 	}
-	cout<<endl;
+	//cout<<setprecision(100)<<"num overflow "<<numericalOverflow<<" "<<temp<<endl;
+	if( numericalOverflow ){
+	    //temp=temp-numeric_limits<long double>::min();
+	    for(int x=0;x<nStates;x++){
+		if(x == numericalOverflowi){
+		    postProb[x][i]  =  -numeric_limits<long double>::min();
+		    //postProb[x][i]  =  logl(1-(numeric_limits<long double>::min()*(nStates-1)));
+		    /* cout<<"numover high "<<-numeric_limits<long double>::min()<<endl; */
+		}else{
+		    postProb[x][i]  =  logl(numeric_limits<long double>::min());
+		    /* cout<<"numover low  "<<logl(numeric_limits<long double>::min())<<endl; */
+		}
+	    }
+	}else{	    
+	    for(int x=0;x<nStates;x++){
+		postProb[x][i]  = postProb[x][i]-temp;
+		/* cout<<"Norm. postProb#"<<x<<" p="<<postProb[x][i]<<" "; */
+	    }
+	}
+	//cout<<setprecision(100)<<"num overflow "<<numericalOverflow<<" "<<temp<<endl;	
+	
+	
+	//cout<<endl;
     }
 
     //normalizing
     long double sumProb=0.0;
     for(int i=0;i<nObservations;i++){
-	cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh;
+	/* cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh<<" undef="<<observed[i].undef; */
 	long double temp = 0.0;
+	
 	for(int x=0;x<nStates;x++){
-	    cout<<" "<<x<<" "<<postProb[x][i]; 
-	    temp             = oplusInitnatl(temp,postProb[x][i]);
+	    //long double pp   = min( postProb[x][i] , numeric_limits<long double>::min());	     	    //fixes numerical issues
+	    long double pp   = postProb[x][i] ;
+	    if(pp==0){//if essentially the probability is 1
+		pp = logl( 1.0-numeric_limits<long double>::min());
+	    }
+	    temp             = oplusInitnatl(temp,pp);
+	    /* cout<<" x="<<x<<" pp="<<(postProb[x][i])<<" t="<<temp; */
 	}
-	cout<<" "<<temp<<" ";
+	/* cout<<" "<<temp<<" "; */
 	
 	for(int x=0;x<nStates;x++){
 	    postProb[x][i] = postProb[x][i]-temp;
-	    cout<<"postProb["<<x<<"]["<<i<<"] "<<exp(postProb[x][i])<<" ";
+	    /* cout<<"postProb["<<x<<"]["<<i<<"] "<<postProb[x][i]<<" "<<expl(postProb[x][i])<<" "; */
 	}
 
-	for(int x=0;x<nStates;x++){
-	    postProb[x][i] = postProb[x][i]-temp;
-	    cout<<"emission["<<x<<"]["<<i<<"] "<< hmm->hmmstates[x]->probEmissionRange( (int)(observed[i].hlow *sizeChunk),
-											(int)(observed[i].hhigh*sizeChunk),
-											sizeChunk)<<" ";
-	}
-	
-	cout<<endl;
+	/* for(int x=0;x<nStates;x++){ */
+	/*     postProb[x][i] = postProb[x][i]-temp; */
+	/*     cout<<"emission["<<x<<"]["<<i<<"] "<< hmm->hmmstates[x]->probEmissionRange( (int)(observed[i].hlow *sizeChunk), */
+	/* 										(int)(observed[i].hhigh*sizeChunk), */
+	/* 										sizeChunk)<<" "; */
+	/*     //if(i>138){ exit(1); } */
+	/* } */	
+	/* cout<<endl; */
 	sumProb+=temp;
     }
 
