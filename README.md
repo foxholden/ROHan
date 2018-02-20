@@ -64,8 +64,10 @@ For MacOS, if you get the problem: fatal error: 'lzma.h' file not found, this is
 
 4) (optional) Either put the executable in the overall path or add the path to your $PATH environment or add an alias to be able to run "rohan" from any directory.
 
+
 Quick start
 ----------------------
+
 
 
 Preparing the BAM file
@@ -82,6 +84,11 @@ Documentation
 FAQ
 ----------------------
 
+
+
+### Why do I have such huge confidence intervals for potential ROH regions?
+
+This is normal, as we use the second derivative for the confidence intervals, the shape of the likelihood function is somewhat flat around 0 which leads to overestimated confidence intervals. 
 
 
 

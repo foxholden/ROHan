@@ -272,7 +272,7 @@ void readDNABaseFreq(const string filename, alleleFrequency & dnaDefaultFreq){
 
 
 void populatedCoverateVector(vector<long double> * cov2ProbSite, long double rateForPoissonCov,int maxcov){
-    cerr<<"Computing coverage priors.";
+    //cerr<<"Computing coverage priors.";
     long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
     long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
 
@@ -311,8 +311,11 @@ void populatedCoverateVector(vector<long double> * cov2ProbSite, long double rat
 	    );
 
     }
-
+    
+#ifdef DEBUGCOV    
     cerr<<"..done"<<endl;
+#endif
+
 }
 
 void populatedCoverateVectorSingle(vector<long double> * cov2ProbSite, long double lambda,int maxcov){
@@ -339,7 +342,7 @@ void populatedCoverateVectorSingle(vector<long double> * cov2ProbSite, long doub
     //cerr<<"size long double "<<int(sizeld)<<endl;
     for(int cov=1;cov<=maxcov;cov++){
         long double fnum;
-	cerr<<sizeof(fnum)<<endl;
+	//cerr<<sizeof(fnum)<<endl;
         in.read((char *) &fnum, sizeof(fnum) );
 
 #ifdef DEBUGCOV

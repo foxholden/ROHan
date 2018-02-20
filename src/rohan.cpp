@@ -7,7 +7,7 @@
 
 //TODO
 
-// why missing values on few windows?
+
 // does the HMM underestimate?
 // global estimate
 
@@ -19,11 +19,6 @@
 #include <utils/bamtools_options.h>
 #include <utils/bamtools_pileup_engine.h>
 #include <utils/bamtools_utilities.h>
-
-// #include "api/BamMultiReader.h"
-// #include "api/BamReader.h"
-// #include "api/BamWriter.h"
-// #include "api/BamAux.h"
 
 #include "PdfWriter.h"
 #include "GenomicWindows.h"
@@ -49,7 +44,7 @@ using namespace BamTools;
 
 
 //#define PRECOMPUTELOG
-#define DEBUGCOV
+//#define DEBUGCOV
 
 //#define DEBUGILLUMINAFREQ
 //#define DEBUGINITSCORES
@@ -185,17 +180,17 @@ vector< vector< mpq2bsq2submatrix  > >  length2pos2mpq2bsq2submatrix;
 
 
 
-    // //dummy values
-    // for(int L=0;L<MINLENGTHFRAGMENT;L++){ //for each fragment length
-    // 	vector<diNucleotideProb> baseQualEffect;//FOR EACH QUAL SCORE
-    // 	fragmentLengthEffect.push_back(baseQualEffect);
-    // }
+// //dummy values
+// for(int L=0;L<MINLENGTHFRAGMENT;L++){ //for each fragment length
+// 	vector<diNucleotideProb> baseQualEffect;//FOR EACH QUAL SCORE
+// 	fragmentLengthEffect.push_back(baseQualEffect);
+// }
 
-    // //int L=35;//fragment length    
-    // for(int L=MINLENGTHFRAGMENT;L<MAXLENGTHFRAGMENT;L++){ //for each fragment length
-    // 	cerr<<L<<endl;
+// //int L=35;//fragment length    
+// for(int L=MINLENGTHFRAGMENT;L<MAXLENGTHFRAGMENT;L++){ //for each fragment length
+// 	cerr<<L<<endl;
 
-    // 	vector<diNucleotideProb> baseQualEffect;//FOR EACH QUAL SCORE
+// 	vector<diNucleotideProb> baseQualEffect;//FOR EACH QUAL SCORE
 
 
 
@@ -1818,7 +1813,8 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
 
-	    cerr<<"Thread#"<<threadID<<" converged "<<endl;
+	    if(verboseHETest)
+		cerr<<"Thread#"<<threadID<<" converged "<<endl;
 
 	    rc = pthread_mutex_unlock(&mutexCERR);
 	    checkResults("pthread_mutex_unlock()\n", rc);
@@ -2172,8 +2168,8 @@ void *mainHeteroComputationThread(void * argc){
     int rankThread=0;
     //#endif
 
-    if(verboseHETest)    
-	cerr<<"mainHeteroComputationThread mutex1"<<endl;
+    // if(verboseHETest)    
+    // 	cerr<<"mainHeteroComputationThread mutex1"<<endl;
 
     rc = pthread_mutex_lock(&mutexRank);
     checkResults("pthread_mutex_lock()\n", rc);
@@ -2205,14 +2201,16 @@ void *mainHeteroComputationThread(void * argc){
     bool foundData=false;
     
 #ifdef HETVERBOSE
-    rc = pthread_mutex_lock(&mutexCERR);
-    checkResults("pthread_mutex_lock()\n", rc);
+    if(verboseHETest)    {
+	rc = pthread_mutex_lock(&mutexCERR);
+	checkResults("pthread_mutex_lock()\n", rc);
 
-    if(verboseHETest)    
+
 	cerr<<"Thread #"<<rankThread <<" started and is requesting data"<<endl;
 
-    rc = pthread_mutex_unlock(&mutexCERR);
-    checkResults("pthread_mutex_unlock()\n", rc);
+	rc = pthread_mutex_unlock(&mutexCERR);
+	checkResults("pthread_mutex_unlock()\n", rc);
+    }
 #endif
 
     DataChunk    * currentChunk;
@@ -2224,15 +2222,15 @@ void *mainHeteroComputationThread(void * argc){
  	queueDataToprocess.pop();
 
 #ifdef HETVERBOSE
-	rc = pthread_mutex_lock(&mutexCERR);
-	checkResults("pthread_mutex_lock()\n", rc);
+	if(verboseHETest){
+	    rc = pthread_mutex_lock(&mutexCERR);
+	    checkResults("pthread_mutex_lock()\n", rc);
 
-	if(verboseHETest)    
 	    cerr<<"Thread #"<<rankThread<<" is reading chunk rank#"<<currentChunk->rank<<endl;
 
-	rc = pthread_mutex_unlock(&mutexCERR);
-	checkResults("pthread_mutex_unlock()\n", rc);
-
+	    rc = pthread_mutex_unlock(&mutexCERR);
+	    checkResults("pthread_mutex_unlock()\n", rc);
+	}
 #endif
 	//cout<<"rank "<< &(currentChunk->dataToProcess) <<endl;
     }
@@ -2314,15 +2312,17 @@ void *mainHeteroComputationThread(void * argc){
     bool setRegionRes=reader.SetRegion( bregion   );
 
     //if(verboseHETest){
-    rc = pthread_mutex_lock(&mutexCERR);
-    checkResults("pthread_mutex_lock()\n", rc);
+    if(verboseHETest){
+	rc = pthread_mutex_lock(&mutexCERR);
+	checkResults("pthread_mutex_lock()\n", rc);
+	
+	cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
+	
+	rc = pthread_mutex_unlock(&mutexCERR);
+	checkResults("pthread_mutex_unlock()\n", rc);
+    }
     
-    cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
-
-
-    rc = pthread_mutex_unlock(&mutexCERR);
-    checkResults("pthread_mutex_unlock()\n", rc);
-	//}
+    //}
 #ifdef HETVERBOSE
 
 #endif
@@ -2410,16 +2410,15 @@ void *mainHeteroComputationThread(void * argc){
     pileup.Flush();
     reader.Close();
     //fastaReference.Close();
-
-    rc = pthread_mutex_lock(&mutexCERR);
-    checkResults("pthread_mutex_lock()\n", rc);
+    if(verboseHETest){
+	rc = pthread_mutex_lock(&mutexCERR);
+	checkResults("pthread_mutex_lock()\n", rc);
 	
-
-    cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(hv->getTotalBases())<<" bases on "<<thousandSeparator(hv->getTotalSites())<<" sites average coverage: "<<double(hv->getTotalBases())/double(hv->getTotalSites())<<endl;
-
-    rc = pthread_mutex_unlock(&mutexCERR);
-    checkResults("pthread_mutex_unlock()\n", rc);
-
+	cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(hv->getTotalBases())<<" bases on "<<thousandSeparator(hv->getTotalSites())<<" sites average coverage: "<<double(hv->getTotalBases())/double(hv->getTotalSites())<<endl;
+	
+	rc = pthread_mutex_unlock(&mutexCERR);
+	checkResults("pthread_mutex_unlock()\n", rc);
+    }
 
 
 
@@ -3088,7 +3087,7 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +"--chains"   +"\t\t"      + "[chains]"+"\t\t"+"Number of chains for MCMC  (default: "+thousandSeparator(maxChains)+")"+"\n"+  
 	"\t\t"+""  +"" +"--hmm"      +"\t\t\t"    + ""        +"\t\t\t"+"Skip the computation of local het. rates,              (default: "+stringify(skipToHMM)+")"+"\n"+  
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"read the previous het. rates [out prefix].hEst.gz and skip to HMM"+"\n"+
-	"\t\t"+""  +"" +"--nohmm"    +"\t\t\t"    + ""        +"\t\t\t"+"Skip the HMM              (default: "+booleanAsString(skipTheHMM)+")"+"\n"+	
+	"\t\t"+""  +"" +"--nohmm"    +"\t\t\t"    + ""        +"\t\t\t"+"Skip the HMM to estimate global het rates (default: "+booleanAsString(skipTheHMM)+")"+"\n"+	
 	"\t\t"+""  +"" +"--burnin"   +"\t\t"      + "[frac ]" +"\t\t\t"+"Fraction of the number of chains for MCMC"+"\n"+  
 	"\t\t"+""  +"" +""   +"\t\t"      + "" +"\t\t\t\t"+"to use as burning  (default: "+stringify(fracChainsBurnin)+")"+"\n"+  
 
@@ -3895,8 +3894,12 @@ int main (int argc, char *argv[]) {
    
     //#ifdef LATER
     //cerr<<"test wroteEverything="<<wroteEverything<<endl;
-    cerr<<"Writing data to logs/output file"<<endl;
+   cerr<<""<<numberOfThreads<<" thread(s) are running in the background, results will be written at it becomes available"<<endl;
+   cerr<<"Writing genotype data to:        "<<outFilePrefix+".vcf.gz" << endl;
+   cerr<<"Writing local het. estimates to: "<<outFilePrefix+".hEst.gz"<< endl;
 
+   //outFilePrefix+".hEst.gz", IBamIODevice::WriteOnly);
+   
     while(!wroteEverything){
 
 	//threads are running here
@@ -3918,7 +3921,8 @@ int main (int argc, char *argv[]) {
 		checkResults("pthread_mutex_lock()\n", rc);
 
 		// if(verboseHETest){
-		cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<thousandSeparator(dataToWrite->vecPositionResults->size())<<" records, "<<(queueDataTowrite.size())<<" chunk(s) left in queue"<<endl;
+		if(verboseHETest)
+		    cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<thousandSeparator(dataToWrite->vecPositionResults->size())<<" records, "<<(queueDataTowrite.size())<<" chunk(s) left in queue"<<endl;
 		
 		// }
 		
@@ -4009,6 +4013,10 @@ int main (int argc, char *argv[]) {
 		
 		wroteData=true;		
 		lastWrittenChunk=dataToWrite->rank;
+
+
+		if(!verboseHETest)
+		    printprogressBarCerr( float(lastWrittenChunk)/float(lastRank) );
 		
 		if(dataToWrite->rank == lastRank)
 		    wroteEverything=true;	
@@ -4048,6 +4056,10 @@ int main (int argc, char *argv[]) {
 
     cerr<<"done writing data"<<endl;
 
+
+
+
+    
     //////////////////////////////////
     //                              //
     // BEGIN HMM                    //
@@ -4056,6 +4068,11 @@ int main (int argc, char *argv[]) {
 
     if(skipTheHMM){
 	//goto endhmm;
+	delete cov2ProbSite;
+	
+	cerr<<"ROHan finished succesfully"<<endl;
+	
+	return 0;
     }
 
 
@@ -4399,9 +4416,7 @@ int main (int argc, char *argv[]) {
 	if(    pdfwriterH.drawHEst(heteroEstResults[c].rangeGen,
 				   (heteroEstResults[c].h ),
 				   // ( (heteroEstResults[c].h )-6.0188e-05),
-				   // ( (heteroEstResults[c].h )+6.0188e-05),
-				   
-				   //TODO to put back
+				   // ( (heteroEstResults[c].h )+6.0188e-05),				   				   
 				   MAX(heteroEstResults[c].hlow,0),
 				   heteroEstResults[c].hhigh,
 				   minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
@@ -4529,188 +4544,6 @@ int main (int argc, char *argv[]) {
 
 
 
-    // for(unsigned int c=0;c<postprob.m[0].size();c++){
-	
-    // }
-    
-    // for(unsigned int c=0;c<heteroEstResults.size();c++){
-    // 	if(heteroEstResults[c].undef)
-    // 	    continue;
-    // 	if(    pdfwriterH.drawHEst(heteroEstResults[c].rangeGen,
-    // 				   (heteroEstResults[c].h ),
-    // 				   // ( (heteroEstResults[c].h )-6.0188e-05),
-    // 				   // ( (heteroEstResults[c].h )+6.0188e-05),				   
-    // 				   //TODO to put back
-    // 				   MAX(heteroEstResults[c].hlow,0),
-    // 				   heteroEstResults[c].hhigh,
-    // 				   minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
-    // 				   maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
-    // 				   sizeChunk
-    // 	)  != 0 ){
-    // 	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
-    // 	    return 1;
-    // 	}
-    // }
-
-
-
-
-
-
-    
-
-    //#endif
-#ifdef TESTHMMSIMS
-    //calculating min/max number of sites per sizeChunk
-    int minSegSitesPerChunk;
-    int maxSegSitesPerChunk;
-    if(sizeChunk == 1000000){
-	//those parameters are defined in the header, they correspond to the lowest possible h in a non-ROH region
-	//and the highest
-	minSegSitesPerChunk = minSegSitesPer1M;	
-	maxSegSitesPerChunk = maxSegSitesPer1M;
-    }else{
-	minSegSitesPerChunk = int( (double(minSegSitesPer1M)/double(1000000))*double(sizeChunk) );
-	maxSegSitesPerChunk = int( (double(maxSegSitesPer1M)/double(1000000))*double(sizeChunk) );
-    }
-    
-    Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
-    
-    cerr<<"Begin running HMM"<<endl;
-    cerr<<"generating a random set"<<endl;
-    vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
-
-    
-    vector<emissionUndef>  eTestUndef;
-    cerr<<"done"<<endl;
-    //TODO add multiple bootstraps
-    //- generate a number between hLower and hUpper
-    // or modified probEmmission to reflect the uncertainty
-    vector<long double> emittedH;
-    
-    //TODO add a way to avoid missing data,
-    //in the log-likelihood computation for missing data and chr breaks
-    //for(unsigned int hWindow=0;hWindow<heteroEstResults.size();hWindow++){
-    
-    // for(unsigned int hWindow=0;hWindow<250;hWindow++){
-    // 	// if(dataToWrite->hetEstResults.hasConverged){
-    // 	//     emittedH.push_back( heteroEstResults[i].h );
-    // 	// }
-    // }
-    long double uncertainty = 0.000000000001;
-    //                        0.00072
-    //                        0.00005
-    //                        0.00001
-    //long double uncertainty = 0.00001000;
-    for(unsigned int i=0;i<eTest.size();i++){
-
-	emittedH.push_back( eTest[i].p );
-	emissionUndef e;
-	e.hlow     = eTest[i].p - uncertainty;
-	if(e.hlow < 0)
-	    e.hlow=0.0;
-	e.hhigh    = eTest[i].p + uncertainty;
-	
-	e.undef    = false;
-	e.chrBreak = false;
-	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<"\t"<<e.hlow<<" "<<e.hhigh<<" "<<e.undef<<" "<<e.chrBreak <<endl;	
-	eTestUndef.push_back( e );
-    }
-
-    
-    cerr<<"ok"<<endl;
-    //BEGIN MCMC chain
-    //init to random settings
-    long double partition= (long double)(stepHMM);
-    int accept=0;
-    long double x_i    ;
-    long double x_i_1  ;
-    
-    //het rate
-    //int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
-    int sitesPer1M     = 1000;// 1000 sites per million
-    long double h_i    = double(       sitesPer1M )/double(1000000);
-    long double h_i_1;
-
-    long double hlower = double( minSegSitesPer1M )/double(1000000);
-    long double hupper = double( maxSegSitesPer1M )/double(1000000);
-    
-    //transition rate
-    // long double pTlowerFirstHalf  =    numeric_limits<double>::epsilon();//TODO put back 0.5 
-    // long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
-    long double pTlowerFirstHalf  =    numeric_limits<double>::min();//TODO put back 0.5 
-    long double pTlowerSecondHalf =    numeric_limits<double>::min();
-	
-    long double pTlower = pTlowerFirstHalf;	
-    //long double pTupper = 1.0 - numeric_limits<double>::epsilon();
-    long double pTupper = 1.0 - numeric_limits<double>::min();
-
-    long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
-    long double pT_i_1;
-    //long double pTlower =       numeric_limits<double>::epsilon();
-        
-    random_device rd;
-    default_random_engine dre (rd());
-    //int maxChains = 100000;
-    //int maxChains   =  50000;
-    //chain 0
-
-    hmm.setHetRateForNonROH(h_i);
-    hmm.setTransprob(pT_i);
-    //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
-    x_i    =  forwardProbUncertaintyMissing(&hmm, eTestUndef , sizeChunk);
-    cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
-    for(int chain=1;chain<=maxChains;chain++){
-
-	//computing new state
-	normal_distribution<long double> distribution_h(h_i,(hupper-hlower)/partition  );
-	h_i_1      = distribution_h(dre);
-
-	if(h_i_1 <= hlower     ||  h_i_1 >= hupper     ){
-	    h_i_1      = h_i;
-	}
-
-
-	normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
-	pT_i_1      = distribution_pT(dre);
-
-	if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
-	    pT_i_1      = pT_i;
-	}
-       
-	hmm.setHetRateForNonROH(h_i_1);
-	hmm.setTransprob(pT_i_1);
-
-	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
-	x_i_1=forwardProbUncertaintyMissing(&hmm, eTestUndef , sizeChunk);
-
-	if(chain>(maxChains/4)){
-	    pTlower = pTlowerSecondHalf;
-	}
-
-	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
-	if( (long double)(randomProb()) < acceptance){
-	    h_i           =  h_i_1;
-	    pT_i          =  pT_i_1;
-	    x_i           =  x_i_1;
-	    accept++;
-	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
-	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
-	}else{
-	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
-	}
-	//chain++;
-	//sleep(0.1);
-    }
-cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
-
-	
-    //cerr<<"Baum Welch"<<endl;
-    //baum_welch(&hmm,&emittedH);
-	
-    cerr<<"HMM done"<<endl;
-#endif
-
     
     //////////////////////////////////
     //                              //
@@ -4718,6 +4551,11 @@ cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<e
     //                              //
     //////////////////////////////////
 
+
+
+
+    //BEGIN CLEANUP and SHUTDOWN
+    
     delete cov2ProbSite;
     
     cerr<<"ROHan finished succesfully"<<endl;
@@ -4730,6 +4568,161 @@ cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<e
 
 
 
+
+
+    
+
+//     //#endif
+// #ifdef TESTHMMSIMS
+//     //calculating min/max number of sites per sizeChunk
+//     int minSegSitesPerChunk;
+//     int maxSegSitesPerChunk;
+//     if(sizeChunk == 1000000){
+// 	//those parameters are defined in the header, they correspond to the lowest possible h in a non-ROH region
+// 	//and the highest
+// 	minSegSitesPerChunk = minSegSitesPer1M;	
+// 	maxSegSitesPerChunk = maxSegSitesPer1M;
+//     }else{
+// 	minSegSitesPerChunk = int( (double(minSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+// 	maxSegSitesPerChunk = int( (double(maxSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+//     }
+    
+//     Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
+    
+//     cerr<<"Begin running HMM"<<endl;
+//     cerr<<"generating a random set"<<endl;
+//     vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
+
+    
+//     vector<emissionUndef>  eTestUndef;
+//     cerr<<"done"<<endl;
+//     //TODO add multiple bootstraps
+//     //- generate a number between hLower and hUpper
+//     // or modified probEmmission to reflect the uncertainty
+//     vector<long double> emittedH;
+    
+//     //TODO add a way to avoid missing data,
+//     //in the log-likelihood computation for missing data and chr breaks
+//     //for(unsigned int hWindow=0;hWindow<heteroEstResults.size();hWindow++){
+    
+//     // for(unsigned int hWindow=0;hWindow<250;hWindow++){
+//     // 	// if(dataToWrite->hetEstResults.hasConverged){
+//     // 	//     emittedH.push_back( heteroEstResults[i].h );
+//     // 	// }
+//     // }
+//     long double uncertainty = 0.000000000001;
+//     //                        0.00072
+//     //                        0.00005
+//     //                        0.00001
+//     //long double uncertainty = 0.00001000;
+//     for(unsigned int i=0;i<eTest.size();i++){
+
+// 	emittedH.push_back( eTest[i].p );
+// 	emissionUndef e;
+// 	e.hlow     = eTest[i].p - uncertainty;
+// 	if(e.hlow < 0)
+// 	    e.hlow=0.0;
+// 	e.hhigh    = eTest[i].p + uncertainty;
+	
+// 	e.undef    = false;
+// 	e.chrBreak = false;
+// 	cout<<i<<"\t"<<eTest[i].idx<<"\t"<<eTest[i].p<<"\t"<<e.hlow<<" "<<e.hhigh<<" "<<e.undef<<" "<<e.chrBreak <<endl;	
+// 	eTestUndef.push_back( e );
+//     }
+
+    
+//     cerr<<"ok"<<endl;
+//     //BEGIN MCMC chain
+//     //init to random settings
+//     long double partition= (long double)(stepHMM);
+//     int accept=0;
+//     long double x_i    ;
+//     long double x_i_1  ;
+    
+//     //het rate
+//     //int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
+//     int sitesPer1M     = 1000;// 1000 sites per million
+//     long double h_i    = double(       sitesPer1M )/double(1000000);
+//     long double h_i_1;
+
+//     long double hlower = double( minSegSitesPer1M )/double(1000000);
+//     long double hupper = double( maxSegSitesPer1M )/double(1000000);
+    
+//     //transition rate
+//     // long double pTlowerFirstHalf  =    numeric_limits<double>::epsilon();//TODO put back 0.5 
+//     // long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+//     long double pTlowerFirstHalf  =    numeric_limits<double>::min();//TODO put back 0.5 
+//     long double pTlowerSecondHalf =    numeric_limits<double>::min();
+	
+//     long double pTlower = pTlowerFirstHalf;	
+//     //long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+//     long double pTupper = 1.0 - numeric_limits<double>::min();
+
+//     long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
+//     long double pT_i_1;
+//     //long double pTlower =       numeric_limits<double>::epsilon();
+        
+//     random_device rd;
+//     default_random_engine dre (rd());
+//     //int maxChains = 100000;
+//     //int maxChains   =  50000;
+//     //chain 0
+
+//     hmm.setHetRateForNonROH(h_i);
+//     hmm.setTransprob(pT_i);
+//     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
+//     x_i    =  forwardProbUncertaintyMissing(&hmm, eTestUndef , sizeChunk);
+//     cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;    
+//     for(int chain=1;chain<=maxChains;chain++){
+
+// 	//computing new state
+// 	normal_distribution<long double> distribution_h(h_i,(hupper-hlower)/partition  );
+// 	h_i_1      = distribution_h(dre);
+
+// 	if(h_i_1 <= hlower     ||  h_i_1 >= hupper     ){
+// 	    h_i_1      = h_i;
+// 	}
+
+
+// 	normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
+// 	pT_i_1      = distribution_pT(dre);
+
+// 	if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
+// 	    pT_i_1      = pT_i;
+// 	}
+       
+// 	hmm.setHetRateForNonROH(h_i_1);
+// 	hmm.setTransprob(pT_i_1);
+
+// 	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
+// 	x_i_1=forwardProbUncertaintyMissing(&hmm, eTestUndef , sizeChunk);
+
+// 	if(chain>(maxChains/4)){
+// 	    pTlower = pTlowerSecondHalf;
+// 	}
+
+// 	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
+// 	if( (long double)(randomProb()) < acceptance){
+// 	    h_i           =  h_i_1;
+// 	    pT_i          =  pT_i_1;
+// 	    x_i           =  x_i_1;
+// 	    accept++;
+// 	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+// 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+// 	}else{
+// 	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+// 	}
+// 	//chain++;
+// 	//sleep(0.1);
+//     }
+// cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+
+	
+//     //cerr<<"Baum Welch"<<endl;
+//     //baum_welch(&hmm,&emittedH);
+	
+//     cerr<<"HMM done"<<endl;
+// #endif
 
 
 
