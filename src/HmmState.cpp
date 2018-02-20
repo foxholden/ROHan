@@ -13,12 +13,12 @@ HmmState::HmmState(int idx_,long double h_,int minSegSitesPerChunk_,int maxSegSi
     rng  = gsl_rng_alloc (gsl_rng_taus);
     gsl_rng_set(rng, time(NULL));
     idx = idx_;
-    probablitiesForEmission = new vector<long double> ();
+    probabilitiesForEmission = new vector<long double> ();
 
     for(unsigned int mutations=0;mutations<=( (unsigned int)maxSegSitesPerChunk);mutations++){ //unsigned int total) const{
 	long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
 	//cout<<mutations<<"\t"<<probMut<<endl;
-	probablitiesForEmission->push_back( probMut );
+	probabilitiesForEmission->push_back( probMut );
     }
     // double noMut=gsl_ran_geometric_pdf  (1, rateGeom);
     // cout<<"no mut="<<noMut<<" "<<(1-noMut)<<" "<<rateGeom<<endl;
@@ -42,12 +42,12 @@ HmmState::HmmState(const HmmState & other){
     maxSegSitesPerChunk = other.maxSegSitesPerChunk;
     sizeChunk           = other.sizeChunk;
 
-    delete probablitiesForEmission;
-    probablitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0);
+    delete probabilitiesForEmission;
+    probabilitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0);
     
     for(unsigned int mutations=0;mutations<=( (unsigned int)maxSegSitesPerChunk);mutations++){ //unsigned int total) const{
 	long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
-	probablitiesForEmission->at(mutations) = probMut ;
+	probabilitiesForEmission->at(mutations) = probMut ;
     }
 
     rng  = gsl_rng_alloc (gsl_rng_taus);
@@ -56,7 +56,7 @@ HmmState::HmmState(const HmmState & other){
 
 HmmState::~HmmState(){
     gsl_rng_free(rng);
-    delete probablitiesForEmission;
+    delete probabilitiesForEmission;
 }
 
 void HmmState::setSecond(HmmState * second_){
@@ -91,7 +91,7 @@ long double HmmState::probEmission(     const int mutations,                    
     }
 
     
-    long double toReturn = probablitiesForEmission->at( mutations );
+    long double toReturn = probabilitiesForEmission->at( mutations );
     // cerr<<h<<"\t"<<mutations<<"\t"<<normalVal<<"\t"<<toReturn<<endl;
     // if(normalVal != toReturn){
     // 	exit(1);
@@ -126,26 +126,30 @@ long double HmmState::probEmissionRange(const int mutationsMin,const int mutatio
 	mutationsMax_ = mutationsMin+1;
     }
 
-    if(int(mutationsMax_) > maxSegSitesPerChunk ){
-	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax_<<","<<total<<") is higher than the defined minimum "<<maxSegSitesPerChunk<<endl;
-	exit(1);	
-    }
+    // if(int(mutationsMax_) > maxSegSitesPerChunk ){
+    // 	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax_<<","<<total<<") is higher than the defined minimum "<<maxSegSitesPerChunk<<endl;
+    // 	exit(1);	
+    // }
 
     long double sumPFE=0.0;
     for(int m=mutationsMin;m<=mutationsMax_;m++){
 	int m_  = m;
-	if(m_ <0)
+	if(m_ < 0)
 	    m_ = 0;//went under the limit, set to zero
-	sumPFE += probablitiesForEmission->at( m_ );
+
+	if(m_ > maxSegSitesPerChunk)
+	    m_ = maxSegSitesPerChunk;//went over the limit, set to max
+
+	sumPFE += probabilitiesForEmission->at( m_ );
     }
     
     //if( (sumPFE / (mutationsMax-mutationsMin) ) == 1){
-    //cerr<<endl<<"probablitiesForEmission("<<h<<","<<idx<<") sumPFE = "<<sumPFE<<" "<<mutationsMin<<" "<<mutationsMax<<" "<<(mutationsMax-mutationsMin)<<" return="<<(sumPFE / (mutationsMax-mutationsMin) )<<endl;
+    //cerr<<endl<<"probabilitiesForEmission("<<h<<","<<idx<<") sumPFE = "<<sumPFE<<" "<<mutationsMin<<" "<<mutationsMax<<" "<<(mutationsMax-mutationsMin)<<" return="<<(sumPFE / (mutationsMax-mutationsMin) )<<endl;
     // 	exit(1);
     // }
     //to test
     return (sumPFE / (mutationsMax_-mutationsMin) );
-    //return probablitiesForEmission->at( (mutationsMax-mutationsMin)/2);
+    //return probabilitiesForEmission->at( (mutationsMax-mutationsMin)/2);
 }
 
 unsigned int HmmState::randomEmission(int total) const{
@@ -192,13 +196,15 @@ void HmmState::setH(long double newH){
     theta    = h/(1-h); //h = theta/theta+1
     rateGeom = 1/(theta+1); //rate of geom
 
-    //need to recompute the probablitiesForEmission
-    delete probablitiesForEmission;
-    probablitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0.0);
+    //need to recompute the probabilitiesForEmission
+    delete probabilitiesForEmission;
+    probabilitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0.0);
     
-    for(unsigned int mutations=minSegSitesPerChunk;mutations<=( (unsigned int)maxSegSitesPerChunk);mutations++){ //unsigned int total) const{
+    for(unsigned int mutations=0;
+	mutations<=( (unsigned int)maxSegSitesPerChunk);
+	mutations++){ //unsigned int total) const{
 	long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
-	probablitiesForEmission->at(mutations) = probMut;
+	probabilitiesForEmission->at(mutations) = probMut;
     }
 
 }

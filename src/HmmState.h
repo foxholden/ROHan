@@ -27,7 +27,7 @@ private:
     int maxSegSitesPerChunk;
     int sizeChunk;
 
-    vector<long double> * probablitiesForEmission;
+    vector<long double> * probabilitiesForEmission;
     HmmState * second;
     gsl_rng * rng;
     int idx;

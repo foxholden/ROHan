@@ -91,7 +91,7 @@ inline long double forwardProb (Hmm * hmm, const vector<long double> & observed,
     vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
     for (int state = 0; state < nStates; state++) { //
-	cerr<<"state0 "<<observed[0]<<" "<<sizeChunk<<endl;
+
 	f[state][0] =
 	    logRobust( hmm->startingState[state]) +                                                                //prob of starting a state	    
 	    logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) ); //emitting observed[0] by state
@@ -113,7 +113,7 @@ inline long double forwardProb (Hmm * hmm, const vector<long double> & observed,
 	    }//end each previous state
 
 	    //logsum contains the sum of all probs from every previous state
-	    cerr<<"state"<<k<<" "<<observed[k]<<" "<<sizeChunk<<endl;
+	    
 	    f[state][k] =
 		logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) +  //emission probability by state
 		logsum;                                                                                                  //sum of all probs for every previous state	    
@@ -150,14 +150,18 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
     vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
     for (int state = 0; state < nStates; state++) { //
+
 	if(observed[state].undef){ //if undefined
 	    f[state][0] =
 		logRobust( hmm->startingState[state]) ;                                                                //prob of starting a state
 	}else{
+	    cerr<<"state "<<observed[0].hlow<<" "<<observed[0].hhigh<<" "<<sizeChunk<<endl;
 	    f[state][0] =
 		logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
 		/* logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[0].plow+observed[0].phigh)/2.0 *sizeChunk), */
 		/* 					       sizeChunk)	); //emitting observed[0] by state */
+		
+
 
 		logRobust(hmm->hmmstates[state]->probEmissionRange( (int)(observed[0].hlow *sizeChunk),
 								    (int)(observed[0].hhigh*sizeChunk),
@@ -179,6 +183,7 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 	    long double logsumNotrans = -1.0*numeric_limits<long double>::infinity();
 	    // double p;
 	    // int dmax=-1;
+	    cerr<<"state"<<k<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" "<<sizeChunk<<endl;
 	    long double p_e = hmm->hmmstates[state]->probEmissionRange( (int)(observed[k].hlow *sizeChunk)  ,
 									(int)(observed[k].hhigh*sizeChunk)  ,
 									sizeChunk);
