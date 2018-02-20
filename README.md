@@ -28,13 +28,13 @@ ROHan aims at:
 Downloading:
 ----------------------
 
-Go to https://github.com/grenaud/glactools and either:
+Go to https://github.com/grenaud/rohan and either:
 
 1) Download the ZIP 
 
 or
 
-2) Do a "git clone --depth 1 https://github.com/grenaud/glactools.git"
+2) Do a "git clone --depth 1 https://github.com/grenaud/rohan.git"
 
 Installation
 ----------------------
@@ -55,7 +55,7 @@ For MacOS, if you have Homebrew (https://brew.sh/) installed:
 
 2) make sure you have gcc that supports -std=c++11, gcc version 4.7 or above. Type "gcc -v" and check the version. For both Ubuntu and MacOS, 
 
-3) As the makefile uses "git clone" to download subpackages, please make sure that the computer on which you are installing glactools has access to the internet. Once done, simply type :
+3) As the makefile uses "git clone" to download subpackages, please make sure that the computer on which you are installing ROHan has access to the internet. Once done, simply type :
      cd ROHan
      make
 
