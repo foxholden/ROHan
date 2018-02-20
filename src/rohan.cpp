@@ -7,7 +7,7 @@
 
 //TODO
 
-
+// problem with probEmission()
 // does the HMM underestimate?
 // global estimate
 
@@ -2030,7 +2030,7 @@ public:
 	}
 
 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-
+	    //cerr<<i<<" "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
 	    
 	    if( pileupData.PileupAlignments[i].IsCurrentDeletion   ||
 	    	pileupData.PileupAlignments[i].IsNextInsertion     ||
@@ -2762,7 +2762,7 @@ void *mainCoverageComputationThread(void * argc){
 	    rg="NA";
 	}
 
-
+	
 
 	if(rg2info.find(rg) == rg2info.end()){
 	    rgInfo toadd;
@@ -3046,7 +3046,8 @@ int main (int argc, char *argv[]) {
     string bedFile;
 
     string autosomeFile;
-
+    bool ignoreExistingRGINFO=false;
+    
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
@@ -3064,10 +3065,11 @@ int main (int argc, char *argv[]) {
 	
 	"\n\tI/O options:\n"+
 	"\t\t"+"-o"+","+"--out"      + "\t\t"     + "[out prefix]" +"\t\t"+"Output prefix  (default: none)"+"\n"+
-	"\t\t"+""  +"" +"--name"     + "\t\t\t"   + "[name]"    +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
-	//"\t\t"+""  +""+"--vcf"    + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
+	"\t\t"+""  +"" +"--name"     + "\t\t\t"   + "[name]"       +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
+	//"\t\t"+""  +""+"--vcf"     + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
 	//"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
-	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""        +"\t\t\t"+"Print extensive info about the heterozygosity estimate (default: "+booleanAsString(verboseHETest)+")"+"\n"+  
+	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""             +"\t\t\t"+"Print extensive info about the heterozygosity estimate (default: "+booleanAsString(verboseHETest)+")"+"\n"+  
+	//"\t\t"+"-f"+","+""           +"\t\t"      + ""             +"\t\t\t"+"Overwrite any .rginfo.gz (default: "+booleanAsString(ignoreExistingRGINFO)+")"+"\n"+  
 	
 			      
 	"\n\tComputation options:\n"+	
@@ -3153,6 +3155,11 @@ int main (int argc, char *argv[]) {
 	if( (string(argv[i]) == "-v") || 
 	    (string(argv[i]) == "--verbose") ){
 	    verboseHETest=true;
+            continue;
+	}
+	
+	if( (string(argv[i]) == "-f") ){
+	    ignoreExistingRGINFO=true;
             continue;
 	}
 
@@ -3428,6 +3435,22 @@ int main (int argc, char *argv[]) {
 
     //    return 1;
 
+
+
+
+
+
+
+
+
+
+
+
+
+    /////////////////////////////
+    // BEGIN  Compute coverage //
+    /////////////////////////////
+    
     cerr<<"Computing average coverage.."<<endl;
 
     rc=0;
@@ -3507,14 +3530,10 @@ int main (int argc, char *argv[]) {
     // vector<GenoResults *> vectorGenoResults;
 
 
-
-    if( ! isFile(outFilePrefix+".rginfo.gz") ){
+    if( ignoreExistingRGINFO || (!isFile(outFilePrefix+".rginfo.gz")) ){
 
 	// if(!genoFileAsInputFlag){
 
-	/////////////////////////////
-	// BEGIN  Compute coverage //
-	/////////////////////////////
 	int bpToComputeCoverage = 10000000;
 	int genomicRegionsToUse = bpToComputeCoverage/bpToExtract;
 	if( genomicRegionsToUse > int(queueDataToprocess.size())){
@@ -3525,7 +3544,8 @@ int main (int argc, char *argv[]) {
 	//TODO to renable
 	//queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
 	queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
-
+	unsigned int queueDataForCoverageOrigsize = queueDataForCoverage.size();
+	
 
 	pthread_mutex_init(&mutexQueueToRead,   NULL);
 	pthread_mutex_init(&mutexQueueToWrite,  NULL);
@@ -3537,20 +3557,30 @@ int main (int argc, char *argv[]) {
 	    checkResults("pthread_create()\n", rc);
 	}
 
-	cerr<<"Creating threads for coverage calculation, need to process="<<queueDataForCoverage.size()<<" out of a total of "<<queueDataToprocess.size()<<endl;
-
+	if(verboseHETest){	    
+	    cerr<<"Creating threads for coverage calculation, need to process="<<queueDataForCoverage.size()<<" out of a total of "<<queueDataToprocess.size()<<endl;
+	}
 
 	while(queueDataForCoverage.size()!=0){
-	    cerr<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataToprocess.size()<<endl;
+	    if(verboseHETest){	    
+		cerr<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataForCoverageOrigsize<<endl;
+	    }else{
+		printprogressBarCerr( float(queueDataForCoverageOrigsize- queueDataForCoverage.size() ) / float(queueDataForCoverageOrigsize) );
+	    }
 	    sleep(timeThreadSleep);
 	}
-    
+	printprogressBarCerr( float(queueDataForCoverageOrigsize- queueDataForCoverage.size() ) / float(queueDataForCoverageOrigsize) );//print 100%
+	
 	//waiting for threads to finish
 	for (int i=0; i <numberOfThreads; ++i) {	
 	    rc = pthread_join(threadCov[i], NULL);
 	    checkResults("pthread_join()\n", rc);
 	}
-	cerr<<"Coverage computations are done"<<endl;
+
+	if(!verboseHETest)
+	    cerr<<endl;//flush the progress bar
+	
+	cerr<<"..done"<<endl;
 
 	pthread_mutex_destroy(&mutexRank);
 	pthread_mutex_destroy(&mutexQueueToRead);
@@ -3558,8 +3588,13 @@ int main (int argc, char *argv[]) {
 	pthread_mutex_destroy(&mutexCERR);
 
 	//    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
+	
 	rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
-	cerr<<"Final computation:" <<" bases="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda coverrage="<<rateForPoissonCov<<endl;
+	if(totalSitesSum ==0 ){
+	    cerr<<"No data was found for the entire BAM file or the regions you defined, please verify the BAM file"<<endl;
+	    return 1;
+	}
+	cerr<<"Final computation:" <<" bases="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda coverage="<<rateForPoissonCov<<endl;
 	//pthread_exit(NULL);	
 	//	cerr<<"Lambda coverage: " <<rateForPoissonCov<<endl;	
 	stringinfo= stringify(rateForPoissonCov)+"\n";       
@@ -3895,8 +3930,12 @@ int main (int argc, char *argv[]) {
     //#ifdef LATER
     //cerr<<"test wroteEverything="<<wroteEverything<<endl;
    cerr<<""<<numberOfThreads<<" thread(s) are running in the background, results will be written at it becomes available"<<endl;
+   
+		
    cerr<<"Writing genotype data to:        "<<outFilePrefix+".vcf.gz" << endl;
    cerr<<"Writing local het. estimates to: "<<outFilePrefix+".hEst.gz"<< endl;
+   if(!verboseHETest)
+       printprogressBarCerr( 0 );
 
    //outFilePrefix+".hEst.gz", IBamIODevice::WriteOnly);
    

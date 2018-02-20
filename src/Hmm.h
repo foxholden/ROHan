@@ -91,8 +91,9 @@ inline long double forwardProb (Hmm * hmm, const vector<long double> & observed,
     vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
     for (int state = 0; state < nStates; state++) { //
+	cerr<<"state0 "<<observed[0]<<" "<<sizeChunk<<endl;
 	f[state][0] =
-	    logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
+	    logRobust( hmm->startingState[state]) +                                                                //prob of starting a state	    
 	    logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[0]*sizeChunk)  , sizeChunk) ); //emitting observed[0] by state
     }
 
@@ -112,7 +113,7 @@ inline long double forwardProb (Hmm * hmm, const vector<long double> & observed,
 	    }//end each previous state
 
 	    //logsum contains the sum of all probs from every previous state
-	    
+	    cerr<<"state"<<k<<" "<<observed[k]<<" "<<sizeChunk<<endl;
 	    f[state][k] =
 		logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) +  //emission probability by state
 		logsum;                                                                                                  //sum of all probs for every previous state	    
