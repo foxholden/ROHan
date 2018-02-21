@@ -130,17 +130,21 @@ long double HmmState::probEmissionRange(const int mutationsMin,const int mutatio
     // 	cerr<<"HmmState::probEmissionRange("<<mutationsMin<<","<<mutationsMax_<<","<<total<<") is higher than the defined minimum "<<maxSegSitesPerChunk<<endl;
     // 	exit(1);	
     // }
-
     long double sumPFE=0.0;
     for(int m=mutationsMin;m<=mutationsMax_;m++){
-	int m_  = m;
-	if(m_ < 0)
-	    m_ = 0;//went under the limit, set to zero
+        //int m_  = m;
+        if(m < 0){
+            sumPFE += probabilitiesForEmission->at( 0 )*(-1.0*m);
+            m  = 0;
+            continue;
+        }
 
-	if(m_ > maxSegSitesPerChunk)
-	    m_ = maxSegSitesPerChunk;//went over the limit, set to max
-
-	sumPFE += probabilitiesForEmission->at( m_ );
+        if(m > maxSegSitesPerChunk){
+            //m = maxSegSitesPerChunk;//went over the limit, set to max
+            sumPFE += probabilitiesForEmission->at( maxSegSitesPerChunk )*(m-maxSegSitesPerChunk);
+            break;
+        }
+        sumPFE += probabilitiesForEmission->at( m );
     }
     
     //if( (sumPFE / (mutationsMax-mutationsMin) ) == 1){

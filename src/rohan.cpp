@@ -3471,6 +3471,7 @@ int main (int argc, char *argv[]) {
 	v = rw.getGenomicWindows(bpToExtract,0);
     }
 
+    
     if( !autosomeFile.empty()){
 
 	vector<GenomicRange> newV;
@@ -4147,10 +4148,10 @@ int main (int argc, char *argv[]) {
 
 
 	    	emissionUndef hetResToAdd;
-		hetResToAdd.rangeGen.setChrName(                                fields[0]  );
+		hetResToAdd.rangeGen.setChrName(                                fields[0]    );
 		hetResToAdd.rangeGen.setStartCoord(  destringify<unsigned int>( fields[1])+1 );
-		hetResToAdd.rangeGen.setEndCoord(    destringify<unsigned int>( fields[2]) );
-		unsigned int sitesDefinedLine      = destringify<unsigned int>( fields[3]);
+		hetResToAdd.rangeGen.setEndCoord(    destringify<unsigned int>( fields[2])   );
+		unsigned int sitesDefinedLine      = destringify<unsigned int>( fields[3]    );
 		
 		if(     previousChrWritten != fields[0]){
 		    if(previousChrWritten == "###"){//first chr
@@ -4165,10 +4166,10 @@ int main (int argc, char *argv[]) {
 	    
 		if(fields[4] != "NA"){
 		    hetResToAdd.undef  = false;		
-		    long double h      = destringify<long double>( fields[4]);
-		    long double errb   = destringify<long double>( fields[5]);
-		    long double hLow   = destringify<long double>( fields[6]);
-		    long double hHigh  = destringify<long double>( fields[7]);
+		    long double h      = destringify<long double>( fields[4] );
+		    long double errb   = destringify<long double>( fields[5] );
+		    long double hLow   = destringify<long double>( fields[6] );
+		    long double hHigh  = destringify<long double>( fields[7] );
 		    
 		    hetResToAdd.h      = h;
 		    hetResToAdd.errb   = errb;
@@ -4179,19 +4180,18 @@ int main (int argc, char *argv[]) {
 		    
 		    hetResToAdd.hlow   = hLow;
 		    hetResToAdd.hhigh  = hHigh;
-		    
-		    
+		    		    
 		    // if(h<0)      h     = 0;
 		    // if(hLow<0)   hLow  = 0;
-		    // if(hHigh<0)  hHigh = 0;
-		    
+		    // if(hHigh<0)  hHigh = 0;		    
 		}else{
 		    hetResToAdd.undef  = true;		
 		}
-
+		
 		hetResToAdd.weight = ( (long double)(sitesDefinedLine) ) / ( (long double)(sizeChunk) );
-		//cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.plow<<"\t"<<hetResToAdd.phigh<<endl;
-
+		
+		//cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.h<<"\t"<<hetResToAdd.hlow<<"\t"<<hetResToAdd.hhigh<<"\t"<<hetResToAdd.weight<<endl;
+		
 		heteroEstResults.push_back(hetResToAdd);
 	    }           
 	    hEstFileSt.close();
@@ -4202,8 +4202,8 @@ int main (int argc, char *argv[]) {
 	cerr<<"..done"<<endl;
 	
     } //end if skipToHMM
-    //return 1;
-
+    // return 1;
+    
 	
 
     cerr<<"Creating HMM..";
@@ -4276,8 +4276,12 @@ int main (int argc, char *argv[]) {
     hmm.setHetRateForNonROH(h_i);
     hmm.setTransprob(pT_i);
     cerr<<".";
+    // for(unsigned int i=0;i<heteroEstResults.size();i++){
+    // 	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
+    // }
+    // return 1;
     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
-    fbreturnVal  tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    fbreturnVal  tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
     x_i  = tmpResFWD.llik;
     // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
     // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
@@ -4312,7 +4316,8 @@ int main (int argc, char *argv[]) {
 	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
 	//compute new likelihood
 	//x_i_1=forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
-	tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+	tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
+
 	x_i_1     = tmpResFWD.llik;
 	
 	if(chain>(maxChains/4)){
