@@ -136,6 +136,7 @@ typedef struct {
     long double hlow;
     long double hhigh;
     long double errb;
+    long double weight;// defined sites/sizechunk
     
     bool undef;     //0 = defined,    1 = undefined
     bool chrBreak;  //0 = continuous, 1 = break
@@ -155,7 +156,7 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 	    f[state][0] =
 		logRobust( hmm->startingState[state]) ;                                                                //prob of starting a state
 	}else{
-	    cerr<<"state "<<observed[0].hlow<<" "<<observed[0].hhigh<<" "<<sizeChunk<<endl;
+	    //cerr<<"state "<<observed[0].hlow<<" "<<observed[0].hhigh<<" "<<sizeChunk<<endl;
 	    f[state][0] =
 		logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
 		/* logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[0].plow+observed[0].phigh)/2.0 *sizeChunk), */
@@ -167,6 +168,8 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 								    (int)(observed[0].hhigh*sizeChunk),
 								    sizeChunk)	); //emitting observed[0] by state
 	}
+
+	f[state][0] =     f[state][0] * observed[0].weight;//weight*log(p)
 	
 #ifdef DEBUGFWD
 	if(verbose)
@@ -183,7 +186,7 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 	    long double logsumNotrans = -1.0*numeric_limits<long double>::infinity();
 	    // double p;
 	    // int dmax=-1;
-	    cerr<<"state"<<k<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" "<<sizeChunk<<endl;
+	    //cerr<<"state"<<k<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" "<<sizeChunk<<endl;
 	    long double p_e = hmm->hmmstates[state]->probEmissionRange( (int)(observed[k].hlow *sizeChunk)  ,
 									(int)(observed[k].hhigh*sizeChunk)  ,
 									sizeChunk);
@@ -214,7 +217,8 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 			logsum;                                                              //sum of all probs for ev
 		}
 	    }
-	    	
+
+	    f[state][k] =     f[state][k] * observed[k].weight;//weight*log(p)
 #ifdef DEBUGFWD
 	    if(verbose)
 		cout<<""<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" undef="<<observed[state].undef<<" chrb="<<observed[k].chrBreak<<endl;
@@ -287,16 +291,19 @@ inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
 	    }//end each next state
 	    
 	    
-	    
+	    //if the next one was a chrBreak
 	    if( observed[k+1].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
 		b[state][k]    =                   logsumNoTransStart; 
 	    }else{
+		//if the next one was undefined
 		if(observed[k+1].undef){
 		    b[state][k] =		   logsumNoTrans;   //forego emission probability just count sum of all probs for every previous state
 		}else{//not undefined and not break
 		    b[state][k] =		   logsum;          //forego emission probability just count sum of all probs for every previous state
 		}
 	    }
+	    
+	    b[state][k] =     b[state][k] * observed[k].weight;
 	    
 #ifdef DEBUGFWD
 	    if(verbose){

@@ -7,7 +7,7 @@
 
 //TODO
 
-// problem with probEmission()
+// check memory leak
 // does the HMM underestimate?
 // global estimate
 
@@ -4012,6 +4012,9 @@ int main (int argc, char *argv[]) {
 		    hetResToAdd.undef  = true;		
 		    strToWrite+="NA\tNA\tNA\tNA\n";
 		}
+		
+		hetResToAdd.weight = ( (long double)(dataToWrite->hetEstResults.sites) ) / ( (long double)(sizeChunk) );
+		
 		heteroEstResults.push_back(hetResToAdd);
 				
 		// cerr<<"writing "<<strToWrite<<endl;
@@ -4147,6 +4150,7 @@ int main (int argc, char *argv[]) {
 		hetResToAdd.rangeGen.setChrName(                                fields[0]  );
 		hetResToAdd.rangeGen.setStartCoord(  destringify<unsigned int>( fields[1])+1 );
 		hetResToAdd.rangeGen.setEndCoord(    destringify<unsigned int>( fields[2]) );
+		unsigned int sitesDefinedLine      = destringify<unsigned int>( fields[3]);
 		
 		if(     previousChrWritten != fields[0]){
 		    if(previousChrWritten == "###"){//first chr
@@ -4185,6 +4189,7 @@ int main (int argc, char *argv[]) {
 		    hetResToAdd.undef  = true;		
 		}
 
+		hetResToAdd.weight = ( (long double)(sitesDefinedLine) ) / ( (long double)(sizeChunk) );
 		//cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.plow<<"\t"<<hetResToAdd.phigh<<endl;
 
 		heteroEstResults.push_back(hetResToAdd);
