@@ -95,6 +95,15 @@ Hmm::~Hmm(){
 	delete hmmstates[n];
     }
 
+    for(int i = 0; i < NBRSTATES; ++i)
+      delete 	trans[i] ;
+    delete trans;
+    
+
+
+    
+
+
 }
 
 

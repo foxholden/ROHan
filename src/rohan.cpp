@@ -7,7 +7,7 @@
 
 //TODO
 
-// check memory leak
+
 // does the HMM underestimate?
 // global estimate
 
@@ -2450,6 +2450,7 @@ void *mainHeteroComputationThread(void * argc){
     
 
 
+    delete currentChunk;    //delete old chunk
 
     queueDataTowrite.push(dataToWrite);
 
@@ -3552,7 +3553,7 @@ int main (int argc, char *argv[]) {
 	pthread_mutex_init(&mutexQueueToWrite,  NULL);
 	pthread_mutex_init(&mutexRank ,         NULL);
 	pthread_mutex_init(&mutexCERR ,         NULL);
-
+	
 	for(int i=0;i<numberOfThreads;i++){
 	    rc = pthread_create(&threadCov[i], NULL, mainCoverageComputationThread, NULL);
 	    checkResults("pthread_create()\n", rc);
