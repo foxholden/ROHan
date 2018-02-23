@@ -100,6 +100,9 @@ long double likeMismatchProb    [MAXBASEQUAL+1];
 long double likeMatchProbMap    [MAXMAPPINGQUAL+1];
 long double likeMismatchProbMap [MAXMAPPINGQUAL+1];
 
+
+long double overestimateFactor [MAXCOV+1];
+
 long double TStoTVratio;
 
 vector< vector<long double> > binomVec (MAXCOV+1,vector<long double>(MAXCOV+1,0)) ;
@@ -381,7 +384,6 @@ void initScores(){
         likeMismatchProbMap[i]        =     powl(10.0,i/-10.0);
     }
 
-
     for(int i=1;i<=MAXCOV;i++){
 	//cout<<i<<endl;
 
@@ -390,6 +392,20 @@ void initScores(){
 	}
 
     }
+
+
+    overestimateFactor[0] = 0.0;
+    overestimateFactor[1] = 1.0;
+
+    for(int i=2;i<=MAXCOV;i++){
+
+	// 2*(1/2^i)=1/2^{i-1} will appear as homoz. So the fraction of het. will be 1-1/2^{i-1}
+	// the underestimate will be by a factor of 1.0/ (  1.0- (1/powl(2.0,i-1))  );
+	
+	overestimateFactor[i] = 1.0/ (  1.0- (1/powl(2.0,i-1))  );
+	cout<<i<<" "<<overestimateFactor[i]<<endl;
+    }
+
 
 #ifdef DEBUGINITSCORES
     cerr<<"qQUAL"<<"\t"<<"likeMatch"<<"\t"<<"likeMismatch"<<"\t"<<"likeMatchProb"<<"\t"<<"likeMismatchProb"<<endl;
@@ -1491,6 +1507,10 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     int maxiterationWithMinHRate = 10;
     double minHRateNonROH = double(minSegSitesPer1M)/double(1000000);
 
+    unsigned int covDist [MAXCOV+1];
+    for(int i=0;i<=MAXCOV;i++){
+	covDist[i] = 0.0;
+    }
     
     while( iterationsGrad<iterationsMax){
 
@@ -1723,6 +1743,11 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 				   pr);
 		//vecPositionResults
 		vecPositionResults->push_back(pr);
+
+		
+		//count cov dist
+		covDist[ piForGenomicWindow->at(p).readsVec.size() ]++;
+		
 	    }
 	    ////////////////////////////////////////////////////
 	    // END GENOTYPING
@@ -1915,6 +1940,22 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	iterationsGrad++;	
     }//end iteration
 
+    
+    unsigned int covDistSum=0.0;
+    for(int i=0;i<=MAXCOV;i++){	
+	covDistSum += covDist[ i ];
+    }
+    
+    long double correctionFactor=0.0;
+    
+    for(int i=0;i<=MAXCOV;i++){
+	correctionFactor += overestimateFactor[i] * (double(covDist[ i ])/double(covDistSum));
+	//cout<<"covDist["<<i<<"] "<<covDist[ i ]<<" overestimateFactor["<<i<<"] "<<overestimateFactor[ i ]<<" "<<correctionFactor<<endl;
+    }
+    // cout<<setprecision(14)<<h<<"\t"<<correctionFactor<<"\t";
+
+    h = h*correctionFactor;
+    cout<<setprecision(14)<<h<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
     hresToReturn.h            = h;
     hresToReturn.hLow         = h-errb;
     hresToReturn.hHigh        = h+errb;
