@@ -1,7 +1,7 @@
 #include "HmmState.h"
 
 
-HmmState::HmmState(int idx_,long double h_,int minSegSitesPerChunk_,int maxSegSitesPerChunk_,int sizeChunk_){
+HmmState::HmmState(int idx_,long double h_,int minSegSitesPerChunk_,int maxSegSitesPerChunk_,int sizeChunk_,unsigned int nrwPerSizeChunk_){
     h        = h_;
     theta    = h/(1-h); //h = theta/theta+1
     rateGeom = 1/(theta+1); //rate of geom
@@ -9,6 +9,7 @@ HmmState::HmmState(int idx_,long double h_,int minSegSitesPerChunk_,int maxSegSi
     minSegSitesPerChunk = minSegSitesPerChunk_;
     maxSegSitesPerChunk = maxSegSitesPerChunk_;
     sizeChunk           = sizeChunk_;
+    nrwPerSizeChunk     = nrwPerSizeChunk_;
 
     rng  = gsl_rng_alloc (gsl_rng_taus);
     gsl_rng_set(rng, time(NULL));
@@ -16,7 +17,10 @@ HmmState::HmmState(int idx_,long double h_,int minSegSitesPerChunk_,int maxSegSi
     probabilitiesForEmission = new vector<long double> ();
 
     for(unsigned int mutations=0;mutations<=( (unsigned int)maxSegSitesPerChunk);mutations++){ //unsigned int total) const{
+	//long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
 	long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
+	//probabilitiesForEmission->at(mutations) = probMut ;
+	
 	//cout<<mutations<<"\t"<<probMut<<endl;
 	probabilitiesForEmission->push_back( probMut );
     }
@@ -157,8 +161,8 @@ long double HmmState::probEmissionRange(const int mutationsMin,const int mutatio
 }
 
 unsigned int HmmState::randomEmission(int total) const{
-
-
+    cerr<<"Recode using negative binomial"<<endl;
+    exit(1);
     //geom
     unsigned int toreturn;
     unsigned int mut=0;
@@ -183,15 +187,19 @@ int HmmState::getIdx() const{
 // }
 
 
-long double HmmState::getH(){
+long double HmmState::getH() const{
     return h;
 }
 
-long double HmmState::getTheta(){
+long double HmmState::getTheta() const{
     return theta;
 }
 
-long double HmmState::getRateGeom(){
+unsigned int HmmState::getNrwPerSizeChunk() const{
+    return nrwPerSizeChunk;
+}
+
+long double HmmState::getRateGeom() const{
     return rateGeom;
 }
 
@@ -200,14 +208,37 @@ void HmmState::setH(long double newH){
     theta    = h/(1-h); //h = theta/theta+1
     rateGeom = 1/(theta+1); //rate of geom
 
+    // delete probabilitiesForEmission;
+    // probabilitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0.0);
+    
+    // for(unsigned int mutations=0;
+    // 	mutations<=( (unsigned int)maxSegSitesPerChunk);
+    // 	mutations++){ //unsigned int total) const{
+    // 	long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
+    // 	probabilitiesForEmission->at(mutations) = probMut;
+    // }
+ 
+}
+
+
+void HmmState::setNrwPerSizeChunk(unsigned int nrwPerSizeChunk_){
+    nrwPerSizeChunk = nrwPerSizeChunk_;
+}
+
+void HmmState::recomputeProbs(){
     //need to recompute the probabilitiesForEmission
     delete probabilitiesForEmission;
     probabilitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0.0);
-    
+
+    long double thetaScale = theta*(1000000/nrwPerSizeChunk);
+
     for(unsigned int mutations=0;
 	mutations<=( (unsigned int)maxSegSitesPerChunk);
 	mutations++){ //unsigned int total) const{
-	long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
+	//long double probMut = gsl_ran_binomial_pdf(mutations,h,sizeChunk);
+	long double probMut = gsl_ran_negative_binomial_pdf( mutations   ,
+							     1/(1+thetaScale),
+							    double(nrwPerSizeChunk)); //gsl_ran_binomial_pdf(mutations,h,sizeChunk);
 	probabilitiesForEmission->at(mutations) = probMut;
     }
 

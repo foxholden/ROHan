@@ -4251,7 +4251,7 @@ int main (int argc, char *argv[]) {
     cerr<<"Creating HMM..";
     //write chains to output
     //bgzipWriterMCMC
-    headerHMMMCMC = "#llik\th\tp\taccepted\tchains\tacptrate\n";
+    headerHMMMCMC = "#llik\th\ts\tp\taccepted\tchains\tacptrate\n";
 
     bgzipWriterMCMC.Open(outFilePrefix+".hmmmcmc.gz", IBamIODevice::WriteOnly);
     if(!bgzipWriterMCMC.IsOpen()){
@@ -4270,7 +4270,7 @@ int main (int argc, char *argv[]) {
 	maxSegSitesPerChunk = int( (double(maxSegSitesPer1M)/double(1000000))*double(sizeChunk) );
     }
     
-    Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
+    Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk,1000);
     
     //cerr<<"Begin running MCMC on HMM"<<endl;
     // cerr<<"generating a random set"<<endl;
@@ -4284,17 +4284,28 @@ int main (int argc, char *argv[]) {
     //init to random settings
     long double partition= (long double)(stepHMM);
     int accept=0;
+
+    //likelihood
     long double x_i    ;
     long double x_i_1  ;
     
     //het rate
     //int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
-    int sitesPer1M     = 1000;// 1000 sites per million
+    int sitesPer1M     = 1000;// 1000 heterozygous sites per million
     long double h_i    = double(       sitesPer1M )/double(1000000);
     long double h_i_1;
 
     long double hlower = double( minSegSitesPer1M )/double(1000000);
     long double hupper = double( maxSegSitesPer1M )/double(1000000);
+
+    //number of non-recombining chunks per window
+    long double s_i    = 100.0; //starting value, there are 100 non-recombining window in sizeChunk
+    long double s_i_1;
+
+    long double slower = 1.0;       // the whole sizeChunk is a non-recombining window
+    long double supper = sizeChunk; // 1 base is a non-recombining window
+    
+
     
     //transition rate
     long double pTlowerFirstHalf  =    0.5;//overestimate the transition probability 
@@ -4306,6 +4317,7 @@ int main (int argc, char *argv[]) {
     long double pTupper = 1.0 - numeric_limits<double>::min();
 
     //generate a random initial probability between pTlower and pTupper
+    //probability of transition
     long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
     long double pT_i_1;
     //long double pTlower =       numeric_limits<double>::epsilon();
@@ -4317,6 +4329,9 @@ int main (int argc, char *argv[]) {
 
     hmm.setHetRateForNonROH(h_i);
     hmm.setTransprob(pT_i);
+    hmm.setNrwPerSizeChunk( (unsigned int)s_i );
+    hmm.recomputeProbs();
+    
     cerr<<".";
     // for(unsigned int i=0;i<heteroEstResults.size();i++){
     // 	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
@@ -4333,7 +4348,10 @@ int main (int argc, char *argv[]) {
     //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
     vector<long double> hvector;
     vector<long double> pvector;
+    vector<long double> svector;
+    
     cerr<<"Begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<" chains"<<endl;
+
     for(int chain=1;chain<=maxChains;chain++){
 
 	//computing new state
@@ -4350,11 +4368,20 @@ int main (int argc, char *argv[]) {
 	    pT_i_1      = pT_i;
 	}
 
+	normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
+	s_i_1      = distribution_s(dre);
+	if(s_i_1 <= slower       ||  s_i_1 >= supper     ){
+	    s_i_1      = s_i;
+	}
+
 
 	//set new model parameters
 	hmm.setHetRateForNonROH(h_i_1);
 	hmm.setTransprob(pT_i_1);
+	hmm.setNrwPerSizeChunk( (unsigned int)s_i_1 );
+	hmm.recomputeProbs();
 
+	
 	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
 	//compute new likelihood
 	//x_i_1=forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
@@ -4369,22 +4396,24 @@ int main (int argc, char *argv[]) {
 	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
 	if( (long double)(randomProb()) < acceptance){
 	    h_i           =  h_i_1;
+	    s_i           =  s_i_1;
 	    pT_i          =  pT_i_1;
 	    x_i           =  x_i_1;
 
 	    if( (chain>=(maxChains*(1.0-fracChainsBurnin)))){
 		hvector.push_back(h_i);
 		pvector.push_back(pT_i);
+		svector.push_back(s_i);
 
-		string strToWrite = stringify( x_i )+"\t"+stringify( h_i )+"\t"+stringify( pT_i )+"\t"+stringify( accept )+"\t"+stringify( chain )+"\t"+stringify( double(accept)/double(chain) )+"\n";
+		string strToWrite = stringify( x_i )+"\t"+stringify( h_i )+"\t"+stringify( s_i )+"\t"+stringify( pT_i )+"\t"+stringify( accept )+"\t"+stringify( chain )+"\t"+stringify( double(accept)/double(chain) )+"\n";
 		bgzipWriterMCMC.Write(strToWrite.c_str(), strToWrite.size());
 	    }
 	    
 	    accept++;
-	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}else{
-	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}
 
 	printprogressBarCerr( float(chain)/float(maxChains) );
@@ -4392,7 +4421,7 @@ int main (int argc, char *argv[]) {
 	//sleep(0.1);
     }
     cerr<<endl;
-    cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+    cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
 
     bgzipWriterMCMC.Close();    
 	
@@ -4403,17 +4432,28 @@ int main (int argc, char *argv[]) {
     //hvector and pvector contain the values
     long double hSum=0.0;
     long double pSum=0.0;
+    long double sSum=0.0;
+    
     long double hAvg=0.0;
     long double pAvg=0.0;
-    long double hMin=1.0;
+    long double sAvg=0.0;
+    
+    long double hMin=1.0;    
+    long double pMin=1.0;    
+    long double sMin=supper+1;
+	
     long double hMax=0.0;
-    long double pMin=1.0;
     long double pMax=0.0;
+    long double sMax=slower-1;
+
+    
 
     
     for(unsigned int i=0;i<hvector.size();i++){
 	hSum += hvector[i];
 	pSum += pvector[i];
+	sSum += svector[i];
+
 	if(hvector[i] < hMin)
 	    hMin = hvector[i] ;
 	if(hvector[i] > hMax)
@@ -4424,10 +4464,16 @@ int main (int argc, char *argv[]) {
 	if(pvector[i] > pMax)
 	    pMax = pvector[i] ;
 	
+	if(svector[i] < sMin)
+	    sMin = svector[i] ;
+	if(svector[i] > sMax)
+	    sMax = svector[i] ;
+	
     }
 
     hAvg = hSum/( (long double)hvector.size() );
     pAvg = pSum/( (long double)pvector.size() );
+    sAvg = sSum/( (long double)svector.size() );
 
 
     //to remove
@@ -4443,7 +4489,10 @@ int main (int argc, char *argv[]) {
     
     hmm.setHetRateForNonROH(hAvg);
     hmm.setTransprob(pAvg);
-	
+    hmm.setNrwPerSizeChunk( (unsigned int)sAvg );
+    hmm.recomputeProbs();
+
+    
     fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
 
     cerr<<"HMM done"<<endl;
@@ -4519,7 +4568,7 @@ int main (int argc, char *argv[]) {
 	}
     }
     //produce plot libharoutFilePrefix+".vcf.gz"u?
-    cerr<<"h est. "<<hAvg<<" hMin "<<hMin<<" hMax "<<hMax<<" p avg. "<<pAvg<<" pMin "<<pMin<<" pMax "<<pMax<<endl;
+    cerr<<"h est. "<<hAvg<<" hMin "<<hMin<<" hMax "<<hMax<<"s "<<sAvg<<" sMin "<<sMin<<" sMax "<<sMax<<" p avg. "<<pAvg<<" pMin "<<pMin<<" pMax "<<pMax<<endl;
     
     // endhmm:
     //write out h estimate
@@ -4622,9 +4671,13 @@ int main (int argc, char *argv[]) {
     if (fileSummary.is_open()){
 
 	fileSummary << "Global heterozygosity rate:\t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;
-	fileSummary << "Segments in ROH:\t"      <<rohSegments    <<"\t"<<100*double(rohSegments)/double(rohSegments+nonrohSegments)<<"\t"<<100*double(rohSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<endl;
-	fileSummary << "Segments in non-ROH:\t"  <<nonrohSegments <<"\t"<<100*double(nonrohSegments)/double(rohSegments+nonrohSegments)<<"\t"<<100*double(nonrohSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<endl;
-	fileSummary << "Segments unclassified:\t"<<unsureSegments <<"\t"<<100*double(unsureSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<endl;
+	
+	fileSummary << "\t" <<"total\tfraction in %"<<endl;
+	fileSummary << "Segments unclassified:\t"<<unsureSegments <<"\t"<<100*double(unsureSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<"%"<<endl;
+	fileSummary << "\t"<<"total\tfraction(defined)\tfraction(total)"<<endl;
+	fileSummary << "Segments in ROH:\t"      <<rohSegments    <<"\t"<<100*double(rohSegments)/double(rohSegments+nonrohSegments)<<"%\t"<<100*double(rohSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<"%"<<endl;
+	fileSummary << "Segments in non-ROH:\t"  <<nonrohSegments <<"\t"<<100*double(nonrohSegments)/double(rohSegments+nonrohSegments)<<"%\t"<<100*double(nonrohSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<"%"<<endl;
+
 	
     }else{
 	cerr << "Unable to print to file "<<filenameSummary<<endl;

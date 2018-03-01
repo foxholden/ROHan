@@ -52,7 +52,7 @@ public:
     long double probStay[NBRSTATES];
     HmmState * hmmstates[NBRSTATES];
 	
-    Hmm(int minSegSitesPerChunk,int maxSegSitesPerChunk,int sizeChunk);
+    Hmm(int minSegSitesPerChunk,int maxSegSitesPerChunk,int sizeChunk,unsigned int nrwPerSizeChunk);
     Hmm(const Hmm & other);
     ~Hmm();
     Hmm & operator= (const Hmm & other);
@@ -60,8 +60,11 @@ public:
     vector<emission> generateStates(unsigned int N,unsigned int total) const;
     int getNumberStates() const;
     long double getTrans(int i,int j) const;
+    //setting for next state
     void setHetRateForNonROH(long double newH);
     void setTransprob(long double newTrans);
+    void setNrwPerSizeChunk(unsigned int nrwPerSizeChunk);
+    void recomputeProbs();
     
     friend ostream& operator<<(ostream& os, const Hmm& hmm);  
 

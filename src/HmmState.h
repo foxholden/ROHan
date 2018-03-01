@@ -22,7 +22,8 @@ private:
     long double h;
     long double theta;
     long double rateGeom;
-
+    unsigned int nrwPerSizeChunk;
+    
     int minSegSitesPerChunk;
     int maxSegSitesPerChunk;
     int sizeChunk;
@@ -33,7 +34,7 @@ private:
     int idx;
     
 public:
-    HmmState(int idx_,long double p_,int minSegSitesPerChunk_,int maxSegSitesPerChunk_,int sizeChunk_);
+    HmmState(int idx_,long double p_,int minSegSitesPerChunk_,int maxSegSitesPerChunk_,int sizeChunk_,unsigned int nrwPerSizeChunk_);
     HmmState(const HmmState & other);
     ~HmmState();
     HmmState & operator= (const HmmState & other);
@@ -49,12 +50,14 @@ public:
     
     unsigned int randomEmission(int total) const;
     int getIdx() const;
-    long double getH();
-    long double getTheta();
-    long double getRateGeom();
-
+    long double getH() const;
+    long double getTheta() const;
+    unsigned int getNrwPerSizeChunk() const;
+    long double getRateGeom() const;
+    
     void setH(long double newH);
-
+    void setNrwPerSizeChunk(unsigned int nrwPerSizeChunk_); //nrw = non-recombining window
+    void recomputeProbs();
     void setSecond(HmmState * second);
 };
 #endif

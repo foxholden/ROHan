@@ -8,13 +8,13 @@
 #include "Hmm.h"
 
 
-Hmm::Hmm(int minSegSitesPerChunk,int maxSegSitesPerChunk,int sizeChunk){
+Hmm::Hmm(int minSegSitesPerChunk,int maxSegSitesPerChunk,int sizeChunk,unsigned int nrwPerSizeChunk){
     //cerr<<"Hmm constr"<<endl;
     for(int n=0;n<NBRSTATES;n++){
 	if(n==0)
-	    hmmstates[n] = new  HmmState (n,0.000000012,minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
+	    hmmstates[n] = new  HmmState (n,0.000000012,minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk,nrwPerSizeChunk);
 	if(n==1)
-	    hmmstates[n] = new  HmmState (n,0.00072    ,minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk);
+	    hmmstates[n] = new  HmmState (n,0.00072    ,minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk,nrwPerSizeChunk);
     }
 
     for(int n=0;n<NBRSTATES;n++){
@@ -149,6 +149,14 @@ long double Hmm::getTrans(int i,int j) const{
 
 void Hmm::setHetRateForNonROH(long double newH){
     hmmstates[1]->setH(newH);
+}
+
+void Hmm::setNrwPerSizeChunk(unsigned int nrwPerSizeChunk){
+    hmmstates[1]->setNrwPerSizeChunk(nrwPerSizeChunk);
+}
+
+void Hmm::recomputeProbs(){
+    hmmstates[1]->recomputeProbs();
 }
 
 void Hmm::setTransprob(long double newTrans){
