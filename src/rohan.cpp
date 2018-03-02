@@ -138,7 +138,7 @@ string fastaIndex;
 
 map<string,rgInfo> rg2info;
 bool specifiedDeam=false;
-bool verboseHETest=false;
+bool verbose=false;
 
 // 1D: mapping quality 
 // 2D: length of fragment
@@ -1435,7 +1435,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     rc = pthread_mutex_lock(&mutexCERR);
     checkResults("pthread_mutex_lock()\n", rc);
 
-    if(verboseHETest){
+    if(verbose){
 	cerr<<"Thread#"<<threadID<<" starting pre-computations size of window: "<<thousandSeparator(piForGenomicWindow->size())<<endl;
     }
     
@@ -1469,7 +1469,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     rc = pthread_mutex_lock(&mutexCERR);
     checkResults("pthread_mutex_lock()\n", rc);
 
-    if(verboseHETest){
+    if(verbose){
 	cerr<<"Thread#"<<threadID<<" done pre-computing computing "<<endl;
     }
     
@@ -1828,7 +1828,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	}
 
 	
-	if(verboseHETest){
+	if(verbose){
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
 	    
@@ -1849,7 +1849,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
 
-	    if(verboseHETest)
+	    if(verbose)
 		cerr<<"Thread#"<<threadID<<" converged "<<endl;
 
 	    rc = pthread_mutex_unlock(&mutexCERR);
@@ -1887,7 +1887,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 
 	//adjusting alpha/beta
 	if(h<0){
-	    if(verboseHETest){
+	    if(verbose){
 		rc = pthread_mutex_lock(&mutexCERR);
 		checkResults("pthread_mutex_lock()\n", rc);
 		
@@ -1923,7 +1923,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 		if( ((iterationWithPositiveD1+iterationWithNegativeD1 )>12 ) &&
 		    ((double(MIN(iterationWithPositiveD1,iterationWithNegativeD1))/double(iterationWithPositiveD1+iterationWithNegativeD1))>0.25) ){ //if more than 25% of iterations are on the other side, adjust alpha
 
-		    if(verboseHETest){
+		    if(verbose){
 			rc = pthread_mutex_lock(&mutexCERR);
 			checkResults("pthread_mutex_lock()\n", rc);
 			
@@ -1945,7 +1945,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 		    if( ((iterationWithPositiveD1+iterationWithNegativeD1 )>12 ) &&
 			((double(MIN(iterationWithPositiveD1,iterationWithNegativeD1))/double(iterationWithPositiveD1+iterationWithNegativeD1))<0.05) ){ //if more than 25% of iterations are on the other side, adjust alpha
 			
-			if(verboseHETest){
+			if(verbose){
 			    rc = pthread_mutex_lock(&mutexCERR);
 			    checkResults("pthread_mutex_lock()\n", rc);
 			    
@@ -1978,7 +1978,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    hasConverged =true;
 	    lastIteration=true;
 	    
-	    if(verboseHETest){
+	    if(verbose){
 		rc = pthread_mutex_lock(&mutexCERR);
 		checkResults("pthread_mutex_lock()\n", rc);
 		
@@ -1994,7 +1994,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
 
-	    if(verboseHETest){
+	    if(verbose){
 		cerr<<"Thread#"<<threadID<<" did not converge"<<endl;
 	    }
 	    
@@ -2088,7 +2088,7 @@ public:
 	    int rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
 
-	    if(verboseHETest)
+	    if(verbose)
 		cerr<<"Thread#"<<m_threadID<<" reading: "<<m_references[m_refID].RefName<<":"<<pileupData.Position<<" valid sites:\t"<<thousandSeparator(totalSites)<<endl;
 
 	    rc = pthread_mutex_unlock(&mutexCERR);
@@ -2271,7 +2271,7 @@ private:
 
 */				
 void *mainHeteroComputationThread(void * argc){
-    if(verboseHETest)
+    if(verbose)
 	cerr<<"mainHeteroComputationThread started"<<endl;
 
     int   rc;
@@ -2280,12 +2280,12 @@ void *mainHeteroComputationThread(void * argc){
     int rankThread=0;
     //#endif
 
-    // if(verboseHETest)    
+    // if(verbose)    
     // 	cerr<<"mainHeteroComputationThread mutex1"<<endl;
 
     rc = pthread_mutex_lock(&mutexRank);
     checkResults("pthread_mutex_lock()\n", rc);
-    //     if(verboseHETest)
+    //     if(verbose)
     //     cerr<<"mainHeteroComputationThread mutex21 ID="<<(*(int *)pthread_self())<<endl;    
     //     cerr<<"mainHeteroComputationThread mutex22 ID="<<(threadID2Rank.size()+1)<<endl;
     // }
@@ -2313,7 +2313,7 @@ void *mainHeteroComputationThread(void * argc){
     bool foundData=false;
     
 #ifdef HETVERBOSE
-    if(verboseHETest)    {
+    if(verbose)    {
 	rc = pthread_mutex_lock(&mutexCERR);
 	checkResults("pthread_mutex_lock()\n", rc);
 
@@ -2334,7 +2334,7 @@ void *mainHeteroComputationThread(void * argc){
  	queueDataToprocess.pop();
 
 #ifdef HETVERBOSE
-	if(verboseHETest){
+	if(verbose){
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
 
@@ -2423,8 +2423,8 @@ void *mainHeteroComputationThread(void * argc){
 
     bool setRegionRes=reader.SetRegion( bregion   );
 
-    //if(verboseHETest){
-    if(verboseHETest){
+    //if(verbose){
+    if(verbose){
 	rc = pthread_mutex_lock(&mutexCERR);
 	checkResults("pthread_mutex_lock()\n", rc);
 	
@@ -2522,7 +2522,7 @@ void *mainHeteroComputationThread(void * argc){
     pileup.Flush();
     reader.Close();
     //fastaReference.Close();
-    if(verboseHETest){
+    if(verbose){
 	rc = pthread_mutex_lock(&mutexCERR);
 	checkResults("pthread_mutex_lock()\n", rc);
 	
@@ -3181,7 +3181,7 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +"--name"     + "\t\t\t"   + "[name]"       +"\t\t\t"+"Sample name (default: "+sampleName+")"+"\n"+
 	//"\t\t"+""  +""+"--vcf"     + "\t\t\t" +    ""          +"\t\t\t"+"Use VCF as output format (default: "+booleanAsString(useVCFoutput)+")"+"\n"+
 	//"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
-	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""             +"\t\t\t"+"Print extensive info about the heterozygosity estimate (default: "+booleanAsString(verboseHETest)+")"+"\n"+  
+	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""             +"\t\t\t"+"Print extensive info  (default: "+booleanAsString(verbose)+")"+"\n"+  
 	//"\t\t"+"-f"+","+""           +"\t\t"      + ""             +"\t\t\t"+"Overwrite any .rginfo.gz (default: "+booleanAsString(ignoreExistingRGINFO)+")"+"\n"+  
 	
 			      
@@ -3267,7 +3267,7 @@ int main (int argc, char *argv[]) {
 
 	if( (string(argv[i]) == "-v") || 
 	    (string(argv[i]) == "--verbose") ){
-	    verboseHETest=true;
+	    verbose=true;
             continue;
 	}
 	
@@ -3671,12 +3671,12 @@ int main (int argc, char *argv[]) {
 	    checkResults("pthread_create()\n", rc);
 	}
 
-	if(verboseHETest){	    
+	if(verbose){	    
 	    cerr<<"Creating threads for coverage calculation, need to process="<<queueDataForCoverage.size()<<" out of a total of "<<queueDataToprocess.size()<<endl;
 	}
 
 	while(queueDataForCoverage.size()!=0){
-	    if(verboseHETest){	    
+	    if(verbose){	    
 		cerr<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataForCoverageOrigsize<<endl;
 	    }else{
 		printprogressBarCerr( float(queueDataForCoverageOrigsize- queueDataForCoverage.size() ) / float(queueDataForCoverageOrigsize) );
@@ -3691,7 +3691,7 @@ int main (int argc, char *argv[]) {
 	    checkResults("pthread_join()\n", rc);
 	}
 
-	if(!verboseHETest)
+	if(!verbose)
 	    cerr<<endl;//flush the progress bar
 	
 	cerr<<"..done"<<endl;
@@ -4048,7 +4048,7 @@ int main (int argc, char *argv[]) {
 		
    cerr<<"Writing genotype data to:        "<<outFilePrefix+".vcf.gz" << endl;
    cerr<<"Writing local het. estimates to: "<<outFilePrefix+".hEst.gz"<< endl;
-   if(!verboseHETest)
+   if(!verbose)
        printprogressBarCerr( 0 );
 
    //outFilePrefix+".hEst.gz", IBamIODevice::WriteOnly);
@@ -4073,8 +4073,8 @@ int main (int argc, char *argv[]) {
 		rc = pthread_mutex_lock(&mutexCERR);
 		checkResults("pthread_mutex_lock()\n", rc);
 
-		// if(verboseHETest){
-		if(verboseHETest)
+		// if(verbose){
+		if(verbose)
 		    cerr<<getDateString()<<" "<<getTimeString()<<" writing chunk#"<<dataToWrite->rank<<" with "<<thousandSeparator(dataToWrite->vecPositionResults->size())<<" records, "<<(queueDataTowrite.size())<<" chunk(s) left in queue"<<endl;
 		
 		// }
@@ -4171,7 +4171,7 @@ int main (int argc, char *argv[]) {
 		lastWrittenChunk=dataToWrite->rank;
 
 
-		if(!verboseHETest)
+		if(!verbose)
 		    printprogressBarCerr( float(lastWrittenChunk)/float(lastRank) );
 		
 		if(dataToWrite->rank == lastRank)
@@ -4302,8 +4302,9 @@ int main (int argc, char *argv[]) {
 		}
 		
 		hetResToAdd.weight = ( (long double)(sitesDefinedLine) ) / ( (long double)(sizeChunk) );
-		
-		//cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.h<<"\t"<<hetResToAdd.hlow<<"\t"<<hetResToAdd.hhigh<<"\t"<<hetResToAdd.weight<<endl;
+
+		if(verbose)
+		  cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.h<<"\t"<<hetResToAdd.hlow<<"\t"<<hetResToAdd.hhigh<<"\t"<<hetResToAdd.weight<<endl;
 		
 		heteroEstResults.push_back(hetResToAdd);
 	    }           
@@ -4414,7 +4415,7 @@ int main (int argc, char *argv[]) {
     // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
     // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
     cerr<<"..done"<<endl;
-
+    //cerr<<"x_i "<<x_i<<endl;
     //return 1;
     //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
     vector<long double> hvector;
@@ -4439,7 +4440,8 @@ int main (int argc, char *argv[]) {
 	    pT_i_1      = pT_i;
 	}
 
-	normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
+	//normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
+	normal_distribution<long double> distribution_s(s_i,  2  );
 	s_i_1      = distribution_s(dre);
 	if(s_i_1 <= slower       ||  s_i_1 >= supper     ){
 	    s_i_1      = s_i;
@@ -4447,6 +4449,9 @@ int main (int argc, char *argv[]) {
 
 
 	//set new model parameters
+	// cerr<<"old   h_i   "<<h_i<<" "<<" pT_i "<<" "<<pT_i<<" s_i  "<<s_i <<endl;
+	// cerr<<"new   h_i_1 "<<h_i_1<<" "<<" pT_i_1 "<<" "<<pT_i_1<<" s_i_1  "<<s_i_1 <<endl;
+
 	hmm.setHetRateForNonROH(h_i_1);
 	hmm.setTransprob(pT_i_1);
 	hmm.setNrwPerSizeChunk( (unsigned int)s_i_1 );
@@ -4459,7 +4464,7 @@ int main (int argc, char *argv[]) {
 	tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
 
 	x_i_1     = tmpResFWD.llik;
-	
+	//	cerr<<"x_i_1 "<<x_i_1<<endl;
 	if(chain>(maxChains/4)){
 	    pTlower = pTlowerSecondHalf;
 	}
@@ -4481,13 +4486,17 @@ int main (int argc, char *argv[]) {
 	    }
 	    
 	    accept++;
-	    //cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    if(verbose)
+	      cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}else{
-	    //cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+	  
+	  if(verbose)
+	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
 	}
-
-	printprogressBarCerr( float(chain)/float(maxChains) );
+	
+	if(!verbose)
+	  printprogressBarCerr( float(chain)/float(maxChains) );
 	//chain++;
 	//sleep(0.1);
     }
