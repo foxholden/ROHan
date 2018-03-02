@@ -18,7 +18,7 @@
 #include "utils.h"
 #include "GenomicRange.h"
 
-#define DEBUGCOV
+/* #define DEBUGCOV */
 using namespace std;
 
 static vector<long double> lnFactVec;

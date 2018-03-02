@@ -403,7 +403,7 @@ void initScores(){
 	// the underestimate will be by a factor of 1.0/ (  1.0- (1/powl(2.0,i-1))  );
 	
 	overestimateFactor[i] = 1.0/ (  1.0- (1/powl(2.0,i-1))  );
-	cout<<i<<" "<<overestimateFactor[i]<<endl;
+
     }
 
 
@@ -1501,10 +1501,14 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     // long double lambda   = 0.0000000001;
     //long double lambdaHW  = 0.0000000001;
 
-    int iterationsMax     = 100;
+    int iterationsMax     = 200;
     int iterationsGrad    = 1;
     int iterationWithMinHRate    =  0;
     int maxiterationWithMinHRate = 10;
+    //check jumping around min
+    int iterationWithPositiveD1  = 0;//iterations with positive first derivative
+    int iterationWithNegativeD1  = 0;//iterations with negative first derivative
+    
     double minHRateNonROH = double(minSegSitesPer1M)/double(1000000);
 
     unsigned int covDist [MAXCOV+1];
@@ -1817,6 +1821,13 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	z = beta_*z + loglikelihoodForEveryPositionForEveryBaBdD1;
 	long double hnew = h + alpha_*z;
 
+	if(loglikelihoodForEveryPositionForEveryBaBdD1 > 0){
+	    iterationWithPositiveD1++;
+	}else{
+	    iterationWithNegativeD1++;
+	}
+
+	
 	if(verboseHETest){
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
@@ -1850,7 +1861,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	}
 
 	//setting h to hnew
-	if(loglikelihoodForEveryPositionForEveryBaBdP == LDBL_MAX){
+	if(loglikelihoodForEveryPositionForEveryBaBdP == LDBL_MAX){//if previous hadn't been set
 	    loglikelihoodForEveryPositionForEveryBaBdP = loglikelihoodForEveryPositionForEveryBaBd;
 	    hp = h;
 	    h  = hnew;
@@ -1873,14 +1884,15 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	    //}
 	}
 
+
+	//adjusting alpha/beta
 	if(h<0){
 	    if(verboseHETest){
 		rc = pthread_mutex_lock(&mutexCERR);
 		checkResults("pthread_mutex_lock()\n", rc);
 		
-		cerr<<"Thread#"<<threadID<<setprecision(14)<<"\tnew proposed h is less than 0 "<<h<<"\t"<<alpha_<<"\t"<<beta_<<endl;
-		
-		
+		cerr<<"Thread#"<<threadID<<setprecision(14)<<"\tnew proposed h is less than 0 "<<h<<"\talpha:"<<alpha_<<"\tbeta:"<<beta_<<endl;
+				
 		rc = pthread_mutex_unlock(&mutexCERR);
 		checkResults("pthread_mutex_unlock()\n", rc);
 	    }
@@ -1888,12 +1900,71 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 
 	    //h     = 1.0e-11;
 	    h = hp;//resetting to previous h
-	    alpha_ = alpha_/2.0;
+	    alpha_ = alpha_*0.5;
+	    beta_  = beta_ *0.9;
+
+	    //resetting 
+	    iterationWithPositiveD1=0;
+	    iterationWithNegativeD1=0;
+
 	}else{
 
 	    if(h>0.1){
 		h     = 0.1-1.0e-11;
-		alpha_ = alpha_/2.0;                        
+		alpha_ = alpha_*0.5;
+		beta_  = beta_ *0.9;
+
+		//resetting 
+		iterationWithPositiveD1=0;
+		iterationWithNegativeD1=0;
+	    }else{
+
+		//if we spent too much on either side, reduce alpha
+		if( ((iterationWithPositiveD1+iterationWithNegativeD1 )>12 ) &&
+		    ((double(MIN(iterationWithPositiveD1,iterationWithNegativeD1))/double(iterationWithPositiveD1+iterationWithNegativeD1))>0.25) ){ //if more than 25% of iterations are on the other side, adjust alpha
+
+		    if(verboseHETest){
+			rc = pthread_mutex_lock(&mutexCERR);
+			checkResults("pthread_mutex_lock()\n", rc);
+			
+			cerr<<"Thread#"<<threadID<<setprecision(14)<<"\t found signs of oscillation +:"<<iterationWithPositiveD1<<"  -:"<<iterationWithNegativeD1<<" "<<h<<"\talpha:"<<alpha_<<"\tbeta:"<<beta_<<endl;
+			
+			rc = pthread_mutex_unlock(&mutexCERR);
+			checkResults("pthread_mutex_unlock()\n", rc);
+		    }
+
+		    alpha_ = alpha_*0.5;
+		    beta_  = beta_ *0.9;
+		    //resetting 
+		    iterationWithPositiveD1=0;
+		    iterationWithNegativeD1=0;
+		}else{
+
+		    //if spend too much time on one side, increase alpha
+
+		    if( ((iterationWithPositiveD1+iterationWithNegativeD1 )>12 ) &&
+			((double(MIN(iterationWithPositiveD1,iterationWithNegativeD1))/double(iterationWithPositiveD1+iterationWithNegativeD1))<0.05) ){ //if more than 25% of iterations are on the other side, adjust alpha
+			
+			if(verboseHETest){
+			    rc = pthread_mutex_lock(&mutexCERR);
+			    checkResults("pthread_mutex_lock()\n", rc);
+			    
+			    cerr<<"Thread#"<<threadID<<setprecision(14)<<"\t spent too much time on one side +:"<<iterationWithPositiveD1<<"  -:"<<iterationWithNegativeD1<<" "<<h<<"\talpha:"<<alpha_<<"\tbeta:"<<beta_<<endl;
+			    
+			    rc = pthread_mutex_unlock(&mutexCERR);
+			    checkResults("pthread_mutex_unlock()\n", rc);
+			}
+			
+			alpha_ = alpha_*2.0;
+			//beta_  = beta_ *0.9;
+			//resetting 
+			iterationWithPositiveD1=0;
+			iterationWithNegativeD1=0;
+		    }
+
+		    
+		}
+
 	    }
 	}
 	
@@ -1955,7 +2026,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     // cout<<setprecision(14)<<h<<"\t"<<correctionFactor<<"\t";
 
     h = h*correctionFactor;
-    cout<<setprecision(14)<<h<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
+    // cout<<setprecision(14)<<h<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
     hresToReturn.h            = h;
     hresToReturn.hLow         = h-errb;
     hresToReturn.hHigh        = h+errb;
@@ -2455,7 +2526,7 @@ void *mainHeteroComputationThread(void * argc){
 	rc = pthread_mutex_lock(&mutexCERR);
 	checkResults("pthread_mutex_lock()\n", rc);
 	
-	cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(hv->getTotalBases())<<" bases on "<<thousandSeparator(hv->getTotalSites())<<" sites average coverage: "<<double(hv->getTotalBases())/double(hv->getTotalSites())<<endl;
+	cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(hv->getTotalBases())<<" bases on "<<thousandSeparator(hv->getTotalSites())<<" sites average coverage: "<<(hv->getTotalSites()!=0 ? stringify(double(hv->getTotalBases())/double(hv->getTotalSites())) : "no sites found" )<<endl;
 	
 	rc = pthread_mutex_unlock(&mutexCERR);
 	checkResults("pthread_mutex_unlock()\n", rc);
