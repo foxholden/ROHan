@@ -2025,12 +2025,12 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     }
     // cout<<setprecision(14)<<h<<"\t"<<correctionFactor<<"\t";
 
-    h = h*correctionFactor;
+    //h = h*correctionFactor;
     // cout<<setprecision(14)<<h<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
-    hresToReturn.h            = h;
-    hresToReturn.hLow         = h-errb;
-    hresToReturn.hHigh        = h+errb;
-    hresToReturn.errb         = errb;
+    hresToReturn.h            = (h)     *correctionFactor;
+    hresToReturn.hLow         = (h-errb)*correctionFactor;
+    hresToReturn.hHigh        = (h+errb)*correctionFactor;
+    hresToReturn.errb         = errb    *correctionFactor;
     
     hresToReturn.hasConverged = hasConverged;
 
