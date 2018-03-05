@@ -7,7 +7,7 @@
 
 //TODO
 
-
+//on ROH, what to do if have not reached ml 
 // does the HMM underestimate?
 // global estimate
 
@@ -862,7 +862,6 @@ void initLikelihoodScores(){
 
 
 
-
     //insert dummy values
     for(int L=0;L<int(MINLENGTHFRAGMENT);L++){//for each fragment length
 	vector< mpq2bsq2submatrix > vectorToAdd;	
@@ -1420,12 +1419,259 @@ inline void genotypePositions(const int                   mostLikelyBaBdIdx,
 } //genotypePositions
 
 
+inline void computeLLinternal(const diNucleotideProb priorGenotype,
+			      const diNucleotideProb priorGenotypeD1,
+			      const diNucleotideProb priorGenotypeD2,
+			      const vector<babdlikelihood>      & vectorBaBdLikelihood,
+			      const vector<positionInformation> * piForGenomicWindow,
+			      const bool lastIteration,
+			      vector<PositionResult *>    * vecPositionResults,
+			      unsigned int covDist [MAXCOV+1],
+			      long double & loglikelihoodForEveryPositionForEveryBaBd,
+			      long double & loglikelihoodForEveryPositionForEveryBaBdD1,
+			      long double & loglikelihoodForEveryPositionForEveryBaBdD2){
+
+    for(unsigned int p=0;p<piForGenomicWindow->size();p++){//every genomic position
+	
+
+#ifdef DEBUGCOMPUTELLEACHBASE
+	//if(p>10000 && p<11000){	    
+	cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+
+	cerr<<"B\tQ\tMQ\t5p\tL"<<endl;
+
+	for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){
+	    cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
+		<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
+		<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
+		<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
+		<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
+		<<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
+		//		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
+		<<endl;	    
+	}
+	//}    
+#endif
+
+
+
+
+	// typedef vector< vector<diNucleotideProb> > mpq2bsq2submatrix;
+	
+	
+	//  // 2D: mapping quality 
+	//  // 3D: base qual
+	// vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix5p;
+	// vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix3p;
+	
+	// // 1D: length of fragment
+	// // 2D: pos fragment from the 5' end
+	// vector< vector< mpq2bsq2submatrix * > > length2pos2mpq2bsq2submatrix;
+	
+	//for this position
+	long double loglikelihoodForEveryBaBd          =0.0;
+	long double loglikelihoodForEveryBaBdD1        =0.0;
+	long double loglikelihoodForEveryBaBdD2        =0.0;
+
+
+	vector<long double> vectorOfloglikelihoodForGivenBaBd     (16,0.0) ;
+	vector<long double> vectorOfloglikelihoodForGivenGeno     (10,0.0) ;
+
+	long double mostLikelyBaBd    = -1.0*numeric_limits<long double>::infinity();
+	int         mostLikelyBaBdIdx = -1;
+	int         babdIdx           =  0;
 
 
 
 
 
-inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
+	// long double sumProbForPriors             =0.0; //the derivative of the GL should be 0, just the prior
+	// long double sumDerProbForPriors          =0.0; //the derivative of the GL should be 0, just the prior
+	//if the function is log( f(x) )
+
+	long double internalFunctionD2   = 0.0; // f''(x)
+	long double internalFunctionD1   = 0.0; // f'(x)
+	long double internalFunction     = 0.0; // f(x)
+
+	for(uint8_t ba=0;ba<4;ba++){//ancestral base
+#ifdef DEBUGCOMPUTELLEACHBASE
+	    uint8_t ba_c = 3-ba;
+#endif
+	    for(uint8_t bd=0;bd<4;bd++){//derived base
+		    
+#ifdef DEBUGCOMPUTELLEACHBASE
+		uint8_t bd_c = 3-bd;
+#endif
+
+#ifdef DEBUGCOMPUTELLEACHBASE
+		//if(p>10000 && p<11000)
+		cerr<<endl<<"GENO:A="<<"ACGT"[ba]<<" ("<<"ACGT"[ba_c]<<") \tD="<<"ACGT"[bd]<<" ("<<"ACGT"[bd_c]<<")\tprior "<<expl(priorGenotype.p[ba][bd])<<endl;
+		//cerr<<int(ba)<<"\t"<<int(ba_c)<<endl;
+#endif
+		
+		long double loglikelihoodForGivenBaBdTimesPrior  =0.0;
+		long double loglikelihoodForGivenBaBdTimesPriorD1=0.0;
+		long double loglikelihoodForGivenBaBdTimesPriorD2=0.0;
+		    
+		// long double loglikelihoodForGivenBaBd          =0.0;
+
+			       	      
+		//  product of (\prod_{fragment} P(D|G)) times the prior P(G) for the genotype
+		//loglikelihoodForGivenBaBdTimesPrior = loglikelihoodForGivenBaBd + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
+		loglikelihoodForGivenBaBdTimesPrior   = vectorBaBdLikelihood[p].gl[babdIdx] + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
+		loglikelihoodForGivenBaBdTimesPriorD1 = 0                                   + priorGenotypeD1.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
+		loglikelihoodForGivenBaBdTimesPriorD2 = 0                                   + priorGenotypeD2.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
+		
+#ifdef DEBUGCOMPUTELLEACHBASE
+		//if(p>10000 && p<11000)
+		cerr<<"GENO:A="<<"ACGT"[ba]<<"\tD="<<"ACGT"[bd]<<"\tprior "<<expl(priorGenotype.p[ba][bd])<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<"\tllForBaBD*Prior "<<loglikelihoodForGivenBaBdTimesPrior<<" ("<<expl(loglikelihoodForGivenBaBdTimesPrior) <<")"<<" priorGenotypeProb "<<priorGenotypeProb.p[ba][bd]<<" D "<<priorGenotypeProbD.p[ba][bd]<<"\tllForEveryBaBD "<<loglikelihoodForEveryBaBd<<"\tgenoLike "<<mostLikelyBaBd<<"\tmostLikeG "<<mostLikelyBaBdIdx<<endl;
+#endif
+
+
+		//adding probabilities for each genotype
+		loglikelihoodForEveryBaBd  = oplusInitnatl( loglikelihoodForEveryBaBd , loglikelihoodForGivenBaBdTimesPrior); // \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+		    
+		    
+		//(d^2)/(d^2h) (exp(f(h))) =  e^(f(h))f'(h) * f'(h) + e^(f(h)) f''(h) 
+		internalFunctionD2  += 
+		    expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD1*loglikelihoodForGivenBaBdTimesPriorD1 
+		    + 
+		    expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD2;  
+
+		//(d)/(dh)(exp(f(h))) =  e^(f(h)) *f'(h)
+		internalFunctionD1  += expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD1;  
+
+		internalFunction    += expl( loglikelihoodForGivenBaBdTimesPrior );
+
+		    
+		// sumProbForPriors          += priorGenotypeProb.p[ba][bd];
+		// sumDerProbForPriors       += priorGenotypeProbD.p[ba][bd];
+		    
+		vectorOfloglikelihoodForGivenBaBd[babdIdx] = loglikelihoodForGivenBaBdTimesPrior ;
+
+		if(loglikelihoodForGivenBaBdTimesPrior>mostLikelyBaBd){ //finding most likely Ba Bd pair
+		    mostLikelyBaBd    = loglikelihoodForGivenBaBdTimesPrior;
+		    mostLikelyBaBdIdx = babdIdx;
+		}
+		
+#ifdef DEBUGCOMPUTELL
+		//if(p>10000 && p<11000)
+		//cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+#endif
+		babdIdx++;
+	    }//END for each derived base
+	}//END for each ancestral base
+
+	//The derivative for the log( exp(p1) + exp(p2) +...exp(p10) ) is
+	//
+	//             der( exp(p1) + exp(p2) +...exp(p10) )
+	//             -----------------------------------
+	//                ( exp(p1) + exp(p2) +...exp(p10) )
+	loglikelihoodForEveryBaBdD1 +=  ( internalFunctionD1 / internalFunction );  
+	//loglikelihoodForEveryBaBdD1 +=  ( sumNumerator / sumDenominator);  
+	//loglikelihoodForEveryBaBdD1 +=  ( sumDerProbForPriors/sumProbForPriors);  
+	    
+	//If the function is log( f(x) ) where f(x) (called internalFunction) is the likelihood function then
+	//  d/dx log( f(x) ) = f'(x) / f(x)
+	//  and 
+	//  d^2/d^2x log( f(x) ) = [f''(x) f(x) + f'(x) ] / [ f(x) ]^2
+	loglikelihoodForEveryBaBdD2 +=  ( internalFunctionD2 * internalFunction - powl(internalFunctionD1,2) ) / powl( internalFunction , 2 );
+
+#ifdef DEBUGCOMPUTELL	
+	//if(p>10000 && p<11000)
+	//cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
+#endif
+
+
+	//////////////////////////////////////////////////////
+	// BEGIN GENOTYPING
+	//////////////////////////////////////////////////////
+	if(lastIteration){//do it at the last iteration		
+	    PositionResult * pr=new PositionResult();
+
+	    pr->refB   =     piForGenomicWindow->at(p).refBase;
+	    pr->pos    =     piForGenomicWindow->at(p).posAlign;
+	    pr->avgMQ  =     piForGenomicWindow->at(p).avgMQ;
+
+	    for(int n=0;n<4;n++)
+		pr->baseC[n] = piForGenomicWindow->at(p).baseC[n];
+
+	    pr->dp     = int(piForGenomicWindow->at(p).readsVec.size());
+
+	    genotypePositions( mostLikelyBaBdIdx                 ,
+			       &vectorOfloglikelihoodForGivenBaBd,
+			       &vectorOfloglikelihoodForGivenGeno,
+			       pr);
+	    //vecPositionResults
+	    vecPositionResults->push_back(pr);
+
+		
+	    //count cov dist
+	    covDist[ piForGenomicWindow->at(p).readsVec.size() ]++;
+		
+	}
+	////////////////////////////////////////////////////
+	// END GENOTYPING
+	////////////////////////////////////////////////////
+	    
+
+
+
+
+
+	//product for each genomic position
+                                                        
+	// loglikelihoodForEveryPositionForEveryBaBd   += loglikelihoodForEveryBaBd;   // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+	// loglikelihoodForEveryPositionForEveryBaBdD1 += loglikelihoodForEveryBaBdD1; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+	// loglikelihoodForEveryPositionForEveryBaBdD2 += loglikelihoodForEveryBaBdD2; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+
+	// \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
+#if defined(ONLYUSECOV) || defined(ONLYUSECOVMIN) || defined(ONLYUSECOVMAX)
+	//cout<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+
+	if(piForGenomicWindow->at(p).readsVec.size() < ONLYUSECOVMIN){
+	    continue;
+	}
+
+	if(piForGenomicWindow->at(p).readsVec.size() > ONLYUSECOVMAX){
+	    continue;
+	}
+
+#endif
+	loglikelihoodForEveryPositionForEveryBaBd   +=
+#ifdef CORRECTCOV
+	    cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+#endif
+	    loglikelihoodForEveryBaBd;
+	// #ifdef DEBUGCOV
+
+	// 	    cerr<<loglikelihoodForEveryPositionForEveryBaBd<<" "<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() )<<" "<<loglikelihoodForEveryBaBd<<" l="<<piForGenomicWindow->at(p).readsVec.size()<<"#"<<endl;
+	// 	    if( isnan( cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) ) ){
+	// 		cerr<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+	// 		exit(1);
+	// 	    }
+	// #endif
+	    
+	loglikelihoodForEveryPositionForEveryBaBdD1 +=
+#ifdef CORRECTCOV
+	    cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+#endif
+	    loglikelihoodForEveryBaBdD1; 
+	loglikelihoodForEveryPositionForEveryBaBdD2 +=
+#ifdef CORRECTCOV
+	    cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+#endif
+	    loglikelihoodForEveryBaBdD2; 
+
+    }//END for each genomic position
+
+}
+
+
+
+
+
+inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow,
 			  vector<PositionResult *>    * vecPositionResults,
 			  const int threadID){
 
@@ -1492,8 +1738,11 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     long double errb;
     long double loglikelihoodForEveryPositionForEveryBaBdP=LDBL_MAX;
 
-    bool hasConverged=false;
-    bool lastIteration=false;
+    bool hasConverged    = false;
+    bool lastIteration   = false;
+    bool bottomIteration = false;
+    long double deltaBottom=1.0e-11;
+
     // long double mu ;
 
     // //for(long double h=0.000001;h<0.001000;h+=0.0000250){
@@ -1502,6 +1751,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     //long double lambdaHW  = 0.0000000001;
 
     int iterationsMax     = 200;
+    long double loglikelihoodForEveryPositionForEveryBaBdD1ForConvergence = 100.0;//target to assess convergence
     int iterationsGrad    = 1;
     int iterationWithMinHRate    =  0;
     int maxiterationWithMinHRate = 10;
@@ -1574,242 +1824,20 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	long double loglikelihoodForEveryPositionForEveryBaBdD2        =0.0;
 
 
-	for(unsigned int p=0;p<piForGenomicWindow->size();p++){//every genomic position
-	
-
-#ifdef DEBUGCOMPUTELLEACHBASE
-	    //if(p>10000 && p<11000){	    
-	    cerr<<p<<"\tpos="<<piForGenomicWindow->at(p).posAlign<<"\t"<<piForGenomicWindow->at(p).readsVec.size()<<endl;
-
-	    cerr<<"B\tQ\tMQ\t5p\tL"<<endl;
-
-	    for(unsigned int i=0;i<piForGenomicWindow->at(p).readsVec.size();i++){
-		cerr<<"ACGT"[piForGenomicWindow->at(p).readsVec[i].base]<<"\t"
-		    <<int(piForGenomicWindow->at(p).readsVec[i].qual)<<"\t"
-		    <<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<"\t"
-		    <<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<"\t"
-		    <<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<"\t"
-		    <<piForGenomicWindow->at(p).readsVec[i].isrv<<"\t"
-		    //		<<piForGenomicWindow->at(p).readsVec[i].name<<"\t"
-		    <<endl;	    
-	    }
-	    //}    
-#endif
-
-
-
-
-	    // typedef vector< vector<diNucleotideProb> > mpq2bsq2submatrix;
-	
-	
-	    //  // 2D: mapping quality 
-	    //  // 3D: base qual
-	    // vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix5p;
-	    // vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix3p;
-	
-	    // // 1D: length of fragment
-	    // // 2D: pos fragment from the 5' end
-	    // vector< vector< mpq2bsq2submatrix * > > length2pos2mpq2bsq2submatrix;
-	
-	    //for this position
-	    long double loglikelihoodForEveryBaBd          =0.0;
-	    long double loglikelihoodForEveryBaBdD1        =0.0;
-	    long double loglikelihoodForEveryBaBdD2        =0.0;
-
-
-	    vector<long double> vectorOfloglikelihoodForGivenBaBd     (16,0.0) ;
-	    vector<long double> vectorOfloglikelihoodForGivenGeno     (10,0.0) ;
-
-	    long double mostLikelyBaBd    = -1.0*numeric_limits<long double>::infinity();
-	    int         mostLikelyBaBdIdx = -1;
-	    int         babdIdx           =  0;
-
-
-
-
-
-	    // long double sumProbForPriors             =0.0; //the derivative of the GL should be 0, just the prior
-	    // long double sumDerProbForPriors          =0.0; //the derivative of the GL should be 0, just the prior
-	    //if the function is log( f(x) )
-
-	    long double internalFunctionD2   = 0.0; // f''(x)
-	    long double internalFunctionD1   = 0.0; // f'(x)
-	    long double internalFunction     = 0.0; // f(x)
-
-	    for(uint8_t ba=0;ba<4;ba++){//ancestral base
-#ifdef DEBUGCOMPUTELLEACHBASE
-		uint8_t ba_c = 3-ba;
-#endif
-		for(uint8_t bd=0;bd<4;bd++){//derived base
-		    
-#ifdef DEBUGCOMPUTELLEACHBASE
-		    uint8_t bd_c = 3-bd;
-#endif
-
-#ifdef DEBUGCOMPUTELLEACHBASE
-		    //if(p>10000 && p<11000)
-		    cerr<<endl<<"GENO:A="<<"ACGT"[ba]<<" ("<<"ACGT"[ba_c]<<") \tD="<<"ACGT"[bd]<<" ("<<"ACGT"[bd_c]<<")\tprior "<<expl(priorGenotype.p[ba][bd])<<endl;
-		    //cerr<<int(ba)<<"\t"<<int(ba_c)<<endl;
-#endif
-		
-		    long double loglikelihoodForGivenBaBdTimesPrior  =0.0;
-		    long double loglikelihoodForGivenBaBdTimesPriorD1=0.0;
-		    long double loglikelihoodForGivenBaBdTimesPriorD2=0.0;
-		    
-		    // long double loglikelihoodForGivenBaBd          =0.0;
-
-			       	      
-		    //  product of (\prod_{fragment} P(D|G)) times the prior P(G) for the genotype
-		    //loglikelihoodForGivenBaBdTimesPrior = loglikelihoodForGivenBaBd + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
-		    loglikelihoodForGivenBaBdTimesPrior   = vectorBaBdLikelihood[p].gl[babdIdx] + priorGenotype.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
-		    loglikelihoodForGivenBaBdTimesPriorD1 = 0                                   + priorGenotypeD1.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
-		    loglikelihoodForGivenBaBdTimesPriorD2 = 0                                   + priorGenotypeD2.p[ba][bd]; // (\prod_{fragment} P(D|G))*P(G)
-		
-#ifdef DEBUGCOMPUTELLEACHBASE
-		    //if(p>10000 && p<11000)
-		    cerr<<"GENO:A="<<"ACGT"[ba]<<"\tD="<<"ACGT"[bd]<<"\tprior "<<expl(priorGenotype.p[ba][bd])<<"\tllForBaBD "<<loglikelihoodForGivenBaBd<<"\tllForBaBD*Prior "<<loglikelihoodForGivenBaBdTimesPrior<<" ("<<expl(loglikelihoodForGivenBaBdTimesPrior) <<")"<<" priorGenotypeProb "<<priorGenotypeProb.p[ba][bd]<<" D "<<priorGenotypeProbD.p[ba][bd]<<"\tllForEveryBaBD "<<loglikelihoodForEveryBaBd<<"\tgenoLike "<<mostLikelyBaBd<<"\tmostLikeG "<<mostLikelyBaBdIdx<<endl;
-#endif
-
-
-		    //adding probabilities for each genotype
-		    loglikelihoodForEveryBaBd  = oplusInitnatl( loglikelihoodForEveryBaBd , loglikelihoodForGivenBaBdTimesPrior); // \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-		    
-		    
-		    //(d^2)/(d^2h) (exp(f(h))) =  e^(f(h))f'(h) * f'(h) + e^(f(h)) f''(h) 
-		    internalFunctionD2  += 
-			expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD1*loglikelihoodForGivenBaBdTimesPriorD1 
-			+ 
-			expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD2;  
-
-		    //(d)/(dh)(exp(f(h))) =  e^(f(h)) *f'(h)
-		    internalFunctionD1  += expl( loglikelihoodForGivenBaBdTimesPrior )*loglikelihoodForGivenBaBdTimesPriorD1;  
-
-		    internalFunction    += expl( loglikelihoodForGivenBaBdTimesPrior );
-
-		    
-		    // sumProbForPriors          += priorGenotypeProb.p[ba][bd];
-		    // sumDerProbForPriors       += priorGenotypeProbD.p[ba][bd];
-		    
-		    vectorOfloglikelihoodForGivenBaBd[babdIdx] = loglikelihoodForGivenBaBdTimesPrior ;
-
-		    if(loglikelihoodForGivenBaBdTimesPrior>mostLikelyBaBd){ //finding most likely Ba Bd pair
-			mostLikelyBaBd    = loglikelihoodForGivenBaBdTimesPrior;
-			mostLikelyBaBdIdx = babdIdx;
-		    }
-		
-#ifdef DEBUGCOMPUTELL
-		    //if(p>10000 && p<11000)
-		    //cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
-#endif
-		    babdIdx++;
-		}//END for each derived base
-	    }//END for each ancestral base
-
-	    //The derivative for the log( exp(p1) + exp(p2) +...exp(p10) ) is
-	    //
-	    //             der( exp(p1) + exp(p2) +...exp(p10) )
-	    //             -----------------------------------
-	    //                ( exp(p1) + exp(p2) +...exp(p10) )
-	    loglikelihoodForEveryBaBdD1 +=  ( internalFunctionD1 / internalFunction );  
-	    //loglikelihoodForEveryBaBdD1 +=  ( sumNumerator / sumDenominator);  
-	    //loglikelihoodForEveryBaBdD1 +=  ( sumDerProbForPriors/sumProbForPriors);  
-	    
-	    //If the function is log( f(x) ) where f(x) (called internalFunction) is the likelihood function then
-	    //  d/dx log( f(x) ) = f'(x) / f(x)
-	    //  and 
-	    //  d^2/d^2x log( f(x) ) = [f''(x) f(x) + f'(x) ] / [ f(x) ]^2
-	    loglikelihoodForEveryBaBdD2 +=  ( internalFunctionD2 * internalFunction - powl(internalFunctionD1,2) ) / powl( internalFunction , 2 );
-
-#ifdef DEBUGCOMPUTELL	
-	    //if(p>10000 && p<11000)
-	    //cerr<<endl<<"---------------------------------------------------------------------------------"<<endl;
-#endif
-
-
-	    //////////////////////////////////////////////////////
-	    // BEGIN GENOTYPING
-	    //////////////////////////////////////////////////////
-	    if(lastIteration){//do it at the last iteration		
-		PositionResult * pr=new PositionResult();
-
-		pr->refB   =     piForGenomicWindow->at(p).refBase;
-		pr->pos    =     piForGenomicWindow->at(p).posAlign;
-		pr->avgMQ  =     piForGenomicWindow->at(p).avgMQ;
-
-		for(int n=0;n<4;n++)
-		    pr->baseC[n] = piForGenomicWindow->at(p).baseC[n];
-
-		pr->dp     = int(piForGenomicWindow->at(p).readsVec.size());
-
-		genotypePositions( mostLikelyBaBdIdx                 ,
-				   &vectorOfloglikelihoodForGivenBaBd,
-				   &vectorOfloglikelihoodForGivenGeno,
-				   pr);
-		//vecPositionResults
-		vecPositionResults->push_back(pr);
-
-		
-		//count cov dist
-		covDist[ piForGenomicWindow->at(p).readsVec.size() ]++;
-		
-	    }
-	    ////////////////////////////////////////////////////
-	    // END GENOTYPING
-	    ////////////////////////////////////////////////////
-	    
-
-
-
-
-
-	    //product for each genomic position
-                                                        
-	    // loglikelihoodForEveryPositionForEveryBaBd   += loglikelihoodForEveryBaBd;   // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-	    // loglikelihoodForEveryPositionForEveryBaBdD1 += loglikelihoodForEveryBaBdD1; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-	    // loglikelihoodForEveryPositionForEveryBaBdD2 += loglikelihoodForEveryBaBdD2; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-
-	    // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-#if defined(ONLYUSECOV) || defined(ONLYUSECOVMIN) || defined(ONLYUSECOVMAX)
-	    //cout<<piForGenomicWindow->at(p).readsVec.size()<<endl;
-
-	    if(piForGenomicWindow->at(p).readsVec.size() < ONLYUSECOVMIN){
-	     	continue;
-	    }
-
-	    if(piForGenomicWindow->at(p).readsVec.size() > ONLYUSECOVMAX){
-	     	continue;
-	    }
-
-#endif
-	    loglikelihoodForEveryPositionForEveryBaBd   +=
-#ifdef CORRECTCOV
-		cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
-#endif
-		loglikelihoodForEveryBaBd;
-// #ifdef DEBUGCOV
-
-// 	    cerr<<loglikelihoodForEveryPositionForEveryBaBd<<" "<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() )<<" "<<loglikelihoodForEveryBaBd<<" l="<<piForGenomicWindow->at(p).readsVec.size()<<"#"<<endl;
-// 	    if( isnan( cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) ) ){
-// 		cerr<<piForGenomicWindow->at(p).readsVec.size()<<endl;
-// 		exit(1);
-// 	    }
-// #endif
-	    
-	    loglikelihoodForEveryPositionForEveryBaBdD1 +=
-#ifdef CORRECTCOV
-		cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
-#endif
-		loglikelihoodForEveryBaBdD1; 
-	    loglikelihoodForEveryPositionForEveryBaBdD2 +=
-#ifdef CORRECTCOV
-		cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
-#endif
-		loglikelihoodForEveryBaBdD2; 
-
-	}//END for each genomic position
-
+	computeLLinternal(
+	    priorGenotype,
+	    priorGenotypeD1,
+	    priorGenotypeD2,
+	    vectorBaBdLikelihood,
+	    piForGenomicWindow,
+	    lastIteration,
+	    vecPositionResults,
+	    covDist ,
+	    loglikelihoodForEveryPositionForEveryBaBd,
+	    loglikelihoodForEveryPositionForEveryBaBdD1,
+	    loglikelihoodForEveryPositionForEveryBaBdD2	);
         errb = 1.96/sqrt(-1.0*loglikelihoodForEveryPositionForEveryBaBdD2);
-
+	
 	
 	//cout<<setprecision(14)<<h<<"\t"<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<errb<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<"\t"<<hnew<<endl;
 
@@ -1844,7 +1872,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	}
 	
 	//if(abs(hnew-h)<hPrecision){
-	if(fabsl(loglikelihoodForEveryPositionForEveryBaBdD1)<100){
+	if(fabsl(loglikelihoodForEveryPositionForEveryBaBdD1) < loglikelihoodForEveryPositionForEveryBaBdD1ForConvergence){
 
 	    rc = pthread_mutex_lock(&mutexCERR);
 	    checkResults("pthread_mutex_lock()\n", rc);
@@ -1891,7 +1919,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 		rc = pthread_mutex_lock(&mutexCERR);
 		checkResults("pthread_mutex_lock()\n", rc);
 		
-		cerr<<"Thread#"<<threadID<<setprecision(14)<<"\tnew proposed h is less than 0 "<<h<<"\talpha:"<<alpha_<<"\tbeta:"<<beta_<<endl;
+		cerr<<"Thread#"<<threadID<<setprecision(14)<<" new proposed h is less than 0 "<<h<<"\talpha:"<<alpha_<<"\tbeta:"<<beta_<<endl;
 				
 		rc = pthread_mutex_unlock(&mutexCERR);
 		checkResults("pthread_mutex_unlock()\n", rc);
@@ -1977,16 +2005,91 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	if(iterationWithMinHRate == maxiterationWithMinHRate ){
 	    hasConverged =true;
 	    lastIteration=true;
-	    
+
 	    if(verbose){
 		rc = pthread_mutex_lock(&mutexCERR);
 		checkResults("pthread_mutex_lock()\n", rc);
 		
-		cerr<<"Thread#"<<threadID<<setprecision(14)<<"\thas reached the bottom limit ("<<minHRateNonROH<<") for "<<iterationWithMinHRate<<" iterations now"<<endl;		
+		cerr<<"Thread#"<<threadID<<setprecision(14)<<" has reached the bottom limit ("<<minHRateNonROH<<") for "<<iterationWithMinHRate<<" iterations now"<<endl;		
 		
 		rc = pthread_mutex_unlock(&mutexCERR);
 		checkResults("pthread_mutex_unlock()\n", rc);
 	    }
+
+	    //has not converged in terms of the first derivative, need to use another mean to asses the errb
+	    if(fabsl(loglikelihoodForEveryPositionForEveryBaBdD1) > loglikelihoodForEveryPositionForEveryBaBdD1ForConvergence){
+
+		if(verbose){
+		    rc = pthread_mutex_lock(&mutexCERR);
+		    checkResults("pthread_mutex_lock()\n", rc);
+		    
+		    cerr<<"Thread#"<<threadID<<setprecision(14)<<" reached bottom but first derivative did not reach close to 0"<<endl;
+		    
+		    rc = pthread_mutex_unlock(&mutexCERR);
+		    checkResults("pthread_mutex_unlock()\n", rc);
+		}
+		
+		long double h_        ;
+		
+		for(int iterationmininter=0;iterationmininter<200;iterationmininter++){
+		    h_ = h+deltaBottom;
+		    
+		    diNucleotideProb priorGenotype;
+		    diNucleotideProb priorGenotypeD1;
+		    diNucleotideProb priorGenotypeD2;
+
+		
+		    computePriorMatrix(h_,
+				       &priorGenotype,
+				       // &priorGenotypeProb,
+				       // &priorGenotypeProbD,
+				       &priorGenotypeD1,
+				       &priorGenotypeD2);
+		    
+	
+
+		
+		    long double loglikelihoodForEveryPositionForEveryBaBd_          =0.0;
+		    long double loglikelihoodForEveryPositionForEveryBaBdD1_        =0.0;
+		    long double loglikelihoodForEveryPositionForEveryBaBdD2_        =0.0;
+		    
+
+		    computeLLinternal(
+			priorGenotype,
+			priorGenotypeD1,
+			priorGenotypeD2,
+			vectorBaBdLikelihood,
+			piForGenomicWindow,
+			false,
+			vecPositionResults,
+			covDist ,
+			loglikelihoodForEveryPositionForEveryBaBd_,
+			loglikelihoodForEveryPositionForEveryBaBdD1_,
+			loglikelihoodForEveryPositionForEveryBaBdD2_	);
+
+		    if(verbose){
+			rc = pthread_mutex_lock(&mutexCERR);
+			checkResults("pthread_mutex_lock()\n", rc);
+		    
+			cerr<<"Thread#"<<threadID<<setprecision(14)<<" bottom "<<h_<<" "<<deltaBottom<<" "<<loglikelihoodForEveryPositionForEveryBaBd_<<" "<<(2.0*fabsl(loglikelihoodForEveryPositionForEveryBaBd_-loglikelihoodForEveryPositionForEveryBaBd))<<endl;
+		    
+			rc = pthread_mutex_unlock(&mutexCERR);
+			checkResults("pthread_mutex_unlock()\n", rc);
+		    }
+		    //cerr<<h_<<" "<<deltaBottom<<" "<<loglikelihoodForEveryPositionForEveryBaBd_<<" "<<(2.0*fabsl(loglikelihoodForEveryPositionForEveryBaBd_-loglikelihoodForEveryPositionForEveryBaBd))<<endl;
+		    if( (2.0*fabsl(loglikelihoodForEveryPositionForEveryBaBd_-loglikelihoodForEveryPositionForEveryBaBd)) > 3.84){
+			bottomIteration=true;
+			break;
+		    }else{
+			deltaBottom = deltaBottom*2.0;
+		    }
+		    
+		}		
+		//cout<<"h new h_ "<<h_<<endl;
+
+	    }//end if first derivative has worked
+
+	    
 
 	}
 	
@@ -2011,6 +2114,9 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
 	iterationsGrad++;	
     }//end iteration
 
+    if(bottomIteration){
+	errb=deltaBottom;
+    }
     
     unsigned int covDistSum=0.0;
     for(int i=0;i<=MAXCOV;i++){	
@@ -2026,7 +2132,7 @@ inline hResults computeLL(vector<positionInformation> * piForGenomicWindow,
     // cout<<setprecision(14)<<h<<"\t"<<correctionFactor<<"\t";
 
     //h = h*correctionFactor;
-    // cout<<setprecision(14)<<h<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
+    //cout<<setprecision(14)<<h<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
     hresToReturn.h            = (h)     *correctionFactor;
     hresToReturn.hLow         = (h-errb)*correctionFactor;
     hresToReturn.hHigh        = (h+errb)*correctionFactor;
@@ -4750,6 +4856,14 @@ int main (int argc, char *argv[]) {
     
     if (fileSummary.is_open()){
 
+	fileSummary << "Command line:"<<endl;
+	for(int i=-1;i<argc;i++){
+	    fileSummary<<" "<<argv[i]<<" "<<endl;
+	}
+	
+	fileSummary<<"Github version: "<< returnGitHubVersion(argv[-1],"") <<" "<<endl;
+	
+	
 	fileSummary << "Global heterozygosity rate:\t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;
 	
 	fileSummary << "\t" <<"total\tfraction in %"<<endl;
