@@ -4857,11 +4857,11 @@ int main (int argc, char *argv[]) {
     if (fileSummary.is_open()){
 
 	fileSummary << "Command line:"<<endl;
-	for(int i=-1;i<argc;i++){
+	for(int i=0;i<argc;i++){
 	    fileSummary<<" "<<argv[i]<<" "<<endl;
 	}
 	
-	fileSummary<<"Github version: "<< returnGitHubVersion(argv[-1],"") <<" "<<endl;
+	fileSummary<<"Github version: "<< returnGitHubVersion(argv[0],"") <<" "<<endl;
 	
 	
 	fileSummary << "Global heterozygosity rate:\t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;

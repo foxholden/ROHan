@@ -164,8 +164,8 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 		/* logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[0].plow+observed[0].phigh)/2.0 *sizeChunk), */
 		/* 					       sizeChunk)	); //emitting observed[0] by state */
 		observed[0].weight*logRobust(hmm->hmmstates[state]->probEmissionRange( (int)(observed[0].hlow *sizeChunk),
-								    (int)(observed[0].hhigh*sizeChunk),
-								    sizeChunk)	); //emitting observed[0] by state
+										       (int)(observed[0].hhigh*sizeChunk),
+										       sizeChunk)	); //emitting observed[0] by state
 		
 	}
 
@@ -189,6 +189,105 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 	    long double p_e = hmm->hmmstates[state]->probEmissionRange( (int)(observed[k].hlow *sizeChunk)  ,
 									(int)(observed[k].hhigh*sizeChunk)  ,
 									sizeChunk);
+	    //cerr<<"k="<<k<<"\ts="<<state<<"\tp_e="<<p_e<<endl;
+	    
+	    for (int previousState = 0; previousState < nStates; previousState++) {//each previous state
+		long double temp =
+		    f[previousState][k-1] +                         // prob stored in previousState
+		    logRobust(hmm->getTrans(previousState,state));  // prob of transition from previousState to state
+		logsum = oplusInitnatl( logsum, temp );
+		logsumNotrans = oplusInitnatl( logsumNotrans, f[previousState][k-1] );
+	    }//end each previous state
+
+	    //logsum contains the sum of all probs from every previous state
+	    if( observed[k].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
+		f[state][k]     =		    logsumNotrans+                                       //previous probability without transition probability
+		                                    observed[k].weight*logRobust( p_e ) +                                   //emission probability by state
+		                                    logRobust( hmm->startingState[state]) ;              //probability of "re"starting at state "state"
+	    }else{
+		if(observed[k].undef){
+		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
+		}else{//not undefined and not break
+
+		    f[state][k] =
+			/* logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[k].plow+observed[k].phigh)/2.0 *sizeChunk)  , */
+			/* 						sizeChunk) ) +  //emission probability by state */			
+			observed[k].weight*logRobust( p_e ) +  //emission probability by state
+			logsum;                                                              //sum of all probs for ev
+		}
+	    }
+
+
+#ifdef DEBUGFWD
+	    if(verbose)
+		cout<<""<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" undef="<<observed[k].undef<<" chrb="<<observed[k].chrBreak<<" w="<<observed[k].weight<<endl;
+#endif
+
+	}//each state
+
+    }//end each obs
+    
+
+    long double temp=0;
+    for (int state = 0; state < nStates; state++) {//each state
+	temp = oplusInitnatl( temp ,  	    f[state][nObservations-1]  );
+    }
+
+    fbreturnVal toreturn;
+    toreturn.m    = f;//copy 
+    toreturn.llik = temp;
+    
+    //long double llik;
+
+    
+    return toreturn;
+}
+
+
+
+inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool usemin,bool verbose=false){
+    int nObservations  = int(observed.size());
+    int nStates        = hmm->getNumberStates();
+    vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
+
+    for (int state = 0; state < nStates; state++) { //
+
+	if(observed[0].undef){ //if undefined
+	    f[state][0] =
+		logRobust( hmm->startingState[state]) ;                                                                //prob of starting a state
+	}else{
+	    //cerr<<"state "<<observed[0].hlow<<" "<<observed[0].hhigh<<" "<<sizeChunk<<endl;
+	    f[state][0] = logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
+		/* logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[0].plow+observed[0].phigh)/2.0 *sizeChunk), */
+		/* 					       sizeChunk)	); //emitting observed[0] by state */
+		observed[0].weight*logRobust(hmm->hmmstates[state]->probEmission( usemin?
+										  ((int)(observed[0].hlow *sizeChunk)):
+										  ((int)(observed[0].hhigh*sizeChunk)),
+										  sizeChunk)	); //emitting observed[0] by state
+	    
+	}
+
+	
+#ifdef DEBUGFWD
+	if(verbose)
+	    cout<<"INIT "<<"f["<<state<<"][0] ="<<f[state][0]<<" undef="<<observed[0].undef<<endl;
+#endif
+	
+    }
+
+
+    for (int k = 1; k < nObservations; k++) {//each obs
+
+	for (int state = 0; state < nStates; state++) {//each state
+	    long double logsum        = -1.0*numeric_limits<long double>::infinity();
+	    long double logsumNotrans = -1.0*numeric_limits<long double>::infinity();
+	    // double p;
+	    // int dmax=-1;
+	    //cerr<<"state"<<k<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" "<<sizeChunk<<endl;
+	    long double p_e = hmm->hmmstates[state]->probEmission( usemin? 
+								   ((int)(observed[k].hlow *sizeChunk)):
+								   ((int)(observed[k].hhigh*sizeChunk)) ,
+								   sizeChunk);
 	    //cerr<<"k="<<k<<"\ts="<<state<<"\tp_e="<<p_e<<endl;
 	    
 	    for (int previousState = 0; previousState < nStates; previousState++) {//each previous state
@@ -372,10 +471,144 @@ inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
     //long double llik;
 
     
+    return toreturn;    
+}
+
+
+inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool usemin,bool verbose=false){
+
+    int nObservations  = int(observed.size());
+    int nStates        = hmm->getNumberStates();
+
+    vector< vector<long double > > b ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
+    
+    
+    
+    for (int k=(nObservations-2); k>=0; k--) {//each obs
+	/* cout<<k<<" "<<observed[k].h<<" "<<observed[k+1].h<<" "<<endl; */
+	
+	for (int state=0; state<nStates; state++) {//each current state
+	    long double logsum             = -1.0*numeric_limits<long double>::infinity();
+	    long double logsumNoTrans      = -1.0*numeric_limits<long double>::infinity();
+	    long double logsumNoTransStart = -1.0*numeric_limits<long double>::infinity();
+	    
+	    //computing the probability for each next of having generated obs k+1
+	    for (int nextState = 0; nextState < nStates; nextState++) {//each next state
+		
+		//long double p_e  = hmm->hmmstates[nextState]->probEmission( (unsigned int)(observed[k+1]*sizeChunk)  , sizeChunk);
+		long double p_e  = observed[k+1].weight*hmm->hmmstates[nextState]->probEmission( usemin? 
+												 ((int)(observed[k+1].hlow *sizeChunk)):
+												 ((int)(observed[k+1].hhigh*sizeChunk)),
+												 sizeChunk);		
+		long double temp;
+		
+		temp=
+		    b[nextState][k+1] + 
+		    logRobust(hmm->getTrans(state,nextState) ) +   //transition from state to nextState
+		    logRobust(p_e); //emission probability of state 
+		/* cout<<"p_e["<<nextState<<"] "<<p_e<<" "<<hmm->hmmstates[nextState]->getH()<<" "<<temp<<" "<<logRobust(hmm->getTrans(state,nextState)) <<endl; */
+		logsum             = oplusInitnatl( logsum,        temp             );
+		logsumNoTrans      = oplusInitnatl( logsumNoTrans, b[nextState][k+1]);//no transition prob and no emission
+		logsumNoTransStart = oplusInitnatl( logsumNoTrans, b[nextState][k+1]+ logRobust( hmm->startingState[nextState]));//no transition but starting
+
+#ifdef DEBUGBWD
+		if(verbose){
+		    cout<<""<<"b["<<nextState<<"]["<<k+1<<"] ="<<b[nextState][k+1]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" logsumNoTrans="<<logsumNoTrans<<" "<<observed[k+1].hlow<<" "<<observed[k+1].hhigh<<" undef="<<observed[k+1].undef<<" chrb="<<observed[k+1].chrBreak<<" w="<<observed[k+1].weight<<endl;
+		    //cout<<"b["<<nextState<<"]["<<(k+1)<<"] "<<b[state][k]<<" = logRobust = "<<logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) << " logsum = "<<logsum<<endl;
+		}
+#endif
+		
+	    }//end each next state
+	    
+	    
+	    //if the next one was a chrBreak
+	    if( observed[k+1].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
+		b[state][k]    =                   logsumNoTransStart; 
+	    }else{
+		//if the next one was undefined
+		if(observed[k+1].undef){
+		    b[state][k] =		   logsumNoTrans;   //forego emission probability just count sum of all probs for every previous state
+		}else{//not undefined and not break
+		    b[state][k] =		   logsum;          //forego emission probability just count sum of all probs for every previous state
+		}
+	    }
+	    
+	    b[state][k] =     b[state][k] * observed[k].weight;
+	    
+#ifdef DEBUGFWD
+	    if(verbose){
+		cout<<"b["<<state<<"]["<<k<<"] "<<b[state][k]<<" 1="<<logsum<<" 2="<<logsumNoTrans<<" 3="<<logsumNoTransStart<<" "<<endl;
+	    }
+#endif
+	}//each state
+	//cout<<endl;
+	//cout<<endl;
+    }//end each obs
+    
+    
+    /* for (int k = 1; k < nObservations; k++) {//each obs */
+    
+    /* 	for (int state = 0; state < nStates; state++) {//each state */
+    /* 	    long double logsum        = -1.0*numeric_limits<long double>::infinity(); */
+    /* 	    long double logsumNotrans = -1.0*numeric_limits<long double>::infinity(); */
+    /* 	    // double p; */
+    /* 	    // int dmax=-1; */
+    /* 	    long double p_e = hmm->hmmstates[state]->probEmissionRange( (int)(observed[k].hlow *sizeChunk)  , */
+    /* 									(int)(observed[k].hhigh*sizeChunk)  , */
+    /* 									sizeChunk); */
+    /* 	    //cerr<<"k="<<k<<"\ts="<<state<<"\tp_e="<<p_e<<endl; */
+	    
+    /* 	    for (int previousState = 0; previousState < nStates; previousState++) {//each previous state */
+    /* 		long double temp = */
+    /* 		    f[previousState][k-1] +                         // prob stored in previousState */
+    /* 		    logRobust(hmm->getTrans(previousState,state));  // prob of transition from previousState to state */
+    /* 		logsum = oplusInitnatl( logsum, temp ); */
+    /* 		logsumNotrans = oplusInitnatl( logsumNotrans, f[previousState][k-1] ); */
+    /* 	    }//end each previous state */
+
+    /* 	    //logsum contains the sum of all probs from every previous state */
+    /* 	    if( observed[k].chrBreak){//if we encounter a chr break = P[Start]*P[emission] */
+    /* 		f[state][k]     =		    logsumNotrans+                            //previous probability without transition probability */
+    /* 		    logRobust( hmm->startingState[state]) ;   //probability of "re"starting at state "state" */
+    /* 	    }else{ */
+    /* 		if(observed[k].undef){ */
+    /* 		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state */
+    /* 		}else{//not undefined and not break */
+
+    /* 		    f[state][k] = */
+    /* 			/\* logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[k].plow+observed[k].phigh)/2.0 *sizeChunk)  , *\/ */
+    /* 			/\* 						sizeChunk) ) +  //emission probability by state *\/			 */
+    /* 			logRobust( p_e ) +  //emission probability by state */
+    /* 			logsum;                                                              //sum of all probs for ev */
+    /* 		} */
+    /* 	    } */
+    /* 	}//each state */
+
+    /* }//end each obs */
+    
+
+    /* long double temp=0; */
+    /* for (int state = 0; state < nStates; state++) {//each state */
+    /* 	temp = oplusInitnatl( temp ,  	    f[state][nObservations-1]  ); */
+    /* } */
+    long double temp=0;
+    for (int state = 0; state < nStates; state++) {//each state
+	temp = oplusInitnatl( temp ,  	    b[state][0]  );
+    }
+
+    fbreturnVal toreturn;
+    toreturn.m    = b;//copy 
+    toreturn.llik = temp;
+    
+    //long double llik;
+
+    
     return toreturn;
 
     
 }
+
+
 
 
 /* typedef struct {  */
@@ -407,6 +640,119 @@ inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vecto
 
     fbreturnVal  f = forwardProbUncertaintyMissing( hmm,  observed, sizeChunk, verbose);
     fbreturnVal  b = backwardProbUncertaintyMissing(hmm,  observed, sizeChunk, verbose);
+    ///    exit(1);
+    vector< vector<long double> > postProb (nStates,vector<long double>(nObservations));
+
+    /* cout<<"FWBW test postprob"<<endl; */
+    for(int i=0;i<nObservations;i++){
+	long double temp = 0.0;
+#ifdef DEBUGFWDBCKWD
+	cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh<<" "<<observed[i].weight;
+#endif
+	for(int x=0;x<nStates;x++){	    
+	    postProb[x][i]   = f.m[x][i] + b.m[x][i];
+#ifdef DEBUGFWDBCKWD
+	    cout<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f.m[x][i] <<" b="<< b.m[x][i]<<" ";
+#endif
+	    /* //cout<<" state#"<<x<<" p="<<postProb[x][i]<<" "<<temp<<" ";  */
+	    
+	    temp             = oplusInitnatl(temp,postProb[x][i]);
+	    /* cout<<" "<<temp<<" "; */
+	}
+	/* cout<<" sum"<<temp<<endl; */
+
+	//numerical overflow can occur if p1+p2 where p1>>p2
+	//in this case we just set the posterior prob to close to 1 
+	bool numericalOverflow  = false;
+	int  numericalOverflowi =-1;
+	
+	for(int x=0;x<nStates;x++){
+	    if(postProb[x][i]  == temp){	       
+		numericalOverflow =true;
+		numericalOverflowi=x;
+	    }
+	}
+#ifdef DEBUGFWDBCKWD
+	cout<<"num overflow "<<numericalOverflow<<" "<<temp<<endl;
+#endif
+	if( numericalOverflow ){
+	    //temp=temp-numeric_limits<long double>::min();
+	    for(int x=0;x<nStates;x++){
+		if(x == numericalOverflowi){
+		    postProb[x][i]  =  -numeric_limits<long double>::min();
+		    //postProb[x][i]  =  logl(1-(numeric_limits<long double>::min()*(nStates-1)));
+		    /* cout<<"numover high "<<-numeric_limits<long double>::min()<<endl; */
+		}else{
+		    postProb[x][i]  =  logl(numeric_limits<long double>::min());
+		    /* cout<<"numover low  "<<logl(numeric_limits<long double>::min())<<endl; */
+		}
+	    }
+	}else{	    
+	    for(int x=0;x<nStates;x++){
+		postProb[x][i]  = postProb[x][i]-temp;
+		/* cout<<"Norm. postProb#"<<x<<" p="<<postProb[x][i]<<" "; */
+	    }
+	}
+	//cout<<setprecision(100)<<"num overflow "<<numericalOverflow<<" "<<temp<<endl;	
+	
+	
+	//cout<<endl;
+    }
+
+    //normalizing
+    long double sumProb=0.0;
+    for(int i=0;i<nObservations;i++){
+	/* cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh<<" undef="<<observed[i].undef; */
+	long double temp = 0.0;
+	
+	for(int x=0;x<nStates;x++){
+	    //long double pp   = min( postProb[x][i] , numeric_limits<long double>::min());	     	    //fixes numerical issues
+	    long double pp   = postProb[x][i] ;
+	    if(pp==0){//if essentially the probability is 1
+		pp = logl( 1.0-numeric_limits<long double>::min());
+	    }
+	    temp             = oplusInitnatl(temp,pp);
+	    /* cout<<" x="<<x<<" pp="<<(postProb[x][i])<<" t="<<temp; */
+	}
+	/* cout<<" "<<temp<<" "; */
+	
+	for(int x=0;x<nStates;x++){
+	    postProb[x][i] = postProb[x][i]-temp;
+	    /* cout<<"postProb["<<x<<"]["<<i<<"] "<<postProb[x][i]<<" "<<expl(postProb[x][i])<<" "; */
+	}
+
+	/* for(int x=0;x<nStates;x++){ */
+	/*     postProb[x][i] = postProb[x][i]-temp; */
+	/*     cout<<"emission["<<x<<"]["<<i<<"] "<< hmm->hmmstates[x]->probEmissionRange( (int)(observed[i].hlow *sizeChunk), */
+	/* 										(int)(observed[i].hhigh*sizeChunk), */
+	/* 										sizeChunk)<<" "; */
+	/*     //if(i>138){ exit(1); } */
+	/* } */	
+	/* cout<<endl; */
+	sumProb+=temp;
+    }
+
+    
+    fbreturnVal toreturn;
+    toreturn.m    = postProb;//copy 
+    toreturn.llik = sumProb;
+    
+    return toreturn;
+}
+
+
+
+inline fbreturnVal forwardBackwardProbMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool usemin,bool verbose=false){
+
+
+    /* cout<<"forwardBackward"<<endl; */
+    /* exit(1); */
+
+    int nObservations  = int(observed.size());
+    int nStates        = hmm->getNumberStates(); 
+
+    fbreturnVal  f = forwardProbMissing( hmm,  observed, sizeChunk, usemin, verbose);
+    fbreturnVal  b = backwardProbMissing(hmm,  observed, sizeChunk, usemin, verbose);
     ///    exit(1);
     vector< vector<long double> > postProb (nStates,vector<long double>(nObservations));
 
