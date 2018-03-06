@@ -534,7 +534,7 @@ int PdfWriter::drawVerticalLine(const double x,
     
     return 0;
 }
-
+#define NEWPLOT
 
 int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
 			const long double   h_,          // value of h
@@ -585,26 +585,33 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
     //cerr<<name2chrScreenInfo[ cr.getChrName() ].le
     double widthtouse = name2chrScreenInfo[ cr.getChrName() ].lengthScreen/(name2chrScreenInfo[ cr.getChrName() ].length/windowSizeForHest);
 
-
+// #ifdef NEWPLOT 
     drawVerticalLine( x,                                                                                                             // x offset
 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,  // baseline
 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hhigh-hLimLow)/hLimHigh),
-		      0.9,
-		      0,
-		      0,
+		      0.0,
+		      0.0,
+		      0.0,
 		      0.0//widthtouse/3.0
     ); // baseline
 
-    //cerr<<"val "<<name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) <<endl;
     
 
-    drawHorizontalLine( x-widthtouse/2.0,                                                                                                             // x offset
-			x+widthtouse/2.0,                                                                                                             // x offset			
-			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),                   // baseline
-			0,
-			0,
-			0,
-			0.2);
+    drawCircle(x-widthtouse/2.0,                                                                                                             // x offset
+    	       x+widthtouse/2.0,                                                                                                             // x offset			,
+    	       name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),
+    	       0.9,
+    	       0.0,
+    	       0.0,
+    	       widthtouse/10.0);
+	
+    // drawHorizontalLine( x-widthtouse/2.0,                                                                                                             // x offset
+    // 			x+widthtouse/2.0,                                                                                                             // x offset			
+    // 			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),                   // baseline
+    // 			0,
+    // 			0,
+    // 			0,
+    // 			0.2);
 			
 
 
@@ -612,12 +619,46 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
     drawVerticalLine( x,                                                                                                             // x offset
 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hlow -hLimLow)/hLimHigh) ,  // baseline
 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,
-		      0.9,
+		      0.0,
 		      0.0,
 		      0.0,
 		      0.0//widthtouse/3.0
     ); // baseline
+// #else
+//     drawVerticalLine( x,                                                                                                             // x offset
+// 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,  // baseline
+// 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hhigh-hLimLow)/hLimHigh),
+// 		      0.9,
+// 		      0,
+// 		      0,
+// 		      0.0//widthtouse/3.0
+//     ); // baseline
 
+    
+
+//     drawHorizontalLine( x-widthtouse/2.0,                                                                                                             // x offset
+// 			x+widthtouse/2.0,                                                                                                             // x offset			
+// 			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),                   // baseline
+// 			0,
+// 			0,
+// 			0,
+// 			0.2);
+			
+
+
+//     // lower estimate
+//     drawVerticalLine( x,                                                                                                             // x offset
+// 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hlow -hLimLow)/hLimHigh) ,  // baseline
+// 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,
+// 		      0.9,
+// 		      0.0,
+// 		      0.0,
+// 		      0.0//widthtouse/3.0
+//     ); // baseline
+// #endif
+
+
+    
     // drawHorizontalLine( x,                                                                                                             // x offset
     //  			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)-1 ,  // baseline
     //  			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)+1,
@@ -661,7 +702,8 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 		       const double        hLimLow,    // lower  limit for the h plot 
 		       const double        hLimHigh,
 		       const double        windowSizeForHest,
-		       const bool          defined){  // higher limit for the h plot 
+		       const bool          defined,
+		       const unsigned char useminmidmax){  // higher limit for the h plot 
     long double   h     = h_;
     //long double   hlow  = hlow_;
     long double   hhigh = hhigh_;
@@ -690,15 +732,17 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 
     double r,g,b,w;
     if(defined){
-	r =   0;
-	g = 1.0;
-	b =   0;
-	w = 1.0;
+	if( useminmidmax == HMMCODEMIN){//red
+	    r =   1.0; g = 0.0; b =   0.0; w = 1.0;
+	}
+	if( useminmidmax == HMMCODEMID){//green
+	    r =   0.0; g = 1.0; b =   0.0; w = 1.0;
+	}
+	if( useminmidmax == HMMCODEMAX){//magenta
+	    r =   1.0; g = 0.0; b =   1.0; w = 1.0;
+	}
     }else{
-	r = 1.0;
-	g = 1.0;
-	b =   0;
-	w = 0.5;
+	r = 1.0; g = 1.0; b =   0; w = 0.5;
     }
 
     widthtouse = 0.9*widthtouse;
@@ -706,7 +750,7 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
     double xlhmm = x-widthtouse/2.0;// x offset
     double xrhmm = x+widthtouse/2.0;// x offset			
     double yhmm  = (name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)); // baseline
-
+    
     drawHorizontalLine( xlhmm,
 			xrhmm,
 			yhmm ,
@@ -785,10 +829,30 @@ int PdfWriter::drawGlobalHEst(//string chrname,
 			   0.0,
 			   0.0,
 			   0.7,
-			   0.3,
+			   0.3, //w
 			   true
-
 	);//baseline
+
+	drawHorizontalLine(xmargin,
+			   xmargin+name2chrScreenInfo[ it->first ].lengthScreen,
+			   name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (hlow  -hLimLow)/hLimHigh),
+			   0.0,
+			   0.0,
+			   0.2,
+			   0.1, //w
+			   true
+	);//baseline
+	drawHorizontalLine(xmargin,
+			   xmargin+name2chrScreenInfo[ it->first ].lengthScreen,
+			   name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (hhigh -hLimLow)/hLimHigh),
+			   0.0,
+			   0.0,
+			   0.2,
+			   0.1, //w
+			   true
+	);//baseline
+
+	
 	// //high
 	// drawVerticalLine(xmargin,
 	// 		 name2chrScreenInfo[ it->first ].lengthScreen,
@@ -826,6 +890,36 @@ int PdfWriter::drawHorizontalLine(const double x1,
     //}
     HPDF_Page_SetRGBStroke (page, 0.0, 0.0, 0.0 );//unset color
     HPDF_Page_SetLineWidth (page, 1.0); //unset line width
+
+    return 0;
+}
+
+
+
+
+int PdfWriter::drawCircle(const double x1,
+			  const double x2,
+			  const double y,
+			  double r,
+			  double g,
+			  double b,
+			  double radius){
+    HPDF_Page_SetLineWidth (page, 0.0);
+
+    HPDF_Page_SetRGBStroke (page, r, g, b);//set color
+    //    HPDF_Page_SetLineWidth (page, ra); //set line width
+    HPDF_Page_SetRGBFill (page, r, g, b);
+
+    //cerr<<"drawHorizontalLine "<<x1<<" "<<x2<<" "<<y<<" "<<r<<" "<<g<<" "<<b<<" "<<w<<" "<<dash<<endl;
+    HPDF_Page_Circle ( page, (x1+x2)/2.0 , y, radius);
+    // HPDF_Page_MoveTo (page, x1,   y);
+    // HPDF_Page_LineTo (page, x2,   y);
+    // HPDF_Page_Stroke (page);
+    HPDF_Page_ClosePathFillStroke (page);
+
+    HPDF_Page_SetRGBStroke (page, 0.0, 0.0, 0.0 );//unset color
+    HPDF_Page_SetRGBFill (page, 0.0, 0.0, 0.0);
+    //HPDF_Page_SetLineWidth (page, 1.0); //unset line width
 
     return 0;
 }

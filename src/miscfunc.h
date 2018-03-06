@@ -23,8 +23,57 @@ using namespace std;
 
 static vector<long double> lnFactVec;
 
+#define HMMCODEMIN 0
+#define HMMCODEMID 1
+#define HMMCODEMAX 2
+
+
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+
+#define MIN3(a,b,c) MIN(MIN(a,b),c)
+#define MAX3(a,b,c) MAX(MAX(a,b),c)
+
+
+
+typedef struct { 
+    long double p;
+    int idx;
+} emission;
+
+
+typedef struct { 
+    vector<int> seq;
+    long double llik;
+ } hmmpath;
+
+
+
+typedef struct { 
+    vector< vector<long double > > m;
+    long double llik;
+ } fbreturnVal;
+
+ typedef struct{
+
+    long double hAvg;
+    long double pAvg;
+    long double sAvg;
+    
+    long double hMin;    
+    long double pMin;    
+    long double sMin;
+	
+    long double hMax;
+    long double pMax;
+    long double sMax;
+    
+    uint64_t rohSegments   ;
+    uint64_t nonrohSegments;
+    uint64_t unsureSegments;
+
+    fbreturnVal postprob;
+ } hmmRes;
 
 
 typedef struct { 

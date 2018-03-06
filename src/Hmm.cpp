@@ -8,8 +8,11 @@
 #include "Hmm.h"
 
 
-Hmm::Hmm(int minSegSitesPerChunk,int maxSegSitesPerChunk,int sizeChunk,unsigned int nrwPerSizeChunk){
+Hmm::Hmm(int minSegSitesPerChunk_,int maxSegSitesPerChunk_,int sizeChunk,unsigned int nrwPerSizeChunk){
     //cerr<<"Hmm constr"<<endl;
+    minSegSitesPerChunk =  minSegSitesPerChunk_;
+    maxSegSitesPerChunk =  maxSegSitesPerChunk_;
+
     for(int n=0;n<NBRSTATES;n++){
 	if(n==0)
 	    hmmstates[n] = new  HmmState (n,0.000000012,minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk,nrwPerSizeChunk);
@@ -98,14 +101,16 @@ Hmm::~Hmm(){
     for(int i = 0; i < NBRSTATES; ++i)
       delete 	trans[i] ;
     delete trans;
-    
-
-
-    
-
-
 }
 
+
+int  Hmm::getMinSegSitesPerChunk(){
+    return minSegSitesPerChunk;
+}
+int  Hmm::getMaxSegSitesPerChunk(){
+    return maxSegSitesPerChunk;
+}
+ 
 
 vector<emission> Hmm::generateStates(unsigned int N,unsigned int total) const{
     vector<emission> vecToReturn;

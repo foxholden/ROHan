@@ -17,6 +17,7 @@ using namespace std;
 #include <setjmp.h>
 #include <vector>
 
+#include "miscfunc.h"
 #include "hpdf.h"
 #include "GenomicWindows.h"
 
@@ -122,13 +123,23 @@ class PdfWriter{
 		const double        hLimLow,    // lower  limit for the h plot 
 		const double        hLimHigh,
 		const double        windowSizeForHest,
-		const bool          defined);  // higher 
+		const bool          defined,
+		const unsigned char useminmidmax);  // higher 
     
     int drawGlobalHEst(const long double   h,
 		       const long double   hlow,
 		       const long double   hhigh,
 		       const double hLimLow,
 		       const double hLimHigh);
+
+    int drawCircle(const double x1,
+		   const double x2,
+		   const double y,
+		   double r,
+		   double g,
+		   double b,
+		   double radius);
+    
 };
 
 

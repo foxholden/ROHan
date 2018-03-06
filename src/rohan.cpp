@@ -33,6 +33,7 @@
 using namespace std;
 using namespace BamTools;
 
+
 //#define MIN(a,b) (((a)<(b))?(a):(b))
 //#define MAX(a,b) (((a)>(b))?(a):(b))
 
@@ -3164,9 +3165,353 @@ void *mainCoverageComputationThread(void * argc){
 
 
 
+// useminmidmax 0:min 1:mid 2:max
+
+hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & heteroEstResults, const int maxChains , const double fracChainsBurnin,const unsigned char useminmidmax){
+
+    cerr<<"Creating HMM";
+    if(useminmidmax == HMMCODEMIN) { cerr<<" for min. values"; }
+    if(useminmidmax == HMMCODEMID) { cerr<<" for mid  values"; }
+    if(useminmidmax == HMMCODEMAX) { cerr<<" for max. values"; }
+
+    cerr<<"..";
+    //write chains to output
+    //bgzipWriterMCMC
+    string headerHMMMCMC = "#llik\th\ts\tp\taccepted\tchains\tacptrate\n";
+    Internal::BgzfStream  bgzipWriterMCMC;
 
 
+    string outFileSuffixMCMC;
+    if(useminmidmax == HMMCODEMIN) { outFileSuffixMCMC = ".min"; }
+    if(useminmidmax == HMMCODEMID) { outFileSuffixMCMC = ".mid"; }
+    if(useminmidmax == HMMCODEMAX) { outFileSuffixMCMC = ".max"; }
+    outFileSuffixMCMC += ".hmmmcmc.gz";
 
+    
+    bgzipWriterMCMC.Open(outFilePrefix+outFileSuffixMCMC, IBamIODevice::WriteOnly);
+    if(!bgzipWriterMCMC.IsOpen()){
+	cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixMCMC)<<" in bgzip writer"<<endl;
+	exit(1);
+    }
+
+    //computing the min/max segsites per chunk
+    int minSegSitesPerChunk;
+    int maxSegSitesPerChunk;
+    if(sizeChunk == 1000000){
+	minSegSitesPerChunk = minSegSitesPer1M;	
+	maxSegSitesPerChunk = maxSegSitesPer1M;
+    }else{
+	minSegSitesPerChunk = int( (double(minSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+	maxSegSitesPerChunk = int( (double(maxSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+    }
+    minSegSitesPerChunk=0;
+    //cerr<<"hmm "<<minSegSitesPerChunk<<" "<<maxSegSitesPerChunk<<endl;
+    Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk,1000);
+    
+    //cerr<<"Begin running MCMC on HMM"<<endl;
+    // cerr<<"generating a random set"<<endl;
+    // vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
+
+    cerr<<".";
+    //vector<emissionUndef>  eTestUndef;
+
+
+    //BEGIN MCMC chain
+    //init to random settings
+    long double partition= (long double)(stepHMM);
+    int accept=0;
+
+    //likelihood
+    long double x_i    ;
+    long double x_i_1  ;
+    
+    //het rate
+    //int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
+    int sitesPer1M     = 1000;// 1000 heterozygous sites per million
+    long double h_i    = double(       sitesPer1M )/double(1000000);
+    long double h_i_1;
+
+    long double hlower = double( minSegSitesPer1M )/double(1000000);
+    long double hupper = double( maxSegSitesPer1M )/double(1000000);
+
+    //number of non-recombining chunks per window
+    long double s_i    = 100.0; //starting value, there are 100 non-recombining window in sizeChunk
+    long double s_i_1;
+
+    long double slower = 1.0;       // the whole sizeChunk is a non-recombining window
+    long double supper = sizeChunk; // 1 base is a non-recombining window
+    
+
+    
+    //transition rate
+    long double pTlowerFirstHalf  =    0.5;//overestimate the transition probability 
+    //long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+    long double pTlowerSecondHalf =    numeric_limits<double>::min();
+	
+    long double pTlower = pTlowerFirstHalf;	
+    //long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+    long double pTupper = 1.0 - numeric_limits<double>::min();
+
+    //generate a random initial probability between pTlower and pTupper
+    //probability of transition
+    long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
+    long double pT_i_1;
+    //long double pTlower =       numeric_limits<double>::epsilon();
+        
+    random_device rd;
+    default_random_engine dre (rd());
+    //int maxChains = 100000;
+    //chain 0
+
+    hmm.setHetRateForNonROH(h_i);
+    hmm.setTransprob(pT_i);
+    hmm.setNrwPerSizeChunk( (unsigned int)s_i );
+    hmm.recomputeProbs();
+    
+    cerr<<".";
+    // for(unsigned int i=0;i<heteroEstResults.size();i++){
+    // 	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
+    // }
+    // return 1;
+    //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
+    //cerr<<"test fwd"<<endl;
+    fbreturnVal  tmpResFWD = forwardProbMissing(&hmm,heteroEstResults,sizeChunk,useminmidmax);
+    x_i  = tmpResFWD.llik;
+    // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+    cerr<<"..done"<<endl;
+    //cerr<<"x_i "<<x_i<<endl;
+    //return 1;
+    //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+    vector<long double> hvector;
+    vector<long double> pvector;
+    vector<long double> svector;
+    
+    cerr<<"Begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<" chains"<<endl;
+
+    for(int chain=1;chain<=maxChains;chain++){
+
+	//computing new state
+	normal_distribution<long double> distribution_h(h_i,  (hupper-hlower)/partition  );
+	h_i_1      = distribution_h(dre);
+	if(h_i_1 <= hlower       ||  h_i_1 >= hupper     ){
+	    h_i_1      = h_i;
+	}
+
+
+	normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
+	pT_i_1      = distribution_pT(dre);
+	if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
+	    pT_i_1      = pT_i;
+	}
+
+	//normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
+	normal_distribution<long double> distribution_s(s_i,  2  );
+	s_i_1      = distribution_s(dre);
+	if(s_i_1 <= slower       ||  s_i_1 >= supper     ){
+	    s_i_1      = s_i;
+	}
+
+
+	//set new model parameters
+	// cerr<<"old   h_i   "<<h_i<<" "<<" pT_i "<<" "<<pT_i<<" s_i  "<<s_i <<endl;
+	// cerr<<"new   h_i_1 "<<h_i_1<<" "<<" pT_i_1 "<<" "<<pT_i_1<<" s_i_1  "<<s_i_1 <<endl;
+
+	hmm.setHetRateForNonROH(h_i_1);
+	hmm.setTransprob(pT_i_1);
+	hmm.setNrwPerSizeChunk( (unsigned int)s_i_1 );
+	hmm.recomputeProbs();
+
+	
+	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
+	//compute new likelihood
+	//x_i_1=forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+	// tmpResFWD = forwardProbUncertaintyMissing(&hmm,heteroEstResults, sizeChunk,useminmidmax);
+	tmpResFWD = forwardProbMissing(&hmm,heteroEstResults, sizeChunk,useminmidmax);
+ 
+
+	x_i_1     = tmpResFWD.llik;
+	//	cerr<<"x_i_1 "<<x_i_1<<endl;
+	if(chain>(maxChains/4)){
+	    pTlower = pTlowerSecondHalf;
+	}
+
+	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
+	if( (long double)(randomProb()) < acceptance){
+	    h_i           =  h_i_1;
+	    s_i           =  s_i_1;
+	    pT_i          =  pT_i_1;
+	    x_i           =  x_i_1;
+
+	    if( (chain>=(maxChains*(1.0-fracChainsBurnin)))){
+		hvector.push_back(h_i);
+		pvector.push_back(pT_i);
+		svector.push_back(s_i);
+
+		string strToWrite = stringify( x_i )+"\t"+stringify( h_i )+"\t"+stringify( s_i )+"\t"+stringify( pT_i )+"\t"+stringify( accept )+"\t"+stringify( chain )+"\t"+stringify( double(accept)/double(chain) )+"\n";
+		bgzipWriterMCMC.Write(strToWrite.c_str(), strToWrite.size());
+	    }
+	    
+	    accept++;
+	    if(verbose)
+		cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+	}else{
+	  
+	  if(verbose)
+	      cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+	}
+	
+	if(!verbose)
+	  printprogressBarCerr( float(chain)/float(maxChains) );
+	//chain++;
+	//sleep(0.1);
+    }
+    cerr<<endl;
+    cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+
+    bgzipWriterMCMC.Close();    
+	
+    //cerr<<"Baum Welch"<<endl;
+    //baum_welch(&hmm,&emittedH);
+	
+
+    //hvector and pvector contain the values
+    long double hSum=0.0;
+    long double pSum=0.0;
+    long double sSum=0.0;
+    
+    long double hAvg=0.0;
+    long double pAvg=0.0;
+    long double sAvg=0.0;
+    
+    long double hMin=1.0;    
+    long double pMin=1.0;    
+    long double sMin=supper+1;
+	
+    long double hMax=0.0;
+    long double pMax=0.0;
+    long double sMax=slower-1;
+
+    
+
+    
+    for(unsigned int i=0;i<hvector.size();i++){
+	hSum += hvector[i];
+	pSum += pvector[i];
+	sSum += svector[i];
+
+	if(hvector[i] < hMin)
+	    hMin = hvector[i] ;
+	if(hvector[i] > hMax)
+	    hMax = hvector[i] ;
+	
+	if(pvector[i] < pMin)
+	    pMin = pvector[i] ;
+	if(pvector[i] > pMax)
+	    pMax = pvector[i] ;
+	
+	if(svector[i] < sMin)
+	    sMin = svector[i] ;
+	if(svector[i] > sMax)
+	    sMax = svector[i] ;
+	
+    }
+
+    hAvg = hSum/( (long double)hvector.size() );
+    pAvg = pSum/( (long double)pvector.size() );
+    sAvg = sSum/( (long double)svector.size() );
+
+
+    //to remove
+    // hMin = 0.00070;
+    // hAvg = 0.0007467025205; 
+    // hMax = 0.0008;
+
+    // computing assignment prob
+    //set average parameters
+    //TODO remove
+    // hAvg = 0.0007467025205;
+    // pAvg = 0.0960255;
+    
+    hmm.setHetRateForNonROH(hAvg);
+    hmm.setTransprob(pAvg);
+    hmm.setNrwPerSizeChunk( (unsigned int)sAvg );
+    hmm.recomputeProbs();
+
+    
+    fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,useminmidmax);
+
+    cerr<<"HMM done"<<endl;
+
+
+    string outFileSuffixHMMpost;
+    if(useminmidmax == HMMCODEMIN) { outFileSuffixHMMpost = ".min"; }
+    if(useminmidmax == HMMCODEMID) { outFileSuffixHMMpost = ".mid"; }
+    if(useminmidmax == HMMCODEMAX) { outFileSuffixHMMpost = ".max"; }
+    outFileSuffixHMMpost += ".hmmp.gz";
+
+    
+
+    string headerHMMpost =   "#CHROM\tBEGIN\tEND\tp[ROH]\tp[nonROH]\n";
+    Internal::BgzfStream  bgzipWriterHMMpost;
+    bgzipWriterHMMpost.Open(outFilePrefix+outFileSuffixHMMpost, IBamIODevice::WriteOnly);
+    if(!bgzipWriterHMMpost.IsOpen()){
+	cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixHMMpost)<<" in bgzip writer"<<endl;
+	exit(1);
+    }
+    bgzipWriterHMMpost.Write(headerHMMpost.c_str(), headerHMMpost.size());
+    uint64_t rohSegments   =0;
+    uint64_t nonrohSegments=0;
+    uint64_t unsureSegments=0;
+
+    for(unsigned int c=0;c<heteroEstResults.size();c++){
+	string strToWrite=heteroEstResults[c].rangeGen.asBed()+"\t";//+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
+
+	if(heteroEstResults[c].undef){
+	    strToWrite+="NA\tNA\n";
+	}else{
+	    strToWrite+=stringify( exp(postprob.m[0][c]) )+"\t"+stringify( exp(postprob.m[1][c]) )+"\n";
+	}
+
+	if(     exp(postprob.m[0][c]) > 0.9){
+	    rohSegments        += sizeChunk;
+	}else{
+	    if( exp(postprob.m[1][c]) < 0.9){
+		nonrohSegments += sizeChunk;
+	    }else{
+		unsureSegments += sizeChunk;
+	    }
+	}
+	bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());	
+    }
+    bgzipWriterHMMpost.Close();    
+    cerr<<"Written trace to "<<(outFilePrefix+outFileSuffixHMMpost)<<endl;
+
+    hmmRes toreturn;
+
+    toreturn.hAvg = hAvg;
+    toreturn.pAvg = pAvg;
+    toreturn.sAvg = sAvg;
+    
+    toreturn.hMin = hMin;
+    toreturn.pMin = pMin;
+    toreturn.sMin = sMin;
+    
+    toreturn.hMax = hMax;
+    toreturn.pMax = pMax;
+    toreturn.sMax = sMax;
+
+
+    toreturn.rohSegments    = rohSegments   ;
+    toreturn.nonrohSegments = nonrohSegments;
+    toreturn.unsureSegments = unsureSegments;
+    
+    toreturn.postprob       = postprob;
+
+    
+    return toreturn;
+}
 
 
 
@@ -3238,11 +3583,8 @@ int main (int argc, char *argv[]) {
     vector<emissionUndef> heteroEstResults;
     Internal::BgzfStream  bgzipWriterHest;
 
-    string headerHMMMCMC;
-    Internal::BgzfStream  bgzipWriterMCMC;
 
-    string headerHMMpost;
-    Internal::BgzfStream  bgzipWriterHMMpost;
+
     
     unsigned int      rank  = 0;
     int          lastRank   =-1;
@@ -4422,266 +4764,22 @@ int main (int argc, char *argv[]) {
 	cerr<<"..done"<<endl;
 	
     } //end if skipToHMM
-    // return 1;
-    
-	
 
-    cerr<<"Creating HMM..";
-    //write chains to output
-    //bgzipWriterMCMC
-    headerHMMMCMC = "#llik\th\ts\tp\taccepted\tchains\tacptrate\n";
-
-    bgzipWriterMCMC.Open(outFilePrefix+".hmmmcmc.gz", IBamIODevice::WriteOnly);
-    if(!bgzipWriterMCMC.IsOpen()){
-	cerr<<"Cannot open file "<<(outFilePrefix+".hmmmcmc.gz")<<" in bgzip writer"<<endl;
-	return 1;
-    }
-
-    //computing the min/max segsites per chunk
-    int minSegSitesPerChunk;
-    int maxSegSitesPerChunk;
-    if(sizeChunk == 1000000){
-	minSegSitesPerChunk = minSegSitesPer1M;	
-	maxSegSitesPerChunk = maxSegSitesPer1M;
-    }else{
-	minSegSitesPerChunk = int( (double(minSegSitesPer1M)/double(1000000))*double(sizeChunk) );
-	maxSegSitesPerChunk = int( (double(maxSegSitesPer1M)/double(1000000))*double(sizeChunk) );
-    }
-    
-    Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk,1000);
-    
-    //cerr<<"Begin running MCMC on HMM"<<endl;
-    // cerr<<"generating a random set"<<endl;
-    // vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
-
-    cerr<<".";
-    //vector<emissionUndef>  eTestUndef;
-
-
-    //BEGIN MCMC chain
-    //init to random settings
-    long double partition= (long double)(stepHMM);
-    int accept=0;
-
-    //likelihood
-    long double x_i    ;
-    long double x_i_1  ;
-    
-    //het rate
-    //int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
-    int sitesPer1M     = 1000;// 1000 heterozygous sites per million
-    long double h_i    = double(       sitesPer1M )/double(1000000);
-    long double h_i_1;
-
-    long double hlower = double( minSegSitesPer1M )/double(1000000);
-    long double hupper = double( maxSegSitesPer1M )/double(1000000);
-
-    //number of non-recombining chunks per window
-    long double s_i    = 100.0; //starting value, there are 100 non-recombining window in sizeChunk
-    long double s_i_1;
-
-    long double slower = 1.0;       // the whole sizeChunk is a non-recombining window
-    long double supper = sizeChunk; // 1 base is a non-recombining window
-    
-
-    
-    //transition rate
-    long double pTlowerFirstHalf  =    0.5;//overestimate the transition probability 
-    //long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
-    long double pTlowerSecondHalf =    numeric_limits<double>::min();
-	
-    long double pTlower = pTlowerFirstHalf;	
-    //long double pTupper = 1.0 - numeric_limits<double>::epsilon();
-    long double pTupper = 1.0 - numeric_limits<double>::min();
-
-    //generate a random initial probability between pTlower and pTupper
-    //probability of transition
-    long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
-    long double pT_i_1;
-    //long double pTlower =       numeric_limits<double>::epsilon();
-        
-    random_device rd;
-    default_random_engine dre (rd());
-    //int maxChains = 100000;
-    //chain 0
-
-    hmm.setHetRateForNonROH(h_i);
-    hmm.setTransprob(pT_i);
-    hmm.setNrwPerSizeChunk( (unsigned int)s_i );
-    hmm.recomputeProbs();
-    
-    cerr<<".";
-    // for(unsigned int i=0;i<heteroEstResults.size();i++){
-    // 	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
-    // }
-    // return 1;
-    //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
-    fbreturnVal  tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
-    x_i  = tmpResFWD.llik;
-    // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
-    // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
-    cerr<<"..done"<<endl;
-    //cerr<<"x_i "<<x_i<<endl;
-    //return 1;
-    //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
-    vector<long double> hvector;
-    vector<long double> pvector;
-    vector<long double> svector;
-    
-    cerr<<"Begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<" chains"<<endl;
-
-    for(int chain=1;chain<=maxChains;chain++){
-
-	//computing new state
-	normal_distribution<long double> distribution_h(h_i,  (hupper-hlower)/partition  );
-	h_i_1      = distribution_h(dre);
-	if(h_i_1 <= hlower       ||  h_i_1 >= hupper     ){
-	    h_i_1      = h_i;
-	}
-
-
-	normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
-	pT_i_1      = distribution_pT(dre);
-	if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
-	    pT_i_1      = pT_i;
-	}
-
-	//normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
-	normal_distribution<long double> distribution_s(s_i,  2  );
-	s_i_1      = distribution_s(dre);
-	if(s_i_1 <= slower       ||  s_i_1 >= supper     ){
-	    s_i_1      = s_i;
-	}
-
-
-	//set new model parameters
-	// cerr<<"old   h_i   "<<h_i<<" "<<" pT_i "<<" "<<pT_i<<" s_i  "<<s_i <<endl;
-	// cerr<<"new   h_i_1 "<<h_i_1<<" "<<" pT_i_1 "<<" "<<pT_i_1<<" s_i_1  "<<s_i_1 <<endl;
-
-	hmm.setHetRateForNonROH(h_i_1);
-	hmm.setTransprob(pT_i_1);
-	hmm.setNrwPerSizeChunk( (unsigned int)s_i_1 );
-	hmm.recomputeProbs();
-
-	
-	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
-	//compute new likelihood
-	//x_i_1=forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
-	tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
-
-	x_i_1     = tmpResFWD.llik;
-	//	cerr<<"x_i_1 "<<x_i_1<<endl;
-	if(chain>(maxChains/4)){
-	    pTlower = pTlowerSecondHalf;
-	}
-
-	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
-	if( (long double)(randomProb()) < acceptance){
-	    h_i           =  h_i_1;
-	    s_i           =  s_i_1;
-	    pT_i          =  pT_i_1;
-	    x_i           =  x_i_1;
-
-	    if( (chain>=(maxChains*(1.0-fracChainsBurnin)))){
-		hvector.push_back(h_i);
-		pvector.push_back(pT_i);
-		svector.push_back(s_i);
-
-		string strToWrite = stringify( x_i )+"\t"+stringify( h_i )+"\t"+stringify( s_i )+"\t"+stringify( pT_i )+"\t"+stringify( accept )+"\t"+stringify( chain )+"\t"+stringify( double(accept)/double(chain) )+"\n";
-		bgzipWriterMCMC.Write(strToWrite.c_str(), strToWrite.size());
-	    }
-	    
-	    accept++;
-	    if(verbose)
-	      cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
-	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
-	}else{
-	  
-	  if(verbose)
-	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
-	}
-	
-	if(!verbose)
-	  printprogressBarCerr( float(chain)/float(maxChains) );
-	//chain++;
-	//sleep(0.1);
-    }
-    cerr<<endl;
-    cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
-
-    bgzipWriterMCMC.Close();    
-	
-    //cerr<<"Baum Welch"<<endl;
-    //baum_welch(&hmm,&emittedH);
-	
-
-    //hvector and pvector contain the values
-    long double hSum=0.0;
-    long double pSum=0.0;
-    long double sSum=0.0;
-    
-    long double hAvg=0.0;
-    long double pAvg=0.0;
-    long double sAvg=0.0;
-    
-    long double hMin=1.0;    
-    long double pMin=1.0;    
-    long double sMin=supper+1;
-	
-    long double hMax=0.0;
-    long double pMax=0.0;
-    long double sMax=slower-1;
 
     
 
-    
-    for(unsigned int i=0;i<hvector.size();i++){
-	hSum += hvector[i];
-	pSum += pvector[i];
-	sSum += svector[i];
 
-	if(hvector[i] < hMin)
-	    hMin = hvector[i] ;
-	if(hvector[i] > hMax)
-	    hMax = hvector[i] ;
-	
-	if(pvector[i] < pMin)
-	    pMin = pvector[i] ;
-	if(pvector[i] > pMax)
-	    pMax = pvector[i] ;
-	
-	if(svector[i] < sMin)
-	    sMin = svector[i] ;
-	if(svector[i] > sMax)
-	    sMax = svector[i] ;
-	
-    }
+    //lower
+    hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,HMMCODEMIN);
+    cerr<<"min h est. "<<hmmResmin.hAvg<<" hMin "<<hmmResmin.hMin<<" hMax "<<hmmResmin.hMax<<" s "<<hmmResmin.sAvg<<" sMin "<<hmmResmin.sMin<<" sMax "<<hmmResmin.sMax<<" p avg. "<<hmmResmin.pAvg<<" pMin "<<hmmResmin.pMin<<" pMax "<<hmmResmin.pMax<<" rohS "<<hmmResmin.rohSegments<<" nonrohS "<<hmmResmin.nonrohSegments<<" unsure "<<hmmResmin.unsureSegments<<endl;
 
-    hAvg = hSum/( (long double)hvector.size() );
-    pAvg = pSum/( (long double)pvector.size() );
-    sAvg = sSum/( (long double)svector.size() );
+    //mid
+    hmmRes hmmResmid=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,HMMCODEMID);
+    cerr<<"mid h est. "<<hmmResmid.hAvg<<" hMin "<<hmmResmid.hMin<<" hMax "<<hmmResmid.hMax<<" s "<<hmmResmid.sAvg<<" sMin "<<hmmResmid.sMin<<" sMax "<<hmmResmid.sMax<<" p avg. "<<hmmResmid.pAvg<<" pMin "<<hmmResmid.pMin<<" pMax "<<hmmResmid.pMax<<" rohS "<<hmmResmid.rohSegments<<" nonrohS "<<hmmResmid.nonrohSegments<<" unsure "<<hmmResmid.unsureSegments<<endl;
 
-
-    //to remove
-    // hMin = 0.00070;
-    // hAvg = 0.0007467025205; 
-    // hMax = 0.0008;
-
-    // computing assignment prob
-    //set average parameters
-    //TODO remove
-    // hAvg = 0.0007467025205;
-    // pAvg = 0.0960255;
-    
-    hmm.setHetRateForNonROH(hAvg);
-    hmm.setTransprob(pAvg);
-    hmm.setNrwPerSizeChunk( (unsigned int)sAvg );
-    hmm.recomputeProbs();
-
-    
-    fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
-
-    cerr<<"HMM done"<<endl;
+    //upper
+    hmmRes hmmResmax=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,HMMCODEMAX);
+    cerr<<"max h est. "<<hmmResmax.hAvg<<" hMin "<<hmmResmax.hMin<<" hMax "<<hmmResmax.hMax<<" s "<<hmmResmax.sAvg<<" sMin "<<hmmResmax.sMin<<" sMax "<<hmmResmax.sMax<<" p avg. "<<hmmResmax.pAvg<<" pMin "<<hmmResmax.pMin<<" pMax "<<hmmResmax.pMax<<" rohS "<<hmmResmax.rohSegments<<" nonrohS "<<hmmResmax.nonrohSegments<<" unsure "<<hmmResmax.unsureSegments<<endl;
 
     //return 1;
     //////////////////////////////////
@@ -4690,10 +4788,13 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
+    long double hAvg=hmmResmid.hAvg;
+    long double hMin= MIN3(  hmmResmin.hMin , hmmResmid.hMin  ,  hmmResmax.hMin );
+    long double hMax= MAX3(  hmmResmin.hMax , hmmResmid.hMax  ,  hmmResmax.hMax );
 
 
 
-
+    
 
 
 
@@ -4754,8 +4855,8 @@ int main (int argc, char *argv[]) {
 	}
     }
     //produce plot libharoutFilePrefix+".vcf.gz"u?
-    cerr<<"h est. "<<hAvg<<" hMin "<<hMin<<" hMax "<<hMax<<"s "<<sAvg<<" sMin "<<sMin<<" sMax "<<sMax<<" p avg. "<<pAvg<<" pMin "<<pMin<<" pMax "<<pMax<<endl;
-    
+
+
     // endhmm:
     //write out h estimate
     pdfwriterH.drawGlobalHEst(hAvg,
@@ -4765,6 +4866,7 @@ int main (int argc, char *argv[]) {
 			      maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
     
 
+    //#ifdef NOTDEF    
 
 
 
@@ -4793,14 +4895,40 @@ int main (int argc, char *argv[]) {
 	// if(heteroEstResults[c].undef)
 	//     continue;
 	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,
-				    exp(postprob.m[1][c]),
-				    exp(postprob.m[1][c]),
-				    exp(postprob.m[1][c]),
+				    exp(hmmResmin.postprob.m[1][c]),
+				    exp(hmmResmin.postprob.m[1][c]),
+				    exp(hmmResmin.postprob.m[1][c]),
 				    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
 				    maxPPlotting, // 0.00500    = 4*2e-8*62500
 				    sizeChunk,
-				    !heteroEstResults[c].undef
-	)  != 0 ){
+				    !heteroEstResults[c].undef,
+				    HMMCODEMIN)  != 0 ){
+	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
+	    return 1;
+	}
+
+	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,
+				    exp(hmmResmid.postprob.m[1][c]),
+				    exp(hmmResmid.postprob.m[1][c]),
+				    exp(hmmResmid.postprob.m[1][c]),
+				    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+				    maxPPlotting, // 0.00500    = 4*2e-8*62500
+				    sizeChunk,
+				    !heteroEstResults[c].undef,
+				    HMMCODEMID)  != 0 ){
+	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
+	    return 1;
+	}
+	
+	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,
+				    exp(hmmResmax.postprob.m[1][c]),
+				    exp(hmmResmax.postprob.m[1][c]),
+				    exp(hmmResmax.postprob.m[1][c]),
+				    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+				    maxPPlotting, // 0.00500    = 4*2e-8*62500
+				    sizeChunk,
+				    !heteroEstResults[c].undef,
+				    HMMCODEMAX)  != 0 ){
 	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
 	    return 1;
 	}
@@ -4811,45 +4939,17 @@ int main (int argc, char *argv[]) {
     }
 
     
-
-
-    headerHMMpost =   "#CHROM\tBEGIN\tEND\tp[ROH]\tp[nonROH]\n";
-
-    bgzipWriterHMMpost.Open(outFilePrefix+".hmmp.gz", IBamIODevice::WriteOnly);
-    if(!bgzipWriterHMMpost.IsOpen()){
-	cerr<<"Cannot open file "<<(outFilePrefix+".hmmp.gz")<<" in bgzip writer"<<endl;
-	return 1;
-    }
-    bgzipWriterHMMpost.Write(headerHMMpost.c_str(), headerHMMpost.size());
-    uint64_t rohSegments   =0;
-    uint64_t nonrohSegments=0;
-    uint64_t unsureSegments=0;
-
-    for(unsigned int c=0;c<heteroEstResults.size();c++){
-	string strToWrite=heteroEstResults[c].rangeGen.asBed()+"\t";//+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
-
-	if(heteroEstResults[c].undef){
-	    strToWrite+="NA\tNA\n";
-	}else{
-	    strToWrite+=stringify( exp(postprob.m[0][c]) )+"\t"+stringify( exp(postprob.m[1][c]) )+"\n";
-	}
-
-	if(     exp(postprob.m[0][c]) > 0.9){
-	    rohSegments        += sizeChunk;
-	}else{
-	    if( exp(postprob.m[1][c]) < 0.9){
-		nonrohSegments += sizeChunk;
-	    }else{
-		unsureSegments += sizeChunk;
-	    }
-	}
-	bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());	
-    }
-    bgzipWriterHMMpost.Close();    
-    cerr<<"Written trace to "<<(outFilePrefix+".hmmp.gz")<<endl;
+    // toreturn.rohSegments    = rohSegments   ;
+    // toreturn.nonrohSegments = nonrohSegments;
+    // toreturn.unsureSegments = unsureSegments;
+    
+    // toreturn.postprob       = postprob;
 
 
 
+
+
+// #ifdef notdef
     ofstream fileSummary;
     string filenameSummary = outFilePrefix+".summary.txt";
     fileSummary.open(filenameSummary.c_str());
@@ -4858,19 +4958,48 @@ int main (int argc, char *argv[]) {
 
 	fileSummary << "Command line:"<<endl;
 	for(int i=0;i<argc;i++){
-	    fileSummary<<" "<<argv[i]<<" "<<endl;
+	    fileSummary<<" "<<argv[i]<<" ";
 	}
 	
-	fileSummary<<"Github version: "<< returnGitHubVersion(argv[0],"") <<" "<<endl;
+	fileSummary<<"Github version: "<< returnGitHubVersion("."+argv[0],"") <<" "<<endl;
 	
 	
 	fileSummary << "Global heterozygosity rate:\t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;
 	
-	fileSummary << "\t" <<"total\tfraction in %"<<endl;
-	fileSummary << "Segments unclassified:\t"<<unsureSegments <<"\t"<<100*double(unsureSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<"%"<<endl;
-	fileSummary << "\t"<<"total\tfraction(defined)\tfraction(total)"<<endl;
-	fileSummary << "Segments in ROH:\t"      <<rohSegments    <<"\t"<<100*double(rohSegments)/double(rohSegments+nonrohSegments)<<"%\t"<<100*double(rohSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<"%"<<endl;
-	fileSummary << "Segments in non-ROH:\t"  <<nonrohSegments <<"\t"<<100*double(nonrohSegments)/double(rohSegments+nonrohSegments)<<"%\t"<<100*double(nonrohSegments)/double(rohSegments+nonrohSegments+unsureSegments)<<"%"<<endl;
+	//fileSummary << "\t" <<"total\tfraction in %"<<endl;
+	fileSummary << "Segments unclassified    :\t"<<hmmResmid.unsureSegments <<" ("<<MIN3( hmmResmin.unsureSegments, hmmResmid.unsureSegments, hmmResmax.unsureSegments)<<","<<MAX3( hmmResmin.unsureSegments, hmmResmid.unsureSegments, hmmResmax.unsureSegments)<<endl;
+	fileSummary << "Segments unclassified (%):\t"<<100* (double(hmmResmid.unsureSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments))<<" ("<<
+	    100* (double(MIN3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
+		  double(MAX3(hmmResmin.rohSegments+hmmResmin.nonrohSegments+hmmResmin.unsureSegments,
+			      hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments,
+			      hmmResmax.rohSegments+hmmResmax.nonrohSegments+hmmResmax.unsureSegments)))<<","<<
+	    100* (double(MAX3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
+		  double(MIN3(hmmResmin.rohSegments+hmmResmin.nonrohSegments+hmmResmin.unsureSegments,
+			      hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments,
+			      hmmResmax.rohSegments+hmmResmax.nonrohSegments+hmmResmax.unsureSegments)))<<")"
+		    <<endl;
+	
+	// fileSummary << "\t"<<"total\tfraction(defined)\tfraction(total)"<<endl;
+
+	fileSummary << "Segments in ROH          :\t"      <<hmmResmid.rohSegments    <<" ("<<MIN3( hmmResmin.rohSegments, hmmResmid.rohSegments, hmmResmax.rohSegments)<<","<<MAX3( hmmResmin.rohSegments, hmmResmid.rohSegments, hmmResmax.rohSegments)<<")"<<endl;
+	fileSummary << "Segments in ROH(%)       :\t"      <<100*double(hmmResmid.rohSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments)<<" ("<<
+	    100*double(MIN3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
+	    double( MAX3(hmmResmin.rohSegments+hmmResmin.unsureSegments,hmmResmid.rohSegments+hmmResmin.unsureSegments,hmmResmax.rohSegments+hmmResmin.unsureSegments))
+		    <<","<<
+	    100*double(MAX3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
+	    double( MIN3(hmmResmin.rohSegments+hmmResmin.unsureSegments,hmmResmid.rohSegments+hmmResmin.unsureSegments,hmmResmax.rohSegments+hmmResmin.unsureSegments))
+	    <<")"<<endl;
+
+	fileSummary << "Segments in non-ROH      :\t"  <<hmmResmid.nonrohSegments <<" ("<<MIN3( hmmResmin.nonrohSegments, hmmResmid.nonrohSegments, hmmResmax.nonrohSegments)<<","<<MAX3( hmmResmin.nonrohSegments, hmmResmid.nonrohSegments, hmmResmax.nonrohSegments)<<")"<<endl;
+	fileSummary << "Segments in non-ROH (%)  :\t"  <<100*double(hmmResmid.nonrohSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments)<<" ("<<	    
+	    100*double(MIN3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
+	    double( MAX3(hmmResmin.rohSegments+hmmResmin.unsureSegments,hmmResmid.rohSegments+hmmResmin.unsureSegments,hmmResmax.rohSegments+hmmResmin.unsureSegments))
+		    <<","<<
+	    100*double(MAX3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
+	    double( MIN3(hmmResmin.rohSegments+hmmResmin.unsureSegments,hmmResmid.rohSegments+hmmResmin.unsureSegments,hmmResmax.rohSegments+hmmResmin.unsureSegments))
+		    <<")"<<endl;
+
+
 
 	
     }else{
@@ -4879,7 +5008,7 @@ int main (int argc, char *argv[]) {
     fileSummary.close();
     cerr<<"final summary written to "<<filenameSummary<<endl;
     
-
+// #endif
 
 
     
@@ -5484,3 +5613,280 @@ int main (int argc, char *argv[]) {
 	
 // hmmpath hp=viterbi(&hmm, emittedH, sizeChunk);//, const int n) {
 // // cout<<"done"<<endl;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// void runHMM(const string & outFilePrefix, const    vector<emissionUndef> & heteroEstResults, const int maxChains , const double fracChainsBurnin,const unsigned char usemin){
+
+//     cerr<<"Creating HMM..";
+//     //write chains to output
+//     //bgzipWriterMCMC
+//     string headerHMMMCMC = "#llik\th\ts\tp\taccepted\tchains\tacptrate\n";
+//     Internal::BgzfStream  bgzipWriterMCMC;
+//     bgzipWriterMCMC.Open(outFilePrefix+".hmmmcmc.gz", IBamIODevice::WriteOnly);
+//     if(!bgzipWriterMCMC.IsOpen()){
+// 	cerr<<"Cannot open file "<<(outFilePrefix+".hmmmcmc.gz")<<" in bgzip writer"<<endl;
+// 	exit(1);
+//     }
+
+//     //computing the min/max segsites per chunk
+//     int minSegSitesPerChunk;
+//     int maxSegSitesPerChunk;
+//     if(sizeChunk == 1000000){
+// 	minSegSitesPerChunk = minSegSitesPer1M;	
+// 	maxSegSitesPerChunk = maxSegSitesPer1M;
+//     }else{
+// 	minSegSitesPerChunk = int( (double(minSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+// 	maxSegSitesPerChunk = int( (double(maxSegSitesPer1M)/double(1000000))*double(sizeChunk) );
+//     }
+    
+//     Hmm hmm (minSegSitesPerChunk,maxSegSitesPerChunk,sizeChunk,1000);
+    
+//     //cerr<<"Begin running MCMC on HMM"<<endl;
+//     // cerr<<"generating a random set"<<endl;
+//     // vector<emission>       eTest = hmm.generateStates(250,sizeChunk);
+
+//     cerr<<".";
+//     //vector<emissionUndef>  eTestUndef;
+
+
+//     //BEGIN MCMC chain
+//     //init to random settings
+//     long double partition= (long double)(stepHMM);
+//     int accept=0;
+
+//     //likelihood
+//     long double x_i    ;
+//     long double x_i_1  ;
+    
+//     //het rate
+//     //int sitesPer1M     = randomInt(200,1000);// between 1 and 1000 sites per million
+//     int sitesPer1M     = 1000;// 1000 heterozygous sites per million
+//     long double h_i    = double(       sitesPer1M )/double(1000000);
+//     long double h_i_1;
+
+//     long double hlower = double( minSegSitesPer1M )/double(1000000);
+//     long double hupper = double( maxSegSitesPer1M )/double(1000000);
+
+//     //number of non-recombining chunks per window
+//     long double s_i    = 100.0; //starting value, there are 100 non-recombining window in sizeChunk
+//     long double s_i_1;
+
+//     long double slower = 1.0;       // the whole sizeChunk is a non-recombining window
+//     long double supper = sizeChunk; // 1 base is a non-recombining window
+    
+
+    
+//     //transition rate
+//     long double pTlowerFirstHalf  =    0.5;//overestimate the transition probability 
+//     //long double pTlowerSecondHalf =    numeric_limits<double>::epsilon();
+//     long double pTlowerSecondHalf =    numeric_limits<double>::min();
+	
+//     long double pTlower = pTlowerFirstHalf;	
+//     //long double pTupper = 1.0 - numeric_limits<double>::epsilon();
+//     long double pTupper = 1.0 - numeric_limits<double>::min();
+
+//     //generate a random initial probability between pTlower and pTupper
+//     //probability of transition
+//     long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
+//     long double pT_i_1;
+//     //long double pTlower =       numeric_limits<double>::epsilon();
+        
+//     random_device rd;
+//     default_random_engine dre (rd());
+//     //int maxChains = 100000;
+//     //chain 0
+
+//     hmm.setHetRateForNonROH(h_i);
+//     hmm.setTransprob(pT_i);
+//     hmm.setNrwPerSizeChunk( (unsigned int)s_i );
+//     hmm.recomputeProbs();
+    
+//     cerr<<".";
+//     // for(unsigned int i=0;i<heteroEstResults.size();i++){
+//     // 	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
+//     // }
+//     // return 1;
+//     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
+//     fbreturnVal  tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
+//     x_i  = tmpResFWD.llik;
+//     // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+//     // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+//     cerr<<"..done"<<endl;
+//     //cerr<<"x_i "<<x_i<<endl;
+//     //return 1;
+//     //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+//     vector<long double> hvector;
+//     vector<long double> pvector;
+//     vector<long double> svector;
+    
+//     cerr<<"Begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<" chains"<<endl;
+
+//     for(int chain=1;chain<=maxChains;chain++){
+
+// 	//computing new state
+// 	normal_distribution<long double> distribution_h(h_i,  (hupper-hlower)/partition  );
+// 	h_i_1      = distribution_h(dre);
+// 	if(h_i_1 <= hlower       ||  h_i_1 >= hupper     ){
+// 	    h_i_1      = h_i;
+// 	}
+
+
+// 	normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
+// 	pT_i_1      = distribution_pT(dre);
+// 	if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
+// 	    pT_i_1      = pT_i;
+// 	}
+
+// 	//normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
+// 	normal_distribution<long double> distribution_s(s_i,  2  );
+// 	s_i_1      = distribution_s(dre);
+// 	if(s_i_1 <= slower       ||  s_i_1 >= supper     ){
+// 	    s_i_1      = s_i;
+// 	}
+
+
+// 	//set new model parameters
+// 	// cerr<<"old   h_i   "<<h_i<<" "<<" pT_i "<<" "<<pT_i<<" s_i  "<<s_i <<endl;
+// 	// cerr<<"new   h_i_1 "<<h_i_1<<" "<<" pT_i_1 "<<" "<<pT_i_1<<" s_i_1  "<<s_i_1 <<endl;
+
+// 	hmm.setHetRateForNonROH(h_i_1);
+// 	hmm.setTransprob(pT_i_1);
+// 	hmm.setNrwPerSizeChunk( (unsigned int)s_i_1 );
+// 	hmm.recomputeProbs();
+
+	
+// 	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
+// 	//compute new likelihood
+// 	//x_i_1=forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
+// 	tmpResFWD = forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
+
+// 	x_i_1     = tmpResFWD.llik;
+// 	//	cerr<<"x_i_1 "<<x_i_1<<endl;
+// 	if(chain>(maxChains/4)){
+// 	    pTlower = pTlowerSecondHalf;
+// 	}
+
+// 	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
+// 	if( (long double)(randomProb()) < acceptance){
+// 	    h_i           =  h_i_1;
+// 	    s_i           =  s_i_1;
+// 	    pT_i          =  pT_i_1;
+// 	    x_i           =  x_i_1;
+
+// 	    if( (chain>=(maxChains*(1.0-fracChainsBurnin)))){
+// 		hvector.push_back(h_i);
+// 		pvector.push_back(pT_i);
+// 		svector.push_back(s_i);
+
+// 		string strToWrite = stringify( x_i )+"\t"+stringify( h_i )+"\t"+stringify( s_i )+"\t"+stringify( pT_i )+"\t"+stringify( accept )+"\t"+stringify( chain )+"\t"+stringify( double(accept)/double(chain) )+"\n";
+// 		bgzipWriterMCMC.Write(strToWrite.c_str(), strToWrite.size());
+// 	    }
+	    
+// 	    accept++;
+// 	    if(verbose)
+// 	      cout<<setprecision(10)<<"accepted jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;
+// 	    //cerr<<setprecision(10)<<"mcmc"<<mcmc<<"\taccepted\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<" "<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+// 	}else{
+	  
+// 	  if(verbose)
+// 	    cout<<setprecision(10)<<"rejected jump from\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\tto\t"<<h_i_1<<"\t"<<s_i_1<<"\t"<<pT_i_1<<"\t"<<x_i_1<<""<<"\t"<<acceptance<<" "<<accept<<" "<<chain<<" "<<double(accept)/double(chain)<<endl;	    
+// 	}
+	
+// 	if(!verbose)
+// 	  printprogressBarCerr( float(chain)/float(maxChains) );
+// 	//chain++;
+// 	//sleep(0.1);
+//     }
+//     cerr<<endl;
+//     cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
+
+//     bgzipWriterMCMC.Close();    
+	
+//     //cerr<<"Baum Welch"<<endl;
+//     //baum_welch(&hmm,&emittedH);
+	
+
+//     //hvector and pvector contain the values
+//     long double hSum=0.0;
+//     long double pSum=0.0;
+//     long double sSum=0.0;
+    
+//     long double hAvg=0.0;
+//     long double pAvg=0.0;
+//     long double sAvg=0.0;
+    
+//     long double hMin=1.0;    
+//     long double pMin=1.0;    
+//     long double sMin=supper+1;
+	
+//     long double hMax=0.0;
+//     long double pMax=0.0;
+//     long double sMax=slower-1;
+
+    
+
+    
+//     for(unsigned int i=0;i<hvector.size();i++){
+// 	hSum += hvector[i];
+// 	pSum += pvector[i];
+// 	sSum += svector[i];
+
+// 	if(hvector[i] < hMin)
+// 	    hMin = hvector[i] ;
+// 	if(hvector[i] > hMax)
+// 	    hMax = hvector[i] ;
+	
+// 	if(pvector[i] < pMin)
+// 	    pMin = pvector[i] ;
+// 	if(pvector[i] > pMax)
+// 	    pMax = pvector[i] ;
+	
+// 	if(svector[i] < sMin)
+// 	    sMin = svector[i] ;
+// 	if(svector[i] > sMax)
+// 	    sMax = svector[i] ;
+	
+//     }
+
+//     hAvg = hSum/( (long double)hvector.size() );
+//     pAvg = pSum/( (long double)pvector.size() );
+//     sAvg = sSum/( (long double)svector.size() );
+
+
+//     //to remove
+//     // hMin = 0.00070;
+//     // hAvg = 0.0007467025205; 
+//     // hMax = 0.0008;
+
+//     // computing assignment prob
+//     //set average parameters
+//     //TODO remove
+//     // hAvg = 0.0007467025205;
+//     // pAvg = 0.0960255;
+    
+//     hmm.setHetRateForNonROH(hAvg);
+//     hmm.setTransprob(pAvg);
+//     hmm.setNrwPerSizeChunk( (unsigned int)sAvg );
+//     hmm.recomputeProbs();
+
+    
+//     fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,true);
+
+//     cerr<<"HMM done"<<endl;
+
+
+// }
