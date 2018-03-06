@@ -238,15 +238,20 @@ inline int returnMinMidMax(const unsigned char useminmidmax,
 			   const int minSegSitesPerChunk,
 			   const int maxSegSitesPerChunk){
     int toreturn=-1;
-    if(useminmidmax == 0)
+    if(useminmidmax == HMMCODEMIN)
 	toreturn = ((int)(hlow *sizeChunk));
-    if(useminmidmax == 1)
+    else{
+      if(useminmidmax == HMMCODEMID){
 	toreturn = ((int)(h    *sizeChunk));
-    if(useminmidmax == 2)
-	toreturn = ((int)(hmax *sizeChunk));
-    //    cerr<<"toreturn "<<toreturn<<" "<<minSegSitesPerChunk<<" "<<maxSegSitesPerChunk<<endl;
-    if(toreturn == -1){ cerr<<"Undefined code "<<useminmidmax<<" in returnMinMidMax()  "<<endl; exit(1); }
-    
+      }else{
+	if(useminmidmax == HMMCODEMAX){
+	  toreturn = ((int)(hmax *sizeChunk));
+	}else{
+	  if(toreturn == -1){ cerr<<"Undefined code "<<int(useminmidmax)<<" in returnMinMidMax()  "<<endl; exit(1); }
+	}
+      }
+    }
+    //cerr<<"toreturn "<<toreturn<<" "<<minSegSitesPerChunk<<" "<<maxSegSitesPerChunk<<" "<<int(useminmidmax)<<" "<<hlow<<" "<<h<<" "<<hmax<<" "<<(useminmidmax == HMMCODEMIN)<<endl;
     if(toreturn < minSegSitesPerChunk){return minSegSitesPerChunk;     }
     if(toreturn > maxSegSitesPerChunk){return maxSegSitesPerChunk;     }
     return toreturn;    
@@ -256,13 +261,14 @@ inline int returnMinMidMax(const unsigned char useminmidmax,
 inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & observed, const unsigned int sizeChunk,const unsigned char useminmidmax,bool verbose=false){//useminmidmax 0 = min, 1 = mid, 2=max
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates();
-    /* cerr<<"n "<<nObservations<<" "<<nStates<<" "<<sizeChunk<<" "<<returnMinMidMax(useminmidmax, */
-    /* 										  observed[0].hlow, */
-    /* 										  observed[0].h, */
-    /* 										  observed[0].hhigh, */
-    /* 										  sizeChunk, */
-    /* 										  hmm->getMinSegSitesPerChunk(), */
-    /* 										  hmm->getMaxSegSitesPerChunk())<<endl; */
+    //cerr<<"n "<<nObservations<<" "<<nStates<<" "<<sizeChunk<<" useminmidmax>"<<int(useminmidmax)<<"<"<<endl;
+    /* cerr<<returnMinMidMax(useminmidmax, */
+    /* 			  observed[0].hlow, */
+    /* 			  observed[0].h, */
+    /* 			  observed[0].hhigh, */
+    /* 			  sizeChunk, */
+    /* 			  hmm->getMinSegSitesPerChunk(), */
+    /* 			  hmm->getMaxSegSitesPerChunk())<<endl; */
     
     vector< vector<long double > > f ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
 
@@ -316,15 +322,18 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 	    /* 													  sizeChunk, */
 	    /* 													  hmm->getMinSegSitesPerChunk(), */
 	    /* 													  hmm->getMaxSegSitesPerChunk())<<endl; */
-	    long double p_e = hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax,
-										   observed[k].hlow,
-										   observed[k].h,
-										   observed[k].hhigh,
-										   sizeChunk,
-										   hmm->getMinSegSitesPerChunk(),
-										   hmm->getMaxSegSitesPerChunk()),
-								   sizeChunk );
 
+	    long double p_e=-1;
+	    if(!observed[k].undef){
+	      p_e= hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax,
+									observed[k].hlow,
+									observed[k].h,
+									observed[k].hhigh,
+									sizeChunk,
+									hmm->getMinSegSitesPerChunk(),
+									hmm->getMaxSegSitesPerChunk()),
+							sizeChunk );
+	    }
 	    /* usemin?  */
 	    /* 						   ((int)(observed[k].hlow *sizeChunk)): */
 	    /* 						   ((int)(observed[k].hhigh*sizeChunk)) , */
@@ -537,14 +546,17 @@ inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & 
 	    for (int nextState = 0; nextState < nStates; nextState++) {//each next state
 		
 		//long double p_e  = hmm->hmmstates[nextState]->probEmission( (unsigned int)(observed[k+1]*sizeChunk)  , sizeChunk);
-		long double p_e  = observed[k+1].weight*hmm->hmmstates[nextState]->probEmission( returnMinMidMax(useminmidmax,
-														 observed[k+1].hlow,
-														 observed[k+1].h,
-														 observed[k+1].hhigh,
-														 sizeChunk,
-														 hmm->getMinSegSitesPerChunk(),
-														 hmm->getMaxSegSitesPerChunk()),
-												 sizeChunk);
+	      long double p_e = 0;
+	      if(!observed[k+1].undef){
+		p_e = observed[k+1].weight*hmm->hmmstates[nextState]->probEmission( returnMinMidMax(useminmidmax,
+												    observed[k+1].hlow,
+												    observed[k+1].h,
+												    observed[k+1].hhigh,
+												    sizeChunk,
+												    hmm->getMinSegSitesPerChunk(),
+												    hmm->getMaxSegSitesPerChunk()),
+										    sizeChunk);
+	      }
 		/* usemin?  */
 		/* 										 ((int)(observed[k+1].hlow *sizeChunk)): */
 		/* 										 ((int)(observed[k+1].hhigh*sizeChunk)), */
@@ -574,8 +586,8 @@ inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & 
 	    if( observed[k+1].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
 		b[state][k]    =                   logsumNoTransStart; 
 	    }else{
-		//if the next one was undefined
-		if(observed[k+1].undef){
+	      //if the next one was undefined
+	      if(observed[k+1].undef){
 		    b[state][k] =		   logsumNoTrans;   //forego emission probability just count sum of all probs for every previous state
 		}else{//not undefined and not break
 		    b[state][k] =		   logsum;          //forego emission probability just count sum of all probs for every previous state
@@ -678,7 +690,7 @@ inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & 
 
 //#define DEBUGFWDBCKWD
 
-inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
+    inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
 
 
     /* cout<<"forwardBackward"<<endl; */
