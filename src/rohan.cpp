@@ -4440,7 +4440,7 @@ int main (int argc, char *argv[]) {
     
     headerVCFFile=string("")+
 	"##fileformat=VCFv4.2\n";
-    headerVCFFile+="##ROHanVersion="+returnGitHubVersion(argv[0],"")+"\n";
+    headerVCFFile+="##ROHanVersion="+returnGitHubVersion("."+string(argv[0]),"")+"\n";
     headerVCFFile+="##reference="+fastaFile+"\n";
 
 
@@ -4961,7 +4961,7 @@ int main (int argc, char *argv[]) {
 	    fileSummary<<" "<<argv[i]<<" ";
 	}
 	
-	fileSummary<<"Github version: "<< returnGitHubVersion("."+argv[0],"") <<" "<<endl;
+	fileSummary<<"Github version: "<< returnGitHubVersion("."+string(argv[0]),"") <<" "<<endl;
 	
 	
 	fileSummary << "Global heterozygosity rate:\t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;
