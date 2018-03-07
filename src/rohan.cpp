@@ -3632,7 +3632,7 @@ int main (int argc, char *argv[]) {
 	//"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
 	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""             +"\t\t\t"+"Print extensive info  (default: "+booleanAsString(verbose)+")"+"\n"+  
 	//"\t\t"+"-f"+","+""           +"\t\t"      + ""             +"\t\t\t"+"Overwrite any .rginfo.gz (default: "+booleanAsString(ignoreExistingRGINFO)+")"+"\n"+  
-	"\t\t"+""+","+"--nogl"       +"\t\t"      + ""             +"\t\t\t"+"Do not output genotype likelihoods  (default: "+booleanAsString(!outputgenol)+")"+"\n"+  
+	"\t\t"+""+""+"--nogl"       +"\t\t"      + ""             +"\t\t\t"+"Do not output genotype likelihoods  (default: "+booleanAsString(!outputgenol)+")"+"\n"+  
 			      
 	"\n\tComputation options:\n"+	
 	"\t\t"+"-t"+"" +""           +"\t\t\t"    + "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
