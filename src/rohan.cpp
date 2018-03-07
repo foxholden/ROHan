@@ -2587,6 +2587,8 @@ void *mainHeteroComputationThread(void * argc){
     //unsigned int numReads=0;
     while ( reader.GetNextAlignment(al) ) {
         //cout<<"mainHeteroComputationThread al.Name="<<al.Name<<endl;
+
+	//if we have specified deamination rates	
 	if(specifiedDeam){
 	    if( al.IsPaired() ) continue; //skip paired-end reads because we cannot get proper deamination
 	    string rg;
@@ -2606,17 +2608,16 @@ void *mainHeteroComputationThread(void * argc){
 		cerr << "Heterozygosity computation: found an unknown RG tag from  "<<al.Name<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<endl;
 		exit(1);	
 	    }else{
-		if(!rg2info[rg].isPe){ //
-		    if(al.Length == rg2info[rg].maxReadLength)//probably reached the end of the read length, we will keep maxlength-1 and under
-			
-			continue;		    
+		if(!rg2info[rg].isPe){ //if single end
+		    if(al.Length == rg2info[rg].maxReadLength){//probably reached the end of the read length, we will keep maxlength-1 and under		
+			//cerr<<"name "<<al.Name<<"\t"<<rg<<endl;
+			continue;
+		    }
 		}else{
 		    //since we skipped the paired reads, if we have reached here
-		    //we can add single-end fragments 
-		    
+		    //we can add single-end fragments 		    
 		}
 	    }
-
 	}
 
 	if(al.Length>=int(MINLENGTHFRAGMENT) &&
@@ -4170,11 +4171,13 @@ int main (int argc, char *argv[]) {
 	
 	for (map<string,rgInfo>::iterator it=rg2info.begin(); it!=rg2info.end(); ++it){
 	    string s = stringify(it->first)+"\t"+stringify(it->second.isPe)+"\t"+stringify(it->second.maxReadLength)+"\n";
+	    
 	    if(it->second.isPe)
 		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)it->second.maxReadLength );
 	    else
 		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(it->second.maxReadLength-1) );
-	    cerr<<"RG:\t" <<s<<endl;	
+	    //cerr<<"RG:\t" <<s<<endl;
+	    cerr<<"RG:\t"<<stringify(it->first)<<"\t"<<(it->second.isPe?"PE":"SE")<<"\t"<<stringify(it->second.maxReadLength)<<endl;
 	    stringinfo+=s;
 	}
 	bgzipWriterInfo.Write(stringinfo.c_str(), stringinfo.size());
@@ -4214,7 +4217,9 @@ int main (int argc, char *argv[]) {
 		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(toadd.maxReadLength -1) );
 
 		rg2info[ tempv[0] ] = toadd;
-		cerr<<"RG:\t" <<l<<endl;	
+
+		cerr<<"RG:\t"<<tempv[0]<<"\t"<<(toadd.isPe?"PE":"SE")<<"\t"<<stringify(toadd.maxReadLength)<<endl;
+
 	    }
 	    infoFilePreComputed.close();
 
@@ -4226,15 +4231,15 @@ int main (int argc, char *argv[]) {
     }
     //    return 1;
     
-//     long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
-//     long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
+    //     long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
+    //     long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
 
     
-// #ifdef DEBUGCOV
-//     cerr<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
-//     cerr<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
-// #endif
-
+    // #ifdef DEBUGCOV
+    //     cerr<<"rateForPoissonCovFloor "<<rateForPoissonCovFloor<<endl;
+    //     cerr<<"rateForPoissonCovCeil "<<rateForPoissonCovCeil<<endl;
+    // #endif
+    
     cov2ProbSite = new vector<long double> (MAXCOV+1,0);
 #ifdef CORRECTCOV
     populatedCoverateVector(cov2ProbSite , rateForPoissonCov, MAXCOV);
