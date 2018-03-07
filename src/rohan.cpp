@@ -3609,7 +3609,7 @@ int main (int argc, char *argv[]) {
 
     string autosomeFile;
     bool ignoreExistingRGINFO=false;
-    
+    bool outputgenol = true;
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
@@ -3632,7 +3632,7 @@ int main (int argc, char *argv[]) {
 	//"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
 	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""             +"\t\t\t"+"Print extensive info  (default: "+booleanAsString(verbose)+")"+"\n"+  
 	//"\t\t"+"-f"+","+""           +"\t\t"      + ""             +"\t\t\t"+"Overwrite any .rginfo.gz (default: "+booleanAsString(ignoreExistingRGINFO)+")"+"\n"+  
-	
+	"\t\t"+""+","+"--nogl"       +"\t\t"      + ""             +"\t\t\t"+"Do not output genotype likelihoods  (default: "+booleanAsString(!outputgenol)+")"+"\n"+  
 			      
 	"\n\tComputation options:\n"+	
 	"\t\t"+"-t"+"" +""           +"\t\t\t"    + "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
@@ -3800,6 +3800,12 @@ int main (int argc, char *argv[]) {
         }
 
 
+        if( string(argv[i]) == "--nogl" ){
+	    outputgenol=false;
+            continue;
+        }
+
+       	    
         if(string(argv[i]) == "--phred64"  ){
             offsetQual=64;
             continue;
@@ -4427,27 +4433,27 @@ int main (int argc, char *argv[]) {
 #ifndef DEBUGFIRSTWINDOWS
     
     
+    if(outputgenol){
+	bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
+	if(!bgzipWriterGL.IsOpen()){
+	    cerr<<"Cannot open file "<<(outFilePrefix+".vcf.gz")<<" in bgzip writer"<<endl;
+	    return 1;
+	}
+    
+    
+	// if(outFileSiteLLFlag){
+	// 	bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
+	// 	if(!bgzipWriter.IsOpen()){
+	// 	    cerr<<"Cannot open file "<<outFileSiteLL<<" in bgzip writer"<<endl;
+	// 	    return 1;
+	// 	}
 
-    bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
-    if(!bgzipWriterGL.IsOpen()){
-	cerr<<"Cannot open file "<<(outFilePrefix+".vcf.gz")<<" in bgzip writer"<<endl;
-	return 1;
+    
+	headerVCFFile=string("")+
+	    "##fileformat=VCFv4.2\n";
+	headerVCFFile+="##ROHanVersion="+returnGitHubVersion("."+string(argv[0]),"")+"\n";
+	headerVCFFile+="##reference="+fastaFile+"\n";
     }
-    
-    
-    // if(outFileSiteLLFlag){
-    // 	bgzipWriter.Open(outFileSiteLL, IBamIODevice::WriteOnly);
-    // 	if(!bgzipWriter.IsOpen()){
-    // 	    cerr<<"Cannot open file "<<outFileSiteLL<<" in bgzip writer"<<endl;
-    // 	    return 1;
-    // 	}
-
-    
-    headerVCFFile=string("")+
-	"##fileformat=VCFv4.2\n";
-    headerVCFFile+="##ROHanVersion="+returnGitHubVersion("."+string(argv[0]),"")+"\n";
-    headerVCFFile+="##reference="+fastaFile+"\n";
-
 
 
     // 	if(useVCFoutput){
@@ -4489,7 +4495,9 @@ int main (int argc, char *argv[]) {
 
     headerVCFFile+="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
 
-   bgzipWriterGL.Write(headerVCFFile.c_str(),headerVCFFile.size());
+    if(outputgenol){
+	bgzipWriterGL.Write(headerVCFFile.c_str(),headerVCFFile.size());
+    }
     // }
 #endif
 
@@ -4498,8 +4506,9 @@ int main (int argc, char *argv[]) {
     //cerr<<"test wroteEverything="<<wroteEverything<<endl;
    cerr<<""<<numberOfThreads<<" thread(s) are running in the background, results will be written at it becomes available"<<endl;
    
-		
-   cerr<<"Writing genotype data to:        "<<outFilePrefix+".vcf.gz" << endl;
+   if(outputgenol){	
+	cerr<<"Writing genotype data to:        "<<outFilePrefix+".vcf.gz" << endl;
+   }
    cerr<<"Writing local het. estimates to: "<<outFilePrefix+".hEst.gz"<< endl;
    if(!verbose)
        printprogressBarCerr( 0 );
@@ -4591,31 +4600,32 @@ int main (int argc, char *argv[]) {
 		//sizeGenome+=dataToWrite->vecPositionResults->size();
 
 #ifndef DEBUGFIRSTWINDOWS
-
-		strToWrite="";
-		// cerr<<"SIZE "<<dataToWrite->vecPositionResults->size()<<endl;
-		for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
-		    //cerr<<i<<endl;
-		    // cerr<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID)<<endl;
-		    strToWrite += dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID);
-		    //cout<<i<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(references);
-		    if( (i%500) == 499){
-			//if(outFileSiteLLFlag){
-			bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size());
-			//}
-			strToWrite="";
-		    }
+		if(outputgenol){
+		    strToWrite="";
+		    // cerr<<"SIZE "<<dataToWrite->vecPositionResults->size()<<endl;
+		    for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
+			//cerr<<i<<endl;
+			// cerr<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID)<<endl;
+			strToWrite += dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID);
+			//cout<<i<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(references);
+			if( (i%500) == 499){
+			    //if(outFileSiteLLFlag){
+			    bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size());
+			    //}
+			    strToWrite="";
+			}
 		    
-		    // GenoResults * toadd =  new GenoResults( dataToWrite->vecPositionResults->at(i) );
-		    // vectorGenoResults.push_back(toadd);
-		}
+			// GenoResults * toadd =  new GenoResults( dataToWrite->vecPositionResults->at(i) );
+			// vectorGenoResults.push_back(toadd);
+		    }
 
-		if(!strToWrite.empty()){
-		    // if(outFileSiteLLFlag){
-		    // 	if(outFileSiteLLFlag){ 
-		    bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size()); 
-		    // 	}
-		    // }
+		    if(!strToWrite.empty()){
+			// if(outFileSiteLLFlag){
+			// 	if(outFileSiteLLFlag){ 
+			bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size()); 
+			// 	}
+			// }
+		    }
 		}
 		//#endif		    
 #endif
@@ -4658,9 +4668,9 @@ int main (int argc, char *argv[]) {
     bgzipWriterHest.Close();
 
 #ifndef DEBUGFIRSTWINDOWS
-
-    bgzipWriterGL.Close();
-
+    if(outputgenol){
+	bgzipWriterGL.Close();
+    }
 #endif
 
     cerr<<"done writing data"<<endl;
