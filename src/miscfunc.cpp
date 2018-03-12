@@ -271,7 +271,7 @@ void readDNABaseFreq(const string filename, alleleFrequency & dnaDefaultFreq){
 }
 
 
-void populatedCoverateVector(vector<long double> * cov2ProbSite, long double rateForPoissonCov,int maxcov){
+void populatedCoverateVector(const string  programName, vector<long double> * cov2ProbSite, long double rateForPoissonCov,int maxcov){
     //cerr<<"Computing coverage priors.";
     long double rateForPoissonCovFloor = floorl(rateForPoissonCov);
     long double rateForPoissonCovCeil  =  ceill(rateForPoissonCov);
@@ -282,9 +282,17 @@ void populatedCoverateVector(vector<long double> * cov2ProbSite, long double rat
     rateForPoissonCovFloor = MAX(rateForPoissonCovFloor, (long double)1);
     rateForPoissonCovFloor = MIN(rateForPoissonCovFloor, (long double)maxcov);
     rateForPoissonCovCeil  = MIN(rateForPoissonCovCeil,  (long double)maxcov);
-       
-    populatedCoverateVectorSingle(&cov2ProbSiteFloor, rateForPoissonCovFloor ,  maxcov);
-    populatedCoverateVectorSingle(&cov2ProbSiteCeil , rateForPoissonCovCeil  ,  maxcov);
+    string directoryProgram;
+    string commandPath=string(programName);
+    size_t posSlash=commandPath.find_last_of("/");
+    if(posSlash == string::npos){
+        directoryProgram="";
+    }else{
+        directoryProgram=commandPath.substr(0,posSlash);
+    }
+    directoryProgram = directoryProgram +"/";
+    populatedCoverateVectorSingle(directoryProgram, &cov2ProbSiteFloor, rateForPoissonCovFloor ,  maxcov);
+    populatedCoverateVectorSingle(directoryProgram, &cov2ProbSiteCeil , rateForPoissonCovCeil  ,  maxcov);
 
     //cov2ProbSite->push_back(0.0);//cov =0
 
@@ -318,9 +326,10 @@ void populatedCoverateVector(vector<long double> * cov2ProbSite, long double rat
 
 }
 
-void populatedCoverateVectorSingle(vector<long double> * cov2ProbSite, long double lambda,int maxcov){
-
-    string filein  = string("../preComputated/coverageprior/correctionCov_"+stringify(lambda)+".bin");
+void populatedCoverateVectorSingle(const string  directoryProgram,vector<long double> * cov2ProbSite, long double lambda,int maxcov){
+   
+    
+    string filein  = string(directoryProgram+"../preComputated/coverageprior/correctionCov_"+stringify(lambda)+".bin");
 
 #ifdef DEBUGCOV
     cerr<<"file in "<<filein<<endl;

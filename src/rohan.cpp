@@ -7,7 +7,7 @@
 
 //TODO
 
-
+// fix the path of weights so that rohan can be called anywhere.
 // does the HMM underestimate?
 // global estimate
 
@@ -3529,13 +3529,13 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 
 int main (int argc, char *argv[]) {
     setlocale(LC_ALL, "POSIX");
-
-
+    
+    
 
     // 	    //cout<<"\tobs="<<eTest[i].idx<<"\t"<<eTest[i].p <<"\tpredicted="<< hp.seq[i] << endl;
     // }
-    
-    //return 1;
+    // cout<<returnGitHubVersion(string(argv[0]),"..")<<endl;
+    // return 1;
     
     ////////////////////////////////////
     //        Variables               //
@@ -4248,7 +4248,7 @@ int main (int argc, char *argv[]) {
     
     cov2ProbSite = new vector<long double> (MAXCOV+1,0);
 #ifdef CORRECTCOV
-    populatedCoverateVector(cov2ProbSite , rateForPoissonCov, MAXCOV);
+    populatedCoverateVector( string(argv[0]) , cov2ProbSite , rateForPoissonCov, MAXCOV );
 #endif
 
 
@@ -4451,7 +4451,7 @@ int main (int argc, char *argv[]) {
     
 	headerVCFFile=string("")+
 	    "##fileformat=VCFv4.2\n";
-	headerVCFFile+="##ROHanVersion="+returnGitHubVersion("."+string(argv[0]),"")+"\n";
+	headerVCFFile+="##ROHanVersion="+returnGitHubVersion(string(argv[0]),"..")+"\n";
 	headerVCFFile+="##reference="+fastaFile+"\n";
     }
 
@@ -4976,7 +4976,7 @@ int main (int argc, char *argv[]) {
 	    fileSummary<<" "<<argv[i]<<" ";
 	}
 	fileSummary <<endl;
-	fileSummary<<"Github version: "<< returnGitHubVersion("."+string(argv[0]),"") <<" "<<endl;
+	fileSummary<<"Github version: "<< returnGitHubVersion(string(argv[0]),"..") <<" "<<endl;
 	
 	
 	fileSummary << "Global heterozygosity rate:\t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;

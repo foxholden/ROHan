@@ -318,8 +318,8 @@ inline long double gsl_ran_multinomial_pdf (const size_t K,const long double p[]
 }
 
 
-void populatedCoverateVector(      vector<long double> * cov2ProbSite, long double rateForPoissonCov, int maxcov);
-void populatedCoverateVectorSingle(vector<long double> * cov2ProbSite, long double rateForPoissonCov, int maxcov);
+void populatedCoverateVector(      const string  programName       ,  vector<long double> * cov2ProbSite, long double rateForPoissonCov, int maxcov);
+void populatedCoverateVectorSingle(const string  directoryProgram  ,  vector<long double> * cov2ProbSite, long double rateForPoissonCov, int maxcov);
 /* void readMTConsensus(const string consensusFile,map<int, PHREDgeno> & pos2phredgeno,int & sizeGenome,vector<int> & posOfIndels); */
 /* void readMTAlleleFreq(const string freqFile,	map<int, alleleFrequency> & pos2allelefreq); */
 
