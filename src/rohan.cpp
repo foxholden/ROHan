@@ -27,6 +27,7 @@
 #define MAXCOV             50     // maximal coverage
 //#define TESTHMMSIMS
 
+
 #include "miscfunc.h"
 #include "utils.h"
 
@@ -1184,6 +1185,36 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 		    //#ifdef PRECOMPUTELOG
 		    long double llA; //Likelihood it comes from A
 		    long double llD; //Likelihood it comes from D
+		    // cerr<<p<<" "<<i<<" "<<int(piForGenomicWindow->at(p).readsVec[i].lengthF)<<" "<<int(piForGenomicWindow->at(p).readsVec[i].pos5p)<<" "<<int(piForGenomicWindow->at(p).readsVec[i].mapq)<<" "<<int(piForGenomicWindow->at(p).readsVec[i].qual)<<" "<<int(ba_c)<<" "<<int(piForGenomicWindow->at(p).readsVec[i].base)<<endl;
+
+#ifdef DEBUGSINGLEREAD
+		    cerr<<"name: "<<piForGenomicWindow->at(p).readsVec[i].name<<endl;
+#endif
+		    
+		    // cerr<<"1 "<<length2pos2mpq2bsq2submatrix[piForGenomicWindow->at(p).readsVec[i].lengthF].size()<<endl;
+		    // cerr<<"2 "<<length2pos2mpq2bsq2submatrix
+		    // 	    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    // 	[piForGenomicWindow->at(p).readsVec[i].pos5p].size()<<endl;
+		    
+		    // cerr<<"3 "<<length2pos2mpq2bsq2submatrix
+		    // 	    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    // 	    [piForGenomicWindow->at(p).readsVec[i].pos5p]
+		    // 	[piForGenomicWindow->at(p).readsVec[i].mapq].size()<<endl;
+
+
+		    // cerr<<"4 "<<length2pos2mpq2bsq2submatrix
+		    // 	    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+        	    // 	    [piForGenomicWindow->at(p).readsVec[i].pos5p]
+		    // 	    [piForGenomicWindow->at(p).readsVec[i].mapq]
+         	    // 	    [piForGenomicWindow->at(p).readsVec[i].qual].p[0][0]<<endl;
+
+
+		    // cerr<<"1 "<<length2pos2mpq2bsq2submatrix
+		    // 	    [piForGenomicWindow->at(p).readsVec[i].lengthF]
+		    // 	    [piForGenomicWindow->at(p).readsVec[i].pos5p]
+		    // 	    [piForGenomicWindow->at(p).readsVec[i].mapq]
+		    // 	[piForGenomicWindow->at(p).readsVec[i].qual].p[ba_c][piForGenomicWindow->at(p).readsVec[i].base];
+
 		    
 		    if(piForGenomicWindow->at(p).readsVec[i].isrv){
 			llA = length2pos2mpq2bsq2submatrix
@@ -1211,10 +1242,8 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 			    [piForGenomicWindow->at(p).readsVec[i].pos5p]
 			    [piForGenomicWindow->at(p).readsVec[i].mapq]
 			    [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base];
-
-
 		    }
-			
+		    //cerr<<"done"<<endl;
 
 #ifdef DEBUGPRECOMPUTEBABD
 		    if(printDEBUG){
@@ -2265,6 +2294,17 @@ public:
 		continue;
 	    }
 
+	    //skip fragments below the minimum length
+	    if(  pileupData.PileupAlignments[i].Alignment.Length < int(MINLENGTHFRAGMENT) ){ 
+		cerr<<"skipped minlength "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
+		continue;
+	    }
+
+	    if(  pileupData.PileupAlignments[i].Alignment.Length > int(MAXLENGTHFRAGMENT) ){ 
+		cerr<<"skipped maxlength "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
+		continue;
+	    }
+	    
 	    if(i>=MAXCOV){
 		break;
 	    }
@@ -2301,8 +2341,11 @@ public:
 		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].PositionInAlignment ); 
 	    }
 	    sr_.isrv=isRev;
-	    //sr_.name=pileupData.PileupAlignments[i].Alignment.Name;//to remove
 
+#ifdef DEBUGSINGLEREAD
+	    sr_.name=pileupData.PileupAlignments[i].Alignment.Name;//to remove
+#endif
+	    
 	    piToAdd.readsVec.push_back(sr_);
 	    // obsBase.push_back( bIndex  );
 	    // obsQual.push_back( q        );
@@ -2623,7 +2666,9 @@ void *mainHeteroComputationThread(void * argc){
 	if(al.Length>=int(MINLENGTHFRAGMENT) &&
 	   al.Length<=int(MAXLENGTHFRAGMENT) ){	   
 	    pileup.AddAlignment(al);
-	}
+	}// else{
+	//     cout<<"removed "<<al.Name<<endl;
+	// }
     }
 
     //clean up
@@ -4182,6 +4227,9 @@ int main (int argc, char *argv[]) {
 		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)it->second.maxReadLength );
 	    else
 		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(it->second.maxReadLength-1) );
+
+	    MAXLENGTHFRAGMENT = MIN( 255, MAXLENGTHFRAGMENT );//as the length is stored on 8 bits (for now)
+	    
 	    //cerr<<"RG:\t" <<s<<endl;
 	    cerr<<"RG:\t"<<stringify(it->first)<<"\t"<<(it->second.isPe?"PE":"SE")<<"\t"<<stringify(it->second.maxReadLength)<<endl;
 	    stringinfo+=s;
@@ -4222,6 +4270,8 @@ int main (int argc, char *argv[]) {
 		else
 		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(toadd.maxReadLength -1) );
 
+		MAXLENGTHFRAGMENT = MIN( 255, MAXLENGTHFRAGMENT );//as the length is stored on 8 bits (for now)
+		
 		rg2info[ tempv[0] ] = toadd;
 
 		cerr<<"RG:\t"<<tempv[0]<<"\t"<<(toadd.isPe?"PE":"SE")<<"\t"<<stringify(toadd.maxReadLength)<<endl;

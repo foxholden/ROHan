@@ -194,6 +194,7 @@ typedef struct {
     double tprob;
 
 } logRecord;
+//#define DEBUGSINGLEREAD
 
 //To store a single read
 typedef struct { 
@@ -204,7 +205,9 @@ typedef struct {
     uint8_t lengthF;             
     /* int dist5p; */
     /* int dist3p; */
-    /* string name; //TO REMOVE */
+#ifdef DEBUGSINGLEREAD
+    //string name; //TO REMOVE
+#endif
     bool isrv;
 } singleRead;
 
