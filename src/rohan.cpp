@@ -3914,6 +3914,28 @@ int main (int argc, char *argv[]) {
     fastaFile         = string(argv[lastOpt]);
     bamFileToOpen     = string(argv[lastOpt+1]);
     fastaIndex        = fastaFile+".fai";
+    
+    set<string> listAutosomes;
+
+    if( !autosomeFile.empty()){
+       
+	ifstream myFileAUTO;
+	myFileAUTO.open(autosomeFile.c_str(), ios::in);
+	string line;
+	if (myFileAUTO.is_open()){
+	    while ( getline (myFileAUTO,line)){     
+		listAutosomes.insert(line);
+	    }
+	    myFileAUTO.close();	   
+	}else{
+	    cerr << "Error in reading list of autosomes: Unable to open file "<<autosomeFile<<endl;
+	    exit(1);
+	}
+	
+    }
+
+
+    
 
     if(skipToHMM){//skip het computations
 	goto beginhmm;
@@ -4088,19 +4110,6 @@ int main (int argc, char *argv[]) {
     if( !autosomeFile.empty()){
 
 	vector<GenomicRange> newV;
-	ifstream myFileAUTO;
-	myFileAUTO.open(autosomeFile.c_str(), ios::in);
-	string line;
-	set<string> listAutosomes;
-	if (myFileAUTO.is_open()){
-	    while ( getline (myFileAUTO,line)){     
-		listAutosomes.insert(line);
-	    }
-	    myFileAUTO.close();	   
-	}else{
-	    cerr << "Error in reading list of autosomes: Unable to open file "<<autosomeFile<<endl;
-	    exit(1);
-	}
 	
 	for(unsigned int i=0;i<v.size();i++){
 	    if( listAutosomes.find( v[i].getChrName() ) == listAutosomes.end() ){//not found
@@ -4764,7 +4773,7 @@ int main (int argc, char *argv[]) {
 	    getline (hEstFileSt,line) ; 		//header
 	    //cerr<<line<<endl;
 	    while (getline (hEstFileSt,line) ){
-		//cerr<<line<<endl;	    
+		cerr<<line<<endl;	    
 		fields = allTokens(line,'\t');
 
 		if(fields.size() != 8){
@@ -4773,7 +4782,7 @@ int main (int argc, char *argv[]) {
 		}
 
 
-	    	emissionUndef hetResToAdd;
+	    	emissionUndef hetResToAdd;		
 		hetResToAdd.rangeGen.setChrName(                                fields[0]    );
 		hetResToAdd.rangeGen.setStartCoord(  destringify<unsigned int>( fields[1])+1 );
 		hetResToAdd.rangeGen.setEndCoord(    destringify<unsigned int>( fields[2])   );
@@ -4790,28 +4799,55 @@ int main (int argc, char *argv[]) {
 		    hetResToAdd.chrBreak   = false;		
 		}
 	    
-		if(fields[4] != "NA"){
-		    hetResToAdd.undef  = false;		
-		    long double h      = destringify<long double>( fields[4] );
-		    long double errb   = destringify<long double>( fields[5] );
-		    long double hLow   = destringify<long double>( fields[6] );
-		    long double hHigh  = destringify<long double>( fields[7] );
+		if(fields[4] != "NA"){ //if data is not missing
+
+		    if(fields[5] == "-nan"){//numerical errors			
+			hetResToAdd.undef  = true;  //undefined 
+
+			string htouse = fields[4];
+			if(htouse == "-nan"){
+			    htouse = "0";
+			}
+			
+			long double h      = destringify<long double>( htouse );
+			long double errb   = destringify<long double>( "0" );
+			long double hLow   = destringify<long double>( htouse );			
+			long double hHigh  = destringify<long double>( htouse );
+
+			hetResToAdd.h      = h;
+			hetResToAdd.errb   = errb;
+			
+			if(hLow == 0){  //went under 0
+			    hLow = h-errb;
+			}
+			
+			hetResToAdd.hlow   = hLow;
+			hetResToAdd.hhigh  = hHigh;
+			
+		    }else{//good to go
+
+			hetResToAdd.undef  = false;		
+			long double h      = destringify<long double>( fields[4] );
+			long double errb   = destringify<long double>( fields[5] );
+			long double hLow   = destringify<long double>( fields[6] );
+			long double hHigh  = destringify<long double>( fields[7] );
 		    
-		    hetResToAdd.h      = h;
-		    hetResToAdd.errb   = errb;
+			hetResToAdd.h      = h;
+			hetResToAdd.errb   = errb;
 		    
-		    if(hLow == 0){  //went under 0
-			hLow = h-errb;
-		    }
+			if(hLow == 0){  //went under 0
+			    hLow = h-errb;
+			}
 		    
-		    hetResToAdd.hlow   = hLow;
-		    hetResToAdd.hhigh  = hHigh;
-		    		    
+			hetResToAdd.hlow   = hLow;
+			hetResToAdd.hhigh  = hHigh;
+		    }	    
 		    // if(h<0)      h     = 0;
 		    // if(hLow<0)   hLow  = 0;
 		    // if(hHigh<0)  hHigh = 0;		    
 		}else{
-		    hetResToAdd.undef  = true;		
+		    hetResToAdd.undef  = true; //window is undefined
+		
 		}
 		
 		hetResToAdd.weight = ( (long double)(sitesDefinedLine) ) / ( (long double)(sizeChunk) );
@@ -4876,13 +4912,54 @@ int main (int argc, char *argv[]) {
     //cerr<<"writing plot"<<endl;
 
     double heightChr=45;
-    PdfWriter pdfwriterH (outFilePrefix+".het.pdf",heightChr);
+    vector<PdfWriter *> vecOfPdfWriters;
+    PdfWriter * pdfwriterH =new PdfWriter(outFilePrefix+".het.pdf",heightChr);
 
-    if( pdfwriterH.drawFrame(fastaIndex,sizeChunk) == 1 ){
+    if( pdfwriterH->drawFrame(fastaIndex,sizeChunk,0, &listAutosomes, !autosomeFile.empty()) == 1 ){
 	cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 	return 1;
     }
+    
+    vecOfPdfWriters.push_back(pdfwriterH);
+    int numberPagesPDFhet =1;
+    int numberOfChrPerPage = int( floor( double(pdfwriterH->getPageHeight()) / double( pdfwriterH->getTotalHeightChr()  )) );
+    cerr<<pdfwriterH->getPageHeight()<<" "<<pdfwriterH->getTotalHeightChr() <<endl;
+    if(pdfwriterH->getTotalNumChrToDraw() > numberOfChrPerPage){//multipage
+	numberPagesPDFhet  = int( ceil( double(pdfwriterH->getTotalNumChrToDraw())/double(numberOfChrPerPage)  ) );
+	cerr<<"numberPagesPDFhet "<<numberPagesPDFhet<<endl;
+	
+	vecOfPdfWriters[0]->setFname(    outFilePrefix+".het_"+  stringify(1)+"_"+stringify(numberPagesPDFhet)+".pdf");
+	//cerr<<"0 "<<(outFilePrefix+".het_"+  stringify(1)+"_"+stringify(numberPagesPDFhet)+".pdf")<<endl;
+	for(int i=1;i<numberPagesPDFhet;i++){
+	    PdfWriter * pdfwriterH_ =new PdfWriter(outFilePrefix+".het_"+stringify(i+1)+"_"+stringify(numberPagesPDFhet)+".pdf",heightChr);
+	    //cerr<<"0 "<<(outFilePrefix+".het_"+  stringify(i+1)+"_"+stringify(numberPagesPDFhet)+".pdf")<<endl;
+	    vecOfPdfWriters.push_back(pdfwriterH_);
 
+	    if( pdfwriterH_->drawFrame(fastaIndex,sizeChunk,i*numberOfChrPerPage, &listAutosomes, !autosomeFile.empty()) == 1 ){
+		cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
+		return 1;
+	    }
+
+	    
+	}
+    }else{
+	
+    }
+    cerr<<numberOfChrPerPage<<endl;
+    //return 1;
+		 
+    
+    // cerr<<pdfwriterH->getPageHeight()<<endl;
+    // cerr<<pdfwriterH->getPageWidth()<<endl;
+    // cerr<<pdfwriterH->getHeightLabel()<<endl;
+    // cerr<<pdfwriterH->getHeightChr()<<endl;
+    // cerr<<pdfwriterH->getTotalNumChrToDraw()<<endl;
+
+    // delete(pdfwriterH);
+    // cerr<<numberOfChrPerPage<<endl;
+    
+    //exit(1);
+    
     //pdfwriter.drawHorizontalLine(100,100,102);
     long double minHFoundPlotting = 0.0;
     //long double maxHFoundPlotting = numeric_limits<double>::epsilon();
@@ -4896,49 +4973,68 @@ int main (int argc, char *argv[]) {
     //cerr<<"maxHFoundPlotting "<<maxHFoundPlotting<<endl;
     //maxHFoundPlotting=0.0015;
     maxHFoundPlotting = double( maxSegSitesPer1M )/double(1000000);
-
-    if( pdfwriterH.drawYLabels(minHFoundPlotting,maxHFoundPlotting,true) == 1 ){
-	cerr<<"ERROR writing y labels to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
-	return 1;
+    //vector<PdfWriter *> vecOfPdfWriters;
+    for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
+	if( vecOfPdfWriters[i]->drawYLabels(minHFoundPlotting,maxHFoundPlotting,true) == 1 ){
+	    cerr<<"ERROR writing y labels to pdf file:"<<vecOfPdfWriters[i]->getFname()<<endl;
+	    return 1;
+	}
     }
 
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	if(heteroEstResults[c].undef)
 	    continue;
-	if(    pdfwriterH.drawHEst(heteroEstResults[c].rangeGen,
-				   (heteroEstResults[c].h ),
-				   // ( (heteroEstResults[c].h )-6.0188e-05),
-				   // ( (heteroEstResults[c].h )+6.0188e-05),				   				   
-				   MAX(heteroEstResults[c].hlow,0),
-				   heteroEstResults[c].hhigh,
-				   minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
-				   maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
-				   sizeChunk
-	)  != 0 ){
-	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
-	    return 1;
+
+	for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
+	    //cerr<<heteroEstResults[c].rangeGen.getChrName()<<endl;
+
+	    cerr<<"present "<<heteroEstResults[c].rangeGen.getChrName()<<" i="<<i<<":"<<vecOfPdfWriters[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())<<endl;
+	    if( vecOfPdfWriters[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())){//very inefficient..
+		
+		if(    vecOfPdfWriters[i]->drawHEst(heteroEstResults[c].rangeGen,
+					    (heteroEstResults[c].h ),
+					    // ( (heteroEstResults[c].h )-6.0188e-05),
+					    // ( (heteroEstResults[c].h )+6.0188e-05),				   				   
+					    MAX(heteroEstResults[c].hlow,0),
+					    heteroEstResults[c].hhigh,
+					    minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+					    maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
+					    sizeChunk
+		)  != 0 ){
+		    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
+		    return 1;
+		}
+	    }
 	}
+
     }
     //produce plot libharoutFilePrefix+".vcf.gz"u?
 
 
     // endhmm:
     //write out h estimate
-    pdfwriterH.drawGlobalHEst(hAvg,
-			      hMin,
-			      hMax,			     
-			      double( minSegSitesPer1M )/double(1000000),
-			      maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
-    
+    for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
+	vecOfPdfWriters[i]->drawGlobalHEst(hAvg,
+					   hMin,
+					   hMax,			     
+					   double( minSegSitesPer1M )/double(1000000),
+					   maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
+
+    }
+    for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
+	delete(vecOfPdfWriters[i]);
+    }
 
     //#ifdef NOTDEF    
 
 
 
+    exit(1);
+
 
     PdfWriter pdfwriterHMM (outFilePrefix+".hmm.pdf",heightChr);
     
-    if( pdfwriterHMM.drawFrame(fastaIndex,sizeChunk) == 1 ){
+    if( pdfwriterHMM.drawFrame(fastaIndex,sizeChunk, 0,&listAutosomes, !autosomeFile.empty()) == 1 ){
 	cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
 	return 1;
     }

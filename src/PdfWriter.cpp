@@ -27,7 +27,7 @@ PdfWriter::PdfWriter(const string fname_,
 ){
      fname     = fname_;
      heightChr = heightChr_;
-     
+     totalNumChrToDraw = 0;
     //string fname      = string(argv[indexOflastOpt]);
      string page_title = "";
 
@@ -98,7 +98,7 @@ void PdfWriter::draw_rect (HPDF_Page     page,
     //cerr<<"draw_rect "<<x<<","<<y<<" l = "<<length<<" label="<<label<<" "<<GRAY<<endl;
     //text pos
     HPDF_Page_BeginText (page);
-    HPDF_Page_MoveTextPos (page, x, y - 10);
+    HPDF_Page_MoveTextPos (page, x, y - heightLabel+2);
     HPDF_Page_ShowText (page, label);
     HPDF_Page_EndText (page);
     
@@ -183,13 +183,16 @@ inline void PdfWriter::addRangeCov(HPDF_Page & page,double begin,double end, con
 
 
 int PdfWriter::drawFrame(const string & fastaIndex,
-			 const double   windowSizeForHest){
+			 const double   windowSizeForHest,
+			 int indexFirstChr ,
+			 const  set<string> * listAutosomes,
+			 bool specifiedAutosomes){
     
      string line;
      igzstream myFaidxFile;
      // bool oneChr=false;
      // string oneChrName="";
-
+     int indexLastChr=indexFirstChr;
      myFaidxFile.open(fastaIndex.c_str(), ios::in);
 
 
@@ -204,6 +207,15 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	     toadd.name         =fields[0];
 	     toadd.startIndexChr=genomeLength+1;
 	     toadd.length       =destringify<unsigned int>(fields[1]);
+	     if(specifiedAutosomes){//we have specified the autosomes		 
+		 if(listAutosomes->find(toadd.name) == listAutosomes->end()){//not found in autosomes
+		     continue;
+		 }
+		 totalNumChrToDraw++;
+	     }else{
+		 totalNumChrToDraw++;
+	     }
+
 	     if(toadd.length> maxLengthFound){
 		 maxLengthFound = toadd.length;
 	     }
@@ -217,7 +229,6 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	 cerr << "Unable to open fasta index file "<<fastaIndex<<endl;
 	 return 1;
      }
-
 
      
      //bool found=false;
@@ -238,16 +249,23 @@ int PdfWriter::drawFrame(const string & fastaIndex,
      // }
 
 
-     double sizeToUse=HPDF_Page_GetHeight(page)/double(2.0*chrFound.size());
-
+     //double sizeToUse=HPDF_Page_GetHeight(page)/double(2.0*chrFound.size());
+     double sizeToUse = heightLabel + heightChr;
+     //cerr<<HPDF_Page_GetHeight(page)
 
      double widthScreen= (HPDF_Page_GetWidth(page)-10.0);    
-     for(unsigned int i=0;
-	 i<chrFound.size();
+     for(int i=indexFirstChr;
+	 i<int(chrFound.size());
 	 i++){
+	 indexLastChr = i;
+	 double yOffset=sizeToUse*double(i-indexFirstChr);
 
-	 double yOffset=sizeToUse*double(i*2);
-	 //cerr<<"i1 ="<<i<<"\t"<<yOffset<<endl;
+	 cerr<<"i1 ="<<i<<"\t"<<yOffset<<"\t"<<chrFound[i].name<<" "<<(yOffset+getTotalHeightChr())<<" "<<HPDF_Page_GetHeight(page) <<endl;
+	 //reached the end
+	 if((yOffset+getTotalHeightChr()) > HPDF_Page_GetHeight(page)){
+	     break;
+	 }
+	 cerr<<"accepted"<<endl;
 	 // if(oneChr){
 	 //     if(chrFound[i].name != oneChrName)
 	 // 	 continue;
@@ -257,13 +275,14 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	 draw_rect (page, 
 		    xmargin ,                            //x
 		    HPDF_Page_GetHeight(page) - yOffset, //y
-		    widthScreen  * (double(chrFound[i].length)/double(maxLengthFound)),     //length
+		    (widthScreen-xmargin)  * (double(chrFound[i].length)/double(maxLengthFound)),     //length
 		    //heightChr,//height
 		    chrFound[i].name.c_str());
-	 //cerr<<"i2 ="<<i<<"\t"<<yOffset<<endl;	 
+
+	 //cerr<<indexFirstChr<<"\tchrFound["<<i<<"].name="<< chrFound[i].name<<"\t"<<yOffset<<endl;	 
 	 name2chrScreenInfo[ chrFound[i].name.c_str() ].y            = HPDF_Page_GetHeight(page) -yOffset; //y offset
 	 name2chrScreenInfo[ chrFound[i].name.c_str() ].length       = double(chrFound[i].length);   //actual length in bases 
-	 name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen = ( (HPDF_Page_GetWidth(page)-10.0)  * (double(chrFound[i].length)/double(maxLengthFound)) );     //length on screen in pixel
+	 name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen = ( (HPDF_Page_GetWidth(page)- 2*xmargin)  * (double(chrFound[i].length)/double(maxLengthFound)) );     //length on screen in pixel
 
 	 //cerr<<"i3 ="<<i<<"\t"<<yOffset<<endl;
 
@@ -274,7 +293,8 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	 HPDF_Page_Stroke (page);
 	 //cerr<<
      }
-
+     //cerr<< HPDF_Page_GetHeight(page) <<endl;
+     //exit(1);
      //cerr<<"test "<<endl;
      
 
@@ -285,9 +305,14 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 
 
      //write out x labels
-     for(unsigned int i=0;
-	 i<chrFound.size();
+     for(int i=indexFirstChr;
+	 i<=indexLastChr;
 	 i++){
+    // for(int i=indexFirstChr;
+    // 	 i<int(chrFound.size());
+    // 	 i++){
+
+	 
 	 unsigned int mark = 100000000;
 	 while(mark>=1){
 	     //cerr<<"mark "<<mark<<endl;
@@ -299,14 +324,14 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	     }
 	 }
 	 //cerr<<"mark "<<mark<<endl;
-	 //draw markings
-
+	 //DRAW MARKINGS
+	 //cerr<<chrFound[i].name<<endl;
 	 for(unsigned int m=0;m<name2chrScreenInfo[ chrFound[i].name.c_str() ].length;m+=mark ){
 	     //name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel)
 	     double xfraction = ( m  /(name2chrScreenInfo[ chrFound[i].name.c_str() ].length+windowSizeForHest));
-	     double x = xmargin +   xfraction*name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen ;
+	     double x  = xmargin +   xfraction*name2chrScreenInfo[ chrFound[i].name.c_str() ].lengthScreen ;
 	     double y1 = name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel);
-	     double y2 = name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel)-heightLabel/5.0;//1/5 of the height label
+	     double y2 = name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel)-heightLabel*fracHeightLabelMark;//1/5 of the height label
 	     
 	     //cerr<<"x "<<x<<" m "<<m<<" "<<(name2chrScreenInfo[ chrFound[i].name.c_str() ].y - (heightChr+heightLabel))<<endl;
 
@@ -340,7 +365,7 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 		 }
 		 //labl = "0";
 	     }
-	     
+	     if(labl == "0") 	 continue;
 	     //cerr<<"labl "<<labl<<endl;
 	     double fontsize =5;
 	     HPDF_Page_SetFontAndSize (page, font, 5);
@@ -352,10 +377,47 @@ int PdfWriter::drawFrame(const string & fastaIndex,
 	     
 	 }
      }
+     
+     // for (map<string,chrScreenInfo >::iterator it=name2chrScreenInfo.begin(); it!=name2chrScreenInfo.end(); ++it)
+     // 	 cerr << it->first  << '\n';
 
-    
      return 0;
 }
+
+void PdfWriter::setFname(const string newfname){
+    fname=newfname;
+}
+
+string PdfWriter::getFname() const{
+    return fname;
+}
+
+int PdfWriter::getTotalNumChrToDraw() const{
+    return totalNumChrToDraw;
+}
+
+int PdfWriter::getPageHeight() const{
+    return int(HPDF_Page_GetHeight(page));
+}
+
+
+
+int PdfWriter::getPageWidth() const{
+    return int(HPDF_Page_GetWidth(page));
+}
+
+int PdfWriter::getHeightLabel() const{//height of label
+    return int(heightLabel);
+}
+
+int PdfWriter::getHeightChr()   const{//height of label
+    return int(heightChr);
+}
+
+int PdfWriter::getTotalHeightChr()   const{//height of label
+    return int(heightChr+heightLabel+heightLabel*fracHeightLabelMark);
+}
+
 
 int PdfWriter::drawYLabels(const long double minHFoundPlotting,
 			   const long double maxHFoundPlotting,
@@ -536,6 +598,10 @@ int PdfWriter::drawVerticalLine(const double x,
 }
 #define NEWPLOT
 
+bool  PdfWriter::chrIspresent(const string chrname) const{
+    return ( name2chrScreenInfo.find( chrname ) != name2chrScreenInfo.end() );
+}
+
 int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
 			const long double   h_,          // value of h
 			const long double   hlow_,       // lower  conf. int. for h
@@ -551,10 +617,16 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
     long double   hlow  = hlow_;
     long double   hhigh = hhigh_;
 
+    if(h < hLimLow){	 h  = hLimLow;    }
+    if(h > hLimHigh){	 h  = hLimHigh;   }
+
+    if(hlow < hLimLow){	 hlow  = hLimLow;    }
+    if(hlow > hLimHigh){ hlow  = hLimHigh;   }
+    
     //if the hLimHigh was bound to avoid large confidence interval
-    if(hhigh > hLimHigh){
-	hhigh  = hLimHigh;
-    }
+    if(hhigh > hLimHigh){hhigh  = hLimHigh;    }
+    if(hhigh > hLimHigh){hhigh  = hLimHigh;    }
+    
     //cerr<<"drawHEst "<<cr<<" "<<h<<" "<<hlow<<" "<<hhigh<<" hlims "<<hLimLow<<" "<<hLimHigh<<	endl;
 
     if( name2chrScreenInfo.find( cr.getChrName() ) == name2chrScreenInfo.end() ){
@@ -584,8 +656,9 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
     // ); // baseline
     //cerr<<name2chrScreenInfo[ cr.getChrName() ].le
     double widthtouse = name2chrScreenInfo[ cr.getChrName() ].lengthScreen/(name2chrScreenInfo[ cr.getChrName() ].length/windowSizeForHest);
-
-// #ifdef NEWPLOT 
+    cerr<<"PX "<<cr<<" "<<name2chrScreenInfo[ cr.getChrName() ].y <<" "<<(name2chrScreenInfo[ cr.getChrName() ].y-(heightChr))<<" "<<(name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h-hLimLow)/hLimHigh))<<" "<<h<<" "<<hLimLow<<" "<<hLimHigh<<endl;
+    
+    // #ifdef NEWPLOT 
     drawVerticalLine( x,                                                                                                             // x offset
 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,  // baseline
 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hhigh-hLimLow)/hLimHigh),
@@ -624,38 +697,38 @@ int PdfWriter::drawHEst(const GenomicRange  cr,         // genomic range to plot
 		      0.0,
 		      0.0//widthtouse/3.0
     ); // baseline
-// #else
-//     drawVerticalLine( x,                                                                                                             // x offset
-// 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,  // baseline
-// 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hhigh-hLimLow)/hLimHigh),
-// 		      0.9,
-// 		      0,
-// 		      0,
-// 		      0.0//widthtouse/3.0
-//     ); // baseline
-
+    // #else
+    //     drawVerticalLine( x,                                                                                                             // x offset
+    // 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,  // baseline
+    // 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hhigh-hLimLow)/hLimHigh),
+    // 		      0.9,
+    // 		      0,
+    // 		      0,
+    // 		      0.0//widthtouse/3.0
+    //     ); // baseline
+    
     
 
-//     drawHorizontalLine( x-widthtouse/2.0,                                                                                                             // x offset
-// 			x+widthtouse/2.0,                                                                                                             // x offset			
-// 			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),                   // baseline
-// 			0,
-// 			0,
-// 			0,
-// 			0.2);
-			
+    //     drawHorizontalLine( x-widthtouse/2.0,                                                                                                             // x offset
+    // 			x+widthtouse/2.0,                                                                                                             // x offset			
+    // 			name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh),                   // baseline
+    // 			0,
+    // 			0,
+    // 			0,
+    // 			0.2);
+    
 
 
-//     // lower estimate
-//     drawVerticalLine( x,                                                                                                             // x offset
-// 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hlow -hLimLow)/hLimHigh) ,  // baseline
-// 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,
-// 		      0.9,
-// 		      0.0,
-// 		      0.0,
-// 		      0.0//widthtouse/3.0
-//     ); // baseline
-// #endif
+    //     // lower estimate
+    //     drawVerticalLine( x,                                                                                                             // x offset
+    // 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (hlow -hLimLow)/hLimHigh) ,  // baseline
+    // 		      name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh) ,
+    // 		      0.9,
+    // 		      0.0,
+    // 		      0.0,
+    // 		      0.0//widthtouse/3.0
+    //     ); // baseline
+    // #endif
 
 
     
@@ -805,9 +878,9 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 
 
 int PdfWriter::drawGlobalHEst(//string chrname,
-			      const long double   h,
-			      const long double   hlow,
-			      const long double   hhigh,
+			      const long double   h_,
+			      const long double   hlow_,
+			      const long double   hhigh_,
 			      const double hLimLow,
 			      const double hLimHigh){
     //cerr<<"drawGlobalHEst "<<h<<" "<<hlow<<" "<<hhigh<<endl;
@@ -815,14 +888,45 @@ int PdfWriter::drawGlobalHEst(//string chrname,
     // 	cerr<<"PdfWriter chromosome not found: "<<chrname<<endl;
     // 	return 1;	
     // }
+    long double   h     = h_;
+    long double   hlow  = hlow_;
+    long double   hhigh = hhigh_;
+
+    if(h < hLimLow){	 h  = hLimLow;    }
+    if(h > hLimHigh){	 h  = hLimHigh;   }
+
+    if(hlow < hLimLow){	 hlow  = hLimLow;    }
+    if(hlow > hLimHigh){ hlow  = hLimHigh;   }
+    
+    //if the hLimHigh was bound to avoid large confidence interval
+    if(hhigh > hLimHigh){hhigh  = hLimHigh;    }
+    if(hhigh > hLimHigh){hhigh  = hLimHigh;    }
     
     vector<string> allnames;
     for(map<string , chrScreenInfo>::iterator it = name2chrScreenInfo.begin(); it != name2chrScreenInfo.end(); ++it) {
+	cerr<<fname<<endl;
+	cerr<<"drawGlobalHEst "<<h<<" "<<hlow<<" "<<hhigh<<" "<<it->first<<endl;
+	cerr<<name2chrScreenInfo[ it->first ].y  <<" "<< heightChr<<" "<<heightLabel <<" "<<  ( (h     -hLimLow)/hLimHigh)<<" "<<(name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (h     -hLimLow)/hLimHigh))<<endl;
+	cerr<<xmargin<<" "<<(xmargin+name2chrScreenInfo[ it->first ].lengthScreen)<<" "<<HPDF_Page_GetWidth(page)<<endl;
 	// //low
 	// drawVerticalLine(xmargin,
 	// 		 name2chrScreenInfo[ it->first ].lengthScreen,
 	// 		 name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (hlow  -hLimLow)/hLimHigh) );//baseline
 	//middle
+
+	
+	// drawHorizontalLine(xmargin,
+	// 		   xmargin+100,
+	// 		   name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (h     -hLimLow)/hLimHigh),
+	// 		   0.0,
+	// 		   0.0,
+	// 		   0.7,
+	// 		   0.3, //w
+	// 		   true
+	// );//baseline
+
+	if(0){
+
 	drawHorizontalLine(xmargin,
 			   xmargin+name2chrScreenInfo[ it->first ].lengthScreen,
 			   name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (h     -hLimLow)/hLimHigh),
@@ -842,6 +946,7 @@ int PdfWriter::drawGlobalHEst(//string chrname,
 			   0.1, //w
 			   true
 	);//baseline
+	
 	drawHorizontalLine(xmargin,
 			   xmargin+name2chrScreenInfo[ it->first ].lengthScreen,
 			   name2chrScreenInfo[ it->first ].y - (heightChr+heightLabel) + heightChr*  ( (hhigh -hLimLow)/hLimHigh),
@@ -851,8 +956,8 @@ int PdfWriter::drawGlobalHEst(//string chrname,
 			   0.1, //w
 			   true
 	);//baseline
-
-	
+	}
+	break;
 	// //high
 	// drawVerticalLine(xmargin,
 	// 		 name2chrScreenInfo[ it->first ].lengthScreen,
@@ -879,7 +984,7 @@ int PdfWriter::drawHorizontalLine(const double x1,
     HPDF_Page_SetRGBStroke (page, r, g, b);//set color
     HPDF_Page_SetLineWidth (page, w); //set line width
 
-    //cerr<<"drawHorizontalLine "<<x1<<" "<<x2<<" "<<y<<" "<<r<<" "<<g<<" "<<b<<" "<<w<<" "<<dash<<endl;
+    cerr<<"drawHorizontalLine "<<x1<<" "<<x2<<" "<<y<<" "<<r<<" "<<g<<" "<<b<<" "<<w<<" "<<dash<<endl;
 
     HPDF_Page_MoveTo (page, x1,   y);
     HPDF_Page_LineTo (page, x2,   y);

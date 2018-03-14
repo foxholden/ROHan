@@ -58,10 +58,13 @@ class PdfWriter{
     float tw;
     double alpha=0.8;
     double xmargin=10;
+    
+    double fracHeightLabelMark=0.2;
+    
     double heightLabel=15;//height of label
     double heightChr  =15;//height of label
     //double gray [3] = {0.6,0.6,0.6};
-
+    int totalNumChrToDraw;
     map<string, chrScreenInfo>  name2chrScreenInfo;
 
     void draw_rect (HPDF_Page     page,
@@ -83,7 +86,8 @@ class PdfWriter{
     PdfWriter(const PdfWriter & other);
     ~PdfWriter();
     PdfWriter & operator= (const PdfWriter & other);
-    int drawFrame(const string & fastaIndex,const double   windowSizeForHest);
+    int drawFrame(const string & fastaIndex,const double   windowSizeForHest,int indexFirstChr=0,const  set<string> * listAutosomes=NULL, bool specifiedAutosomes=false );
+
     int drawYLabels(const long double minHFoundPlotting,
 		    const long double maxHFoundPlotting,
 		    const bool scientific);
@@ -139,7 +143,21 @@ class PdfWriter{
 		   double g,
 		   double b,
 		   double radius);
+
+    int getPageHeight()  const;
+    int getPageWidth()   const;
+    int getHeightLabel() const;//height of label
+    int getHeightChr()   const;//height of label
+    int getTotalHeightChr()   const;//height of label
+
     
+    int getTotalNumChrToDraw() const;
+    void setFname(const string newfname);
+    string getFname() const;
+    bool  chrIspresent(const string chrname) const;
+
+
+
 };
 
 
