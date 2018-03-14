@@ -185,17 +185,22 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 		logsum = oplusInitnatl( logsum, temp );
 		logsumNotrans = oplusInitnatl( logsumNotrans, f[previousState][k-1] );
 	    }//end each previous state
-
+    
 	    //logsum contains the sum of all probs from every previous state
 	    if( observed[k].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
-		f[state][k]     =		    logsumNotrans+                                       //previous probability without transition probability
+		if(observed[k].undef){
+		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
+		}else{//not undefined and not break
+		    
+		    f[state][k]     =		    logsumNotrans+                                       //previous probability without transition probability
 		                                    observed[k].weight*logRobust( p_e ) +                                   //emission probability by state
 		                                    logRobust( hmm->startingState[state]) ;              //probability of "re"starting at state "state"
+    }
 	    }else{
 		if(observed[k].undef){
 		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
 		}else{//not undefined and not break
-
+		    
 		    f[state][k] =
 			/* logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[k].plow+observed[k].phigh)/2.0 *sizeChunk)  , */
 			/* 						sizeChunk) ) +  //emission probability by state */			
@@ -259,8 +264,10 @@ inline int returnMinMidMax(const unsigned char useminmidmax,
 
 
 inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & observed, const unsigned int sizeChunk,const unsigned char useminmidmax,bool verbose=false){//useminmidmax 0 = min, 1 = mid, 2=max
+   
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates();
+    //cerr<<"forwardProbMissing "<<verbose<<endl;
     //cerr<<"n "<<nObservations<<" "<<nStates<<" "<<sizeChunk<<" useminmidmax>"<<int(useminmidmax)<<"<"<<endl;
     /* cerr<<returnMinMidMax(useminmidmax, */
     /* 			  observed[0].hlow, */
@@ -302,7 +309,7 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 	
 #ifdef DEBUGFWD
 	if(verbose)
-	    cout<<"INIT "<<"f["<<state<<"][0] ="<<f[state][0]<<" undef="<<observed[0].undef<<endl;
+	    cerr<<"INIT "<<"f["<<state<<"][0] ="<<f[state][0]<<" undef="<<observed[0].undef<<" "<<observed[0].rangeGen<<endl;
 #endif
 	
     }
@@ -348,16 +355,26 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 		logsumNotrans = oplusInitnatl( logsumNotrans, f[previousState][k-1] );
 	    }//end each previous state
 
+#ifdef DEBUGFWD
+	    if(verbose)
+		cerr<<"BEFORE "<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" "<<logsum<<endl;
+#endif
+
+
 	    //logsum contains the sum of all probs from every previous state
 	    if( observed[k].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
-		f[state][k]     =		    logsumNotrans+                                       //previous probability without transition probability
-		                                    observed[k].weight*logRobust( p_e ) +                                   //emission probability by state
-		                                    logRobust( hmm->startingState[state]) ;              //probability of "re"starting at state "state"
+		if(observed[k].undef){
+		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
+		}else{
+		    f[state][k]     =		    logsumNotrans+                                       //previous probability without transition probability
+			observed[k].weight*logRobust( p_e ) +                                   //emission probability by state
+			logRobust( hmm->startingState[state]) ;              //probability of "re"starting at state "state"
+		}
 	    }else{
 		if(observed[k].undef){
 		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
 		}else{//not undefined and not break
-
+		    
 		    f[state][k] =
 			/* logRobust( hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[k].plow+observed[k].phigh)/2.0 *sizeChunk)  , */
 			/* 						sizeChunk) ) +  //emission probability by state */			
@@ -365,11 +382,11 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 			logsum;                                                              //sum of all probs for ev
 		}
 	    }
-
+	    
 
 #ifdef DEBUGFWD
 	    if(verbose)
-		cout<<""<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" undef="<<observed[k].undef<<" chrb="<<observed[k].chrBreak<<" w="<<observed[k].weight<<endl;
+		cerr<<""<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" undef="<<observed[k].undef<<" chrb="<<observed[k].chrBreak<<" w="<<observed[k].weight<<" "<<observed[k].rangeGen<<" "<<returnMinMidMax(useminmidmax,observed[k].hlow,observed[k].h,observed[k].hhigh,sizeChunk,hmm->getMinSegSitesPerChunk(),hmm->getMaxSegSitesPerChunk())<<" "<<hmm->getMaxSegSitesPerChunk()<<endl;
 #endif
 
 	}//each state
@@ -441,7 +458,11 @@ inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
 	    
 	    //if the next one was a chrBreak
 	    if( observed[k+1].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
-		b[state][k]    =                   logsumNoTransStart; 
+		if(observed[k+1].undef){
+		    b[state][k] =		   logsumNoTrans;   //forego emission probability just count sum of all probs for every previous state
+		}else{//not undefined and not break
+		    b[state][k]    =               logsumNoTransStart; 
+		}
 	    }else{
 		//if the next one was undefined
 		if(observed[k+1].undef){
@@ -584,14 +605,18 @@ inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & 
 	    
 	    //if the next one was a chrBreak
 	    if( observed[k+1].chrBreak){//if we encounter a chr break = P[Start]*P[emission]
-		b[state][k]    =                   logsumNoTransStart; 
+		if(observed[k+1].undef){
+		    b[state][k] =	   logsumNoTrans;   //forego emission probability just count sum of all probs for every previous state
+		}else{
+		    b[state][k] =          logsumNoTransStart; 
+		}
 	    }else{
 	      //if the next one was undefined
 	      if(observed[k+1].undef){
-		    b[state][k] =		   logsumNoTrans;   //forego emission probability just count sum of all probs for every previous state
-		}else{//not undefined and not break
-		    b[state][k] =		   logsum;          //forego emission probability just count sum of all probs for every previous state
-		}
+		  b[state][k] =		   logsumNoTrans;   //forego emission probability just count sum of all probs for every previous state
+	      }else{//not undefined and not break
+		  b[state][k] =		   logsum;          //forego emission probability just count sum of all probs for every previous state
+	      }
 	    }
 	    
 	    b[state][k] =     b[state][k] * observed[k].weight;

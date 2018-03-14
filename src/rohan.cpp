@@ -3321,13 +3321,15 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     // return 1;
     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
     //cerr<<"test fwd"<<endl;
-    fbreturnVal  tmpResFWD = forwardProbMissing(&hmm,heteroEstResults,sizeChunk,useminmidmax);
+    fbreturnVal  tmpResFWD = forwardProbMissing(&hmm,heteroEstResults,sizeChunk,useminmidmax,verbose);
     x_i  = tmpResFWD.llik;
     // x_i    =  forwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
     // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
-    cerr<<"..done"<<endl;
-    //cerr<<"x_i "<<x_i<<endl;
+    // cerr<<"..done"<<endl;
+    // cerr<<"x_i "<<x_i<<endl;
+    //    exit(1);
     //return 1;
+    
     //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
     vector<long double> hvector;
     vector<long double> pvector;
@@ -4771,16 +4773,17 @@ int main (int argc, char *argv[]) {
 	    string line;
 	    
 	    getline (hEstFileSt,line) ; 		//header
+	    
 	    //cerr<<line<<endl;
 	    while (getline (hEstFileSt,line) ){
-		cerr<<line<<endl;	    
+		if(verbose)	
+		    cerr<<line<<endl;	    
 		fields = allTokens(line,'\t');
 
 		if(fields.size() != 8){
 		    cerr << "ERROR: line from previous h est. does not have 9 fields ("<<(fields.size()+1)<<") "<<line<<endl;
 		    return 1;
 		}
-
 
 	    	emissionUndef hetResToAdd;		
 		hetResToAdd.rangeGen.setChrName(                                fields[0]    );
@@ -4853,7 +4856,7 @@ int main (int argc, char *argv[]) {
 		hetResToAdd.weight = ( (long double)(sitesDefinedLine) ) / ( (long double)(sizeChunk) );
 
 		if(verbose)
-		  cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.h<<"\t"<<hetResToAdd.hlow<<"\t"<<hetResToAdd.hhigh<<"\t"<<hetResToAdd.weight<<endl;
+		    cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.h<<"\t"<<hetResToAdd.hlow<<"\t"<<hetResToAdd.hhigh<<"\t"<<hetResToAdd.weight<<endl;
 		
 		heteroEstResults.push_back(hetResToAdd);
 	    }           
@@ -4923,10 +4926,10 @@ int main (int argc, char *argv[]) {
     vecOfPdfWriters.push_back(pdfwriterH);
     int numberPagesPDFhet =1;
     int numberOfChrPerPage = int( floor( double(pdfwriterH->getPageHeight()) / double( pdfwriterH->getTotalHeightChr()  )) );
-    cerr<<pdfwriterH->getPageHeight()<<" "<<pdfwriterH->getTotalHeightChr() <<endl;
+    //cerr<<pdfwriterH->getPageHeight()<<" "<<pdfwriterH->getTotalHeightChr() <<endl;
     if(pdfwriterH->getTotalNumChrToDraw() > numberOfChrPerPage){//multipage
 	numberPagesPDFhet  = int( ceil( double(pdfwriterH->getTotalNumChrToDraw())/double(numberOfChrPerPage)  ) );
-	cerr<<"numberPagesPDFhet "<<numberPagesPDFhet<<endl;
+	//cerr<<"numberPagesPDFhet "<<numberPagesPDFhet<<endl;
 	
 	vecOfPdfWriters[0]->setFname(    outFilePrefix+".het_"+  stringify(1)+"_"+stringify(numberPagesPDFhet)+".pdf");
 	//cerr<<"0 "<<(outFilePrefix+".het_"+  stringify(1)+"_"+stringify(numberPagesPDFhet)+".pdf")<<endl;
@@ -4945,7 +4948,7 @@ int main (int argc, char *argv[]) {
     }else{
 	
     }
-    cerr<<numberOfChrPerPage<<endl;
+    //cerr<<numberOfChrPerPage<<endl;
     //return 1;
 		 
     
@@ -4988,9 +4991,10 @@ int main (int argc, char *argv[]) {
 	for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
 	    //cerr<<heteroEstResults[c].rangeGen.getChrName()<<endl;
 
-	    cerr<<"present "<<heteroEstResults[c].rangeGen.getChrName()<<" i="<<i<<":"<<vecOfPdfWriters[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())<<endl;
+
 	    if( vecOfPdfWriters[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())){//very inefficient..
-		
+		// if(c<2300){
+		//     cerr<<"present "<<heteroEstResults[c].rangeGen.getChrName()<<" i="<<i<<":"<<vecOfPdfWriters[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())<<endl;
 		if(    vecOfPdfWriters[i]->drawHEst(heteroEstResults[c].rangeGen,
 					    (heteroEstResults[c].h ),
 					    // ( (heteroEstResults[c].h )-6.0188e-05),
@@ -5004,6 +5008,7 @@ int main (int argc, char *argv[]) {
 		    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
 		    return 1;
 		}
+		//}
 	    }
 	}
 
@@ -5029,7 +5034,7 @@ int main (int argc, char *argv[]) {
 
 
 
-    exit(1);
+    //exit(1);
 
 
     PdfWriter pdfwriterHMM (outFilePrefix+".hmm.pdf",heightChr);
