@@ -74,7 +74,20 @@ PdfWriter::PdfWriter(const string fname_,
      HPDF_Page_EndText (page);
      HPDF_Page_SetFontAndSize (page, font, 10);
      //cerr<<"Creating a page in file  "<<fname_<<"w="<<HPDF_Page_GetWidth(page)<<" h="<<HPDF_Page_GetHeight (page)<<endl;
-     hmmPrevious = false;
+     //hmmPrevious = false;
+
+     hmmprevdata  hmmpmin;
+     hmmprevdata  hmmpmid;
+     hmmprevdata  hmmpmax;
+
+     hmmpmin.hmmPrevious =false;
+     hmmpmid.hmmPrevious =false;
+     hmmpmax.hmmPrevious =false;
+     
+     hmmpv.push_back( hmmpmin ); // [HMMCODEMIN]
+     hmmpv.push_back( hmmpmid ); // [HMMCODEMID] 
+     hmmpv.push_back( hmmpmax ); // [HMMCODEMAX] 
+     
   
 }
 
@@ -777,6 +790,7 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 		       const double        hLimHigh,
 		       const double        windowSizeForHest,
 		       const bool          defined,
+		       const bool          chrbreak,		       
 		       const unsigned char useminmidmax){  // higher limit for the h plot 
     long double   h     = h_;
     //long double   hlow  = hlow_;
@@ -793,45 +807,66 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 	return 1;	
     }
 
-    double xfraction = ( ( (cr.getEndCoord()+cr.getStartCoord())/2.0 )/(name2chrScreenInfo[ cr.getChrName() ].length+windowSizeForHest));
+    double xfraction  = ( ( (cr.getEndCoord()+cr.getStartCoord())/2.0 )/(name2chrScreenInfo[ cr.getChrName() ].length+windowSizeForHest));
     
-    //cerr<<"drawHEst2 "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<name2chrScreenInfo[ cr.getChrName() ].y<<" l="<<name2chrScreenInfo[ cr.getChrName() ].length<<" "<<name2chrScreenInfo[ cr.getChrName() ].lengthScreen<<" "<<(( (h-hLimLow)/hLimHigh) ) <<" xf="<<xfraction<<endl;
+    // cerr<<"drawHEst2 "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<name2chrScreenInfo[ cr.getChrName() ].y<<" l="<<name2chrScreenInfo[ cr.getChrName() ].length<<" "<<name2chrScreenInfo[ cr.getChrName() ].lengthScreen<<" "<<(( (h-hLimLow)/hLimHigh) ) <<" xf="<<xfraction<<endl;
 
-    double x = xmargin +   xfraction*name2chrScreenInfo[ cr.getChrName() ].lengthScreen ;
+    double x          = xmargin +   xfraction*name2chrScreenInfo[ cr.getChrName() ].lengthScreen ;
 	
     double widthtouse = name2chrScreenInfo[ cr.getChrName() ].lengthScreen/(name2chrScreenInfo[ cr.getChrName() ].length/windowSizeForHest);
 
     
-    // cerr<<"drawHMM "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<xfraction<<" "<<x<<" "<<widthtouse<<" "<<name2chrScreenInfo[ cr.getChrName() ].y <<" "<< (heightChr+heightLabel) <<" "<<heightChr <<" "<<  ( (h    -hLimLow)/hLimHigh)<<" "<<((name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)))<<endl;
+     // cerr<<"drawHMM "<<cr.getEndCoord()<<" "<<cr.getStartCoord()<<" "<<xfraction<<" "<<x<<" "<<widthtouse<<" "<<name2chrScreenInfo[ cr.getChrName() ].y <<" "<< (heightChr+heightLabel) <<" "<<heightChr <<" "<<  ( (h    -hLimLow)/hLimHigh)<<" "<<((name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)))<<endl;
 
     double r,g,b,w;
+    double xoffsetVisible=0;
+    
     if(defined){
 	if( useminmidmax == HMMCODEMIN){//red
-	    r =   1.0; g = 0.0; b =   0.0; w = 1.0;
+	    r =   1.0; g = 0.0; b =   0.0; w = 1.0; xoffsetVisible=-1;
 	}
 	if( useminmidmax == HMMCODEMID){//green
-	    r =   0.0; g = 1.0; b =   0.0; w = 1.0;
+	    r =   0.0; g = 1.0; b =   0.0; w = 1.0; xoffsetVisible= 0;
 	}
 	if( useminmidmax == HMMCODEMAX){//magenta
-	    r =   1.0; g = 0.0; b =   1.0; w = 1.0;
+	    r =   1.0; g = 0.0; b =   1.0; w = 1.0; xoffsetVisible= 1;
 	}
     }else{
-	r = 1.0; g = 1.0; b =   0; w = 0.5;
+	r = 1.0; g = 1.0; b =   0; w = 0.5;  //yellow
     }
 
     widthtouse = 0.9*widthtouse;
 
     double xlhmm = x-widthtouse/2.0;// x offset
     double xrhmm = x+widthtouse/2.0;// x offset			
-    double yhmm  = (name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh)); // baseline
+    double yhmm  = (name2chrScreenInfo[ cr.getChrName() ].y - (heightChr+heightLabel) + heightChr*  ( (h    -hLimLow)/hLimHigh))  + xoffsetVisible; // baseline
+    
     
     drawHorizontalLine( xlhmm,
 			xrhmm,
 			yhmm ,
 			r,g,b,w);
 
-    if(hmmPrevious){
-	//cout<<"draw hmm previous "<<xlhmmPrevious<<" "<<xrhmmPrevious<<" "<<yhmmPrevious<<" "<<xlhmm<<" "<<xrhmm<<" "<<yhmm<<endl; 
+    // double xlhmmPrevious;
+    // double xrhmmPrevious;
+    // double yhmmPrevious;
+    // bool   hmmPrevious;
+
+
+
+    // if( useminmidmax == HMMCODEMIN){ 	}
+    // 	if( useminmidmax == HMMCODEMID){
+    // 	}
+    // 	if( useminmidmax == HMMCODEMAX){	}
+    
+    if(chrbreak){ hmmpv[useminmidmax].hmmPrevious =false; }
+    // cout<<"draw hmm previous "<<hmmpv[useminmidmax].xlhmmPrevious<<" "<<hmmpv[useminmidmax].xrhmmPrevious<<" "<<hmmpv[useminmidmax].yhmmPrevious<<" "<<xlhmm<<" "<<xrhmm<<" "<<yhmm<<endl; 
+
+
+
+    
+    if(hmmpv[useminmidmax].hmmPrevious){
+	// cout<<"draw hmm previous "<<hmmpv[useminmidmax].xlhmmPrevious<<" "<<hmmpv[useminmidmax].xrhmmPrevious<<" "<<hmmpv[useminmidmax].yhmmPrevious<<" "<<xlhmm<<" "<<xrhmm<<" "<<yhmm<<endl; 
 
 	//cout<<"1"<<endl;
     	//draw connector to previous
@@ -842,16 +877,16 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 	
 	//cout<<"3"<<endl;
 	//current 
-	HPDF_Page_MoveTo(page,xrhmmPrevious,yhmmPrevious);
+	HPDF_Page_MoveTo(page,hmmpv[useminmidmax].xrhmmPrevious,hmmpv[useminmidmax].yhmmPrevious);
 	//cout<<"4"<<endl;
 
 	double curvature=1;
-	
+	//if(0) //todo remove
     	HPDF_Page_CurveTo( page,
 
 			   //first point for derivative
-    			   xrhmmPrevious+curvature,//xlhmm,        //x1
-    			   yhmmPrevious, //y1
+    			   hmmpv[useminmidmax].xrhmmPrevious+curvature,//xlhmm,        //x1
+    			   hmmpv[useminmidmax].yhmmPrevious, //y1
 
 			   //second point for derivative
 			   xlhmm-curvature, //xrhmmPrevious,//x2
@@ -866,11 +901,11 @@ int PdfWriter::drawHMM(const GenomicRange  cr,         // genomic range to plot
 	//cout<<"5"<<endl;
     }
     
-    xlhmmPrevious = xlhmm;
-    xrhmmPrevious = xrhmm;
-    yhmmPrevious  = yhmm;
+    hmmpv[useminmidmax].xlhmmPrevious = xlhmm;
+    hmmpv[useminmidmax].xrhmmPrevious = xrhmm;
+    hmmpv[useminmidmax].yhmmPrevious  = yhmm;   
+    hmmpv[useminmidmax].hmmPrevious   = true;
     
-    hmmPrevious   = true;
     return 0;
 }
 

@@ -47,9 +47,13 @@ public:
     long double getTrans(int i,int j) const;
     //setting for next state
     void setHetRateForNonROH(long double newH);
+    void setHetRateForROH(long double newH);
+    
     void setTransprob(long double newTrans);
     void setNrwPerSizeChunk(unsigned int nrwPerSizeChunk);
-    void recomputeProbs();
+    void recomputeProbsROH();
+    void recomputeProbsNonROH();
+    
     int  getMinSegSitesPerChunk();
     int  getMaxSegSitesPerChunk();
  

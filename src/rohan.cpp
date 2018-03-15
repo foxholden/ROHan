@@ -6,11 +6,8 @@
 #include <random>
 
 //TODO
-
-// fix the path of weights so that rohan can be called anywhere.
-// does the HMM underestimate?
-// global estimate
-
+//fix pdf hmm
+//TODO: GC bias for coverage?
 
 #include "api/internal/io/BgzfStream_p.h"
 #include <api/BamConstants.h>
@@ -2878,7 +2875,7 @@ private:
 
 
 
-//TODO: GC bias for coverage?
+
 void *mainCoverageComputationThread(void * argc){
 
     int   rc;
@@ -3213,7 +3210,7 @@ void *mainCoverageComputationThread(void * argc){
 
 // useminmidmax 0:min 1:mid 2:max
 
-hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & heteroEstResults, const int maxChains , const double fracChainsBurnin,const unsigned char useminmidmax){
+hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & heteroEstResults, const int maxChains , const double fracChainsBurnin,const long double rohmu,const unsigned char useminmidmax){
 
     cerr<<"Creating HMM";
     if(useminmidmax == HMMCODEMIN) { cerr<<" for min. values"; }
@@ -3312,7 +3309,11 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     hmm.setHetRateForNonROH(h_i);
     hmm.setTransprob(pT_i);
     hmm.setNrwPerSizeChunk( (unsigned int)s_i );
-    hmm.recomputeProbs();
+    hmm.recomputeProbsNonROH();
+
+    hmm.setHetRateForROH(rohmu);
+    hmm.recomputeProbsROH();
+    
     
     cerr<<".";
     // for(unsigned int i=0;i<heteroEstResults.size();i++){
@@ -3335,7 +3336,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     vector<long double> pvector;
     vector<long double> svector;
     
-    cerr<<"Begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<" chains"<<endl;
+    cerr<<"..begin running MCMC on HMM using "<<thousandSeparator(maxChains)<<" chains.."<<endl;
 
     for(int chain=1;chain<=maxChains;chain++){
 
@@ -3368,7 +3369,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	hmm.setHetRateForNonROH(h_i_1);
 	hmm.setTransprob(pT_i_1);
 	hmm.setNrwPerSizeChunk( (unsigned int)s_i_1 );
-	hmm.recomputeProbs();
+	hmm.recomputeProbsNonROH();
 
 	
 	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
@@ -3485,12 +3486,12 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     hmm.setHetRateForNonROH(hAvg);
     hmm.setTransprob(pAvg);
     hmm.setNrwPerSizeChunk( (unsigned int)sAvg );
-    hmm.recomputeProbs();
+    hmm.recomputeProbsNonROH();
 
     
     fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,useminmidmax);
 
-    cerr<<"HMM done"<<endl;
+    cerr<<"...HMM done"<<endl;
 
 
     string outFileSuffixHMMpost;
@@ -3661,9 +3662,9 @@ int main (int argc, char *argv[]) {
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
     
-
+    long double rohmu=0.000000012;
     
-    const string usage=string("\nThis program co-estimates heterozygosity rates and large runs of homozygosity\n")+
+    const string usage=string("\nThis program co-estimates heterozygosity rates (theta) and large runs of homozygosity\n")+
 	"for modern and ancient samples\n\n"+
 	string(argv[0])+                        
 	" [options] [fasta file] [bam file]  "+"\n\n"+
@@ -3689,6 +3690,8 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
 	"\t\t"+""  +"" +"--auto"     +"\t\t\t"    + "[file]"  +"\t\t\t"+"Use only the chromosome/scaffolds in this file   (default: use every chromosome)"+"\n"+
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"this is done to avoid including sex chromosomes in the calculation"+"\n"+
+	"\t\t"+""  +"" +"--rohmu"    +"\t\t\t"    + "[rate]"  +"\t\t\t"+"Use this value as the expected mutation rate in ROHs   (default: "+stringify(rohmu)+")"+"\n"+
+	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"be careful when using this option as it can inflace the background estimate for theta"+"\n"+
 
 
 	//			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
@@ -3788,6 +3791,12 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
+        if( string(argv[i]) == "--rohmu"  ){
+	    rohmu=destringify<long double>(argv[i+1]);
+            i++;
+            continue;
+        }
+
         if( string(argv[i]) == "--auto"  ){
 	    autosomeFile=string(argv[i+1]);
             i++;
@@ -3810,9 +3819,7 @@ int main (int argc, char *argv[]) {
             i++;
             continue;
         }
-
-	
-
+       
         if( string(argv[i]) == "-t"  ){
             numberOfThreads=destringify<int>(argv[i+1]);
             i++;
@@ -4874,15 +4881,15 @@ int main (int argc, char *argv[]) {
 
 
     //lower
-    hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,HMMCODEMIN);
+    hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN);
     cerr<<"min h est. "<<hmmResmin.hAvg<<" hMin "<<hmmResmin.hMin<<" hMax "<<hmmResmin.hMax<<" s "<<hmmResmin.sAvg<<" sMin "<<hmmResmin.sMin<<" sMax "<<hmmResmin.sMax<<" p avg. "<<hmmResmin.pAvg<<" pMin "<<hmmResmin.pMin<<" pMax "<<hmmResmin.pMax<<" rohS "<<hmmResmin.rohSegments<<" nonrohS "<<hmmResmin.nonrohSegments<<" unsure "<<hmmResmin.unsureSegments<<endl;
 
     //mid
-    hmmRes hmmResmid=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,HMMCODEMID);
+    hmmRes hmmResmid=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMID);
     cerr<<"mid h est. "<<hmmResmid.hAvg<<" hMin "<<hmmResmid.hMin<<" hMax "<<hmmResmid.hMax<<" s "<<hmmResmid.sAvg<<" sMin "<<hmmResmid.sMin<<" sMax "<<hmmResmid.sMax<<" p avg. "<<hmmResmid.pAvg<<" pMin "<<hmmResmid.pMin<<" pMax "<<hmmResmid.pMax<<" rohS "<<hmmResmid.rohSegments<<" nonrohS "<<hmmResmid.nonrohSegments<<" unsure "<<hmmResmid.unsureSegments<<endl;
 
     //upper
-    hmmRes hmmResmax=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,HMMCODEMAX);
+    hmmRes hmmResmax=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMAX);
     cerr<<"max h est. "<<hmmResmax.hAvg<<" hMin "<<hmmResmax.hMin<<" hMax "<<hmmResmax.hMax<<" s "<<hmmResmax.sAvg<<" sMin "<<hmmResmax.sMin<<" sMax "<<hmmResmax.sMax<<" p avg. "<<hmmResmax.pAvg<<" pMin "<<hmmResmax.pMin<<" pMax "<<hmmResmax.pMax<<" rohS "<<hmmResmax.rohSegments<<" nonrohS "<<hmmResmax.nonrohSegments<<" unsure "<<hmmResmax.unsureSegments<<endl;
 
     //return 1;
@@ -4915,7 +4922,7 @@ int main (int argc, char *argv[]) {
     //cerr<<"writing plot"<<endl;
 
     double heightChr=45;
-    vector<PdfWriter *> vecOfPdfWriters;
+    vector<PdfWriter *> vecOfPdfWritersH;
     PdfWriter * pdfwriterH =new PdfWriter(outFilePrefix+".het.pdf",heightChr);
 
     if( pdfwriterH->drawFrame(fastaIndex,sizeChunk,0, &listAutosomes, !autosomeFile.empty()) == 1 ){
@@ -4923,30 +4930,28 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
     
-    vecOfPdfWriters.push_back(pdfwriterH);
+    vecOfPdfWritersH.push_back(pdfwriterH);
     int numberPagesPDFhet =1;
     int numberOfChrPerPage = int( floor( double(pdfwriterH->getPageHeight()) / double( pdfwriterH->getTotalHeightChr()  )) );
-    //cerr<<pdfwriterH->getPageHeight()<<" "<<pdfwriterH->getTotalHeightChr() <<endl;
+
     if(pdfwriterH->getTotalNumChrToDraw() > numberOfChrPerPage){//multipage
 	numberPagesPDFhet  = int( ceil( double(pdfwriterH->getTotalNumChrToDraw())/double(numberOfChrPerPage)  ) );
 	//cerr<<"numberPagesPDFhet "<<numberPagesPDFhet<<endl;
 	
-	vecOfPdfWriters[0]->setFname(    outFilePrefix+".het_"+  stringify(1)+"_"+stringify(numberPagesPDFhet)+".pdf");
+	vecOfPdfWritersH[0]->setFname(    outFilePrefix+".het_"+  stringify(1)+"_"+stringify(numberPagesPDFhet)+".pdf");
 	//cerr<<"0 "<<(outFilePrefix+".het_"+  stringify(1)+"_"+stringify(numberPagesPDFhet)+".pdf")<<endl;
 	for(int i=1;i<numberPagesPDFhet;i++){
 	    PdfWriter * pdfwriterH_ =new PdfWriter(outFilePrefix+".het_"+stringify(i+1)+"_"+stringify(numberPagesPDFhet)+".pdf",heightChr);
 	    //cerr<<"0 "<<(outFilePrefix+".het_"+  stringify(i+1)+"_"+stringify(numberPagesPDFhet)+".pdf")<<endl;
-	    vecOfPdfWriters.push_back(pdfwriterH_);
+	    vecOfPdfWritersH.push_back(pdfwriterH_);
 
 	    if( pdfwriterH_->drawFrame(fastaIndex,sizeChunk,i*numberOfChrPerPage, &listAutosomes, !autosomeFile.empty()) == 1 ){
-		cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
+		cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".het_"+stringify(i+1)+"_"+stringify(numberPagesPDFhet)+".pdf")<<endl;
 		return 1;
 	    }
 
 	    
 	}
-    }else{
-	
     }
     //cerr<<numberOfChrPerPage<<endl;
     //return 1;
@@ -4977,9 +4982,9 @@ int main (int argc, char *argv[]) {
     //maxHFoundPlotting=0.0015;
     maxHFoundPlotting = double( maxSegSitesPer1M )/double(1000000);
     //vector<PdfWriter *> vecOfPdfWriters;
-    for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
-	if( vecOfPdfWriters[i]->drawYLabels(minHFoundPlotting,maxHFoundPlotting,true) == 1 ){
-	    cerr<<"ERROR writing y labels to pdf file:"<<vecOfPdfWriters[i]->getFname()<<endl;
+    for(unsigned int i=0;i<vecOfPdfWritersH.size();i++){
+	if( vecOfPdfWritersH[i]->drawYLabels(minHFoundPlotting,maxHFoundPlotting,true) == 1 ){
+	    cerr<<"ERROR writing y labels to pdf file:"<<vecOfPdfWritersH[i]->getFname()<<endl;
 	    return 1;
 	}
     }
@@ -4988,24 +4993,24 @@ int main (int argc, char *argv[]) {
 	if(heteroEstResults[c].undef)
 	    continue;
 
-	for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
+	for(unsigned int i=0;i<vecOfPdfWritersH.size();i++){
 	    //cerr<<heteroEstResults[c].rangeGen.getChrName()<<endl;
 
 
-	    if( vecOfPdfWriters[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())){//very inefficient..
-		// if(c<2300){
-		//     cerr<<"present "<<heteroEstResults[c].rangeGen.getChrName()<<" i="<<i<<":"<<vecOfPdfWriters[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())<<endl;
-		if(    vecOfPdfWriters[i]->drawHEst(heteroEstResults[c].rangeGen,
-					    (heteroEstResults[c].h ),
-					    // ( (heteroEstResults[c].h )-6.0188e-05),
-					    // ( (heteroEstResults[c].h )+6.0188e-05),				   				   
-					    MAX(heteroEstResults[c].hlow,0),
-					    heteroEstResults[c].hhigh,
-					    minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
-					    maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
-					    sizeChunk
+	    if( vecOfPdfWritersH[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())){//very inefficient..
+
+		//cerr<<"present "<<heteroEstResults[c].rangeGen.getChrName()<<" i="<<i<<":"<<vecOfPdfWritersH[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())<<endl;
+		if(    vecOfPdfWritersH[i]->drawHEst(heteroEstResults[c].rangeGen,
+						     (heteroEstResults[c].h ),
+						     // ( (heteroEstResults[c].h )-6.0188e-05),
+						     // ( (heteroEstResults[c].h )+6.0188e-05),				   				   
+						     MAX(heteroEstResults[c].hlow,0),
+						     heteroEstResults[c].hhigh,
+						     minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+						     maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
+						     sizeChunk
 		)  != 0 ){
-		    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".het.pdf")<<endl;
+		    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(vecOfPdfWritersH[i]->getFname())<<endl;
 		    return 1;
 		}
 		//}
@@ -5018,41 +5023,68 @@ int main (int argc, char *argv[]) {
 
     // endhmm:
     //write out h estimate
-    for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
-	vecOfPdfWriters[i]->drawGlobalHEst(hAvg,
+    for(unsigned int i=0;i<vecOfPdfWritersH.size();i++){
+	vecOfPdfWritersH[i]->drawGlobalHEst(hAvg,
 					   hMin,
 					   hMax,			     
 					   double( minSegSitesPer1M )/double(1000000),
 					   maxHFoundPlotting); // 0.00500    = 4*2e-8*62500
 
     }
-    for(unsigned int i=0;i<vecOfPdfWriters.size();i++){
-	delete(vecOfPdfWriters[i]);
+    for(unsigned int i=0;i<vecOfPdfWritersH.size();i++){
+	delete(vecOfPdfWritersH[i]);
     }
 
     //#ifdef NOTDEF    
 
 
 
+    
+
     //exit(1);
 
-
-    PdfWriter pdfwriterHMM (outFilePrefix+".hmm.pdf",heightChr);
+    vector<PdfWriter *> vecOfPdfWritersHMM;
+    PdfWriter *  pdfwriterHMM = new PdfWriter (outFilePrefix+".hmm.pdf",heightChr);
     
-    if( pdfwriterHMM.drawFrame(fastaIndex,sizeChunk, 0,&listAutosomes, !autosomeFile.empty()) == 1 ){
+    if( pdfwriterHMM->drawFrame(fastaIndex,sizeChunk, 0,&listAutosomes, !autosomeFile.empty()) == 1 ){
 	cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
 	return 1;
     }
+    vecOfPdfWritersHMM.push_back(pdfwriterHMM);
+    int numberPagesPDFhetHMM =1;
+    int numberOfChrPerPageHMM = int( floor( double(pdfwriterHMM->getPageHeight()) / double( pdfwriterHMM->getTotalHeightChr()  )) );
 
+    if(pdfwriterHMM->getTotalNumChrToDraw() > numberOfChrPerPageHMM){//multipage
+	numberPagesPDFhetHMM  = int( ceil( double(pdfwriterHMM->getTotalNumChrToDraw())/double(numberOfChrPerPageHMM)  ) );
+
+	
+	vecOfPdfWritersHMM[0]->setFname(    outFilePrefix+".hmm_"+  stringify(1)+"_"+stringify(numberPagesPDFhetHMM)+".pdf");
+
+	for(int i=1;i<numberPagesPDFhetHMM;i++){
+	    PdfWriter * pdfwriterHMM_ =new PdfWriter(outFilePrefix+".hmm_"+stringify(i+1)+"_"+stringify(numberPagesPDFhet)+".pdf",heightChr);
+
+	    vecOfPdfWritersHMM.push_back(pdfwriterHMM_);
+
+	    if( pdfwriterHMM_->drawFrame(fastaIndex,sizeChunk,i*numberOfChrPerPageHMM, &listAutosomes, !autosomeFile.empty()) == 1 ){
+		cerr<<"ERROR writing frame to pdf file:"<<(outFilePrefix+".hmm_"+stringify(i+1)+"_"+stringify(numberPagesPDFhet)+".pdf")<<endl;
+		return 1;
+	    }
+	    
+	}
+    }
+    
     //pdfwriter.drawHorizontalLine(100,100,102);
     long double minPPlotting = 0.0;
     long double maxPPlotting = 1.0;   
 
-    if( pdfwriterHMM.drawYLabels(minPPlotting,maxPPlotting,false) == 1 ){
-	cerr<<"ERROR writing y labels to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
-	return 1;
+    for(unsigned int i=0;i<vecOfPdfWritersHMM.size();i++){
+  
+	if( vecOfPdfWritersHMM[i]->drawYLabels(minPPlotting,maxPPlotting,false) == 1 ){
+	    cerr<<"ERROR writing y labels to pdf file:"<<(vecOfPdfWritersHMM[i]->getFname())<<endl;
+	    return 1;
+	}
     }
-
+    
     for(unsigned int c=0;c<heteroEstResults.size();c++){
     //for(unsigned int c=0;c<150;c++){
 	//cerr<<c<<" plotting 0="<<exp(postprob.m[0][c])<<" 1="<<exp(postprob.m[1][c])<<endl;
@@ -5060,50 +5092,62 @@ int main (int argc, char *argv[]) {
 
 	// if(heteroEstResults[c].undef)
 	//     continue;
-	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,
-				    exp(hmmResmin.postprob.m[1][c]),
-				    exp(hmmResmin.postprob.m[1][c]),
-				    exp(hmmResmin.postprob.m[1][c]),
-				    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
-				    maxPPlotting, // 0.00500    = 4*2e-8*62500
-				    sizeChunk,
-				    !heteroEstResults[c].undef,
-				    HMMCODEMIN)  != 0 ){
-	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
-	    return 1;
-	}
+	for(unsigned int i=0;i<vecOfPdfWritersHMM.size();i++){
 
-	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,
-				    exp(hmmResmid.postprob.m[1][c]),
-				    exp(hmmResmid.postprob.m[1][c]),
-				    exp(hmmResmid.postprob.m[1][c]),
-				    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
-				    maxPPlotting, // 0.00500    = 4*2e-8*62500
-				    sizeChunk,
-				    !heteroEstResults[c].undef,
-				    HMMCODEMID)  != 0 ){
-	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
-	    return 1;
-	}
-	
-	if(    pdfwriterHMM.drawHMM(heteroEstResults[c].rangeGen,
-				    exp(hmmResmax.postprob.m[1][c]),
-				    exp(hmmResmax.postprob.m[1][c]),
-				    exp(hmmResmax.postprob.m[1][c]),
-				    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
-				    maxPPlotting, // 0.00500    = 4*2e-8*62500
-				    sizeChunk,
-				    !heteroEstResults[c].undef,
-				    HMMCODEMAX)  != 0 ){
-	    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(outFilePrefix+".hmm.pdf")<<endl;
-	    return 1;
-	}
+	    if( vecOfPdfWritersHMM[i]->chrIspresent(heteroEstResults[c].rangeGen.getChrName())){//very inefficient..
+		//cerr<<"present "<<heteroEstResults[c].rangeGen<<" "<<i<<endl;
+		
+		if(    vecOfPdfWritersHMM[i]->drawHMM(heteroEstResults[c].rangeGen,
+						      exp(hmmResmin.postprob.m[1][c]),
+						      exp(hmmResmin.postprob.m[1][c]),
+						      exp(hmmResmin.postprob.m[1][c]),
+						      minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+						      maxPPlotting, // 0.00500    = 4*2e-8*62500
+						      sizeChunk,
+						      !heteroEstResults[c].undef,
+						      heteroEstResults[c].chrBreak,						      
+						      HMMCODEMIN)  != 0 ){
+		    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(vecOfPdfWritersHMM[i]->getFname())<<endl;
+		    return 1;
+		}
+		
+		if(  vecOfPdfWritersHMM[i]->drawHMM(heteroEstResults[c].rangeGen,
+						    exp(hmmResmid.postprob.m[1][c]),
+						    exp(hmmResmid.postprob.m[1][c]),
+						    exp(hmmResmid.postprob.m[1][c]),
+						    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+						    maxPPlotting, // 0.00500    = 4*2e-8*62500
+						    sizeChunk,
+						    !heteroEstResults[c].undef,
+						    heteroEstResults[c].chrBreak,						      
+						    HMMCODEMID)  != 0 ){
+		    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(vecOfPdfWritersHMM[i]->getFname())<<endl;
+		    return 1;
+		}
 
 
+		
+		if(  vecOfPdfWritersHMM[i]->drawHMM(heteroEstResults[c].rangeGen,
+						    exp(hmmResmax.postprob.m[1][c]),
+						    exp(hmmResmax.postprob.m[1][c]),
+						    exp(hmmResmax.postprob.m[1][c]),
+						    minPPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
+						    maxPPlotting, // 0.00500    = 4*2e-8*62500
+						    sizeChunk,
+						    !heteroEstResults[c].undef,
+						    heteroEstResults[c].chrBreak,						      
+						    HMMCODEMAX)  != 0 ){
+		    cerr<<"ERROR writing data point#"<<c<<" "<<heteroEstResults[c].rangeGen<<" to pdf file:"<<(vecOfPdfWritersHMM[i]->getFname())<<endl;
+		    return 1;
+		}
 
-	
+	    }
+	}	
     }
 
+    for(unsigned int i=0;i<vecOfPdfWritersHMM.size();i++){
+	delete(vecOfPdfWritersHMM[i]);
+    }
     
     // toreturn.rohSegments    = rohSegments   ;
     // toreturn.nonrohSegments = nonrohSegments;

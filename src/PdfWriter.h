@@ -41,15 +41,29 @@ typedef struct{
     unsigned int markings;
 } chrScreenInfo;
 
+typedef struct{
+    double xlhmmPrevious;
+    double xrhmmPrevious;
+    double yhmmPrevious;
+    bool hmmPrevious;
+} hmmprevdata;
+
 const HPDF_UINT16 DASH_MODE1[] = {3};
 
 class PdfWriter{
  private:
-    double xlhmmPrevious;
-    double xrhmmPrevious;
-    double yhmmPrevious;
+    //double xlhmmPrevious;
+    //double xrhmmPrevious;
+    //double yhmmPrevious;
+
+    /* hmmprevdata  hmmpmin; */
+    /* hmmprevdata  hmmpmid; */
+    /* hmmprevdata  hmmpmax; */
+    //    bool   hmmPrevious;
+
+    //hmmprevdata  hmmpv [];
+    vector<hmmprevdata>  hmmpv ;
     
-    bool   hmmPrevious;
     string fname;
     HPDF_Doc  pdf;
     HPDF_Font font;
@@ -128,6 +142,7 @@ class PdfWriter{
 		const double        hLimHigh,
 		const double        windowSizeForHest,
 		const bool          defined,
+		const bool          chrbreak,	       
 		const unsigned char useminmidmax);  // higher 
     
     int drawGlobalHEst(const long double   h,

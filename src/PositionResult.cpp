@@ -105,7 +105,9 @@ string PositionResult::toString(const RefVector  * references, const int & refID
 
     s<<references->at(refID).RefName<<"\t";
     s<<pos<<"\t";
-
+    //ID
+    s<<"."<<"\t";
+    
     // for(int n=0;n<4;n++)
     // 	s<<baseC[n]<<"\t";
     //REF
