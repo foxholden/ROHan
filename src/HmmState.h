@@ -9,11 +9,14 @@
 #define HmmState_h
 #include <iostream>
 #include <vector>
+#include <limits>
 
 #include <ctime>//for time cmd
 #include <math.h>
 
 #include <gsl/gsl_randist.h>
+
+#include "miscfunc.h"
 
 using namespace std;
 

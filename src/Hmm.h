@@ -289,14 +289,31 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 	    f[state][0] =
 		logRobust( hmm->startingState[state]) ;                                                                //prob of starting a state
 	}else{
-	    /* cerr<<"state "<<observed[0].hlow<<" "<<observed[0].h<<" "<<observed[0].hhigh<<" "<<sizeChunk<<" "<<hmm->getMinSegSitesPerChunk()<<" "<< hmm->getMaxSegSitesPerChunk()<<" "<<returnMinMidMax(useminmidmax, */
-	    /* 																					    observed[0].hlow, */
-	    /* 																					    observed[0].h, */
-	    /* 																					    observed[0].hhigh, */
-	    /* 												   sizeChunk, */
-	    /* 																					    hmm->getMinSegSitesPerChunk(), */
-	    /* 																					    hmm->getMaxSegSitesPerChunk())<<endl; */
-	    f[state][0] = logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
+/* 	    cerr<<"state "<<observed[0].hlow<<" "<<observed[0].h<<" "<<observed[0].hhigh<<" "<<sizeChunk<<" "<<hmm->getMinSegSitesPerChunk()<<" "<< hmm->getMaxSegSitesPerChunk()<<" "<< */
+/* logRobust( hmm->startingState[state]) <<" "<<observed[0].weight<<" return="<<returnMinMidMax(useminmidmax, */
+/* 										      observed[0].hlow, */
+/* 										      observed[0].h, */
+/* 										      observed[0].hhigh, */
+/* 										      sizeChunk, */
+/* 										      hmm->getMinSegSitesPerChunk(), */
+/* 										      hmm->getMaxSegSitesPerChunk())<<" "<<hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax, */
+/* 																     observed[0].hlow, */
+/* 																     observed[0].h, */
+/* 																     observed[0].hhigh, */
+/* 																     sizeChunk, */
+/* 																     hmm->getMinSegSitesPerChunk(), */
+/* 																     hmm->getMaxSegSitesPerChunk()), */
+/* 														     sizeChunk)	<<" "<<logRobust(hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax, */
+/* 																     observed[0].hlow, */
+/* 																     observed[0].h, */
+/* 																     observed[0].hhigh, */
+/* 																     sizeChunk, */
+/* 																     hmm->getMinSegSitesPerChunk(), */
+/* 																     hmm->getMaxSegSitesPerChunk()), */
+/* 														     sizeChunk)	)<<endl; */
+	      
+
+	  f[state][0] = logRobust( hmm->startingState[state]) +                                                                //prob of starting a state
 		/* logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)( (observed[0].plow+observed[0].phigh)/2.0 *sizeChunk), */
 		/* 					       sizeChunk)	); //emitting observed[0] by state */
 		observed[0].weight*logRobust(hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax,

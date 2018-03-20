@@ -239,6 +239,12 @@ void HmmState::recomputeProbs(){
 	long double probMut = gsl_ran_negative_binomial_pdf( mutations   ,
 							     1/(1+thetaScale),
 							    double(nrwPerSizeChunk)); //gsl_ran_binomial_pdf(mutations,h,sizeChunk);
+	if(isnan(probMut)){
+	  probMut = numeric_limits<double>::min();
+	}else{
+	  probMut = MAX( probMut , numeric_limits<double>::min() );
+	}
+	//cerr<<theta<<"\t"<<mutations<<"\t"<<probMut<<endl;
 	probabilitiesForEmission->at(mutations) = probMut;
     }
 
