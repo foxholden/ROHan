@@ -230,7 +230,7 @@ void HmmState::recomputeProbs(){
     delete probabilitiesForEmission;
     probabilitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0.0);
 
-    long double thetaScale = theta*(1000000/nrwPerSizeChunk);
+    long double thetaScale = theta*(sizeChunk/nrwPerSizeChunk);
 
     for(unsigned int mutations=0;
 	mutations<=( (unsigned int)maxSegSitesPerChunk);
