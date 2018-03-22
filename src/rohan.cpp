@@ -138,7 +138,7 @@ string fastaIndex;
 map<string,rgInfo> rg2info;
 bool specifiedDeam=false;
 bool verbose=false;
-
+bool outputgenol = true;
 // 1D: mapping quality 
 // 2D: length of fragment
 // 3D: base qual
@@ -1614,23 +1614,27 @@ inline void computeLLinternal(const diNucleotideProb priorGenotype,
 	// BEGIN GENOTYPING
 	//////////////////////////////////////////////////////
 	if(lastIteration){//do it at the last iteration		
-	    PositionResult * pr=new PositionResult();
+	    if(outputgenol){
+		PositionResult * pr=new PositionResult();
 
-	    pr->refB   =     piForGenomicWindow->at(p).refBase;
-	    pr->pos    =     piForGenomicWindow->at(p).posAlign;
-	    pr->avgMQ  =     piForGenomicWindow->at(p).avgMQ;
 
-	    for(int n=0;n<4;n++)
-		pr->baseC[n] = piForGenomicWindow->at(p).baseC[n];
+		pr->refB   =     piForGenomicWindow->at(p).refBase;
+		pr->pos    =     piForGenomicWindow->at(p).posAlign;
+		pr->avgMQ  =     piForGenomicWindow->at(p).avgMQ;
 
-	    pr->dp     = int(piForGenomicWindow->at(p).readsVec.size());
+		for(int n=0;n<4;n++)
+		    pr->baseC[n] = piForGenomicWindow->at(p).baseC[n];
 
-	    genotypePositions( mostLikelyBaBdIdx                 ,
-			       &vectorOfloglikelihoodForGivenBaBd,
-			       &vectorOfloglikelihoodForGivenGeno,
-			       pr);
+		pr->dp     = int(piForGenomicWindow->at(p).readsVec.size());
+	    
+		genotypePositions( mostLikelyBaBdIdx                 ,
+				   &vectorOfloglikelihoodForGivenBaBd,
+				   &vectorOfloglikelihoodForGivenGeno,
+				   pr);
+		vecPositionResults->push_back(pr);
+	    }
 	    //vecPositionResults
-	    vecPositionResults->push_back(pr);
+
 
 		
 	    //count cov dist
@@ -1851,18 +1855,17 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 	long double loglikelihoodForEveryPositionForEveryBaBdD2        =0.0;
 
 
-	computeLLinternal(
-	    priorGenotype,
-	    priorGenotypeD1,
-	    priorGenotypeD2,
-	    vectorBaBdLikelihood,
-	    piForGenomicWindow,
-	    lastIteration,
-	    vecPositionResults,
-	    covDist ,
-	    loglikelihoodForEveryPositionForEveryBaBd,
-	    loglikelihoodForEveryPositionForEveryBaBdD1,
-	    loglikelihoodForEveryPositionForEveryBaBdD2	);
+	computeLLinternal(priorGenotype,
+			  priorGenotypeD1,
+			  priorGenotypeD2,
+			  vectorBaBdLikelihood,
+			  piForGenomicWindow,
+			  lastIteration,
+			  vecPositionResults,
+			  covDist ,
+			  loglikelihoodForEveryPositionForEveryBaBd,
+			  loglikelihoodForEveryPositionForEveryBaBdD1,
+			  loglikelihoodForEveryPositionForEveryBaBdD2	);
         errb = 1.96/sqrt(-1.0*loglikelihoodForEveryPositionForEveryBaBdD2);
 	
 	
@@ -3657,7 +3660,7 @@ int main (int argc, char *argv[]) {
 
     string autosomeFile;
     bool ignoreExistingRGINFO=false;
-    bool outputgenol = true;
+
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
