@@ -139,6 +139,8 @@ map<string,rgInfo> rg2info;
 bool specifiedDeam=false;
 bool verbose=false;
 bool outputgenol = true;
+bool tvonly=false;
+
 // 1D: mapping quality 
 // 2D: length of fragment
 // 3D: base qual
@@ -1099,6 +1101,7 @@ inline void computePriorMatrix(long double h,
 			       // diNucleotideProb * priorGenotypeProbD,
 			       diNucleotideProb * priorGenotypeD1,
 			       diNucleotideProb * priorGenotypeD2){
+
     for(int ba=0;ba<4;ba++){//ancestral base
 
 	for(int bd=0;bd<4;bd++){//derived base
@@ -1122,23 +1125,34 @@ inline void computePriorMatrix(long double h,
 		    //                                     DER( k*(h) ) = k
 		    // priorGenotypeProb->p[ba][bd]     =      dnaDefaultBases.f[ba]   *         (h) * (TStoTVratio/(TStoTVratio+1.0))     ;
 		    // priorGenotypeProbD->p[ba][bd]    =      dnaDefaultBases.f[ba]   *         1.0 * (TStoTVratio/(TStoTVratio+1.0))     ;
-
-		    priorGenotype->p[ba][bd]         = logl(dnaDefaultBases.f[ba])  +   logl( (h) * (TStoTVratio/(TStoTVratio+1.0))     );
-		    priorGenotypeD1->p[ba][bd]       = 1/(  h );// (d)/(dh)( log(c h) ) = 1/h
-		    priorGenotypeD2->p[ba][bd]       = -1.0/(  powl(h,2) ); //d^2/dh^2(log(h)) = -1/h^2
+		    if(tvonly){
+			priorGenotype->p[ba][bd]         = logl(dnaDefaultBases.f[ba])  +   logl(  0   );
+			priorGenotypeD1->p[ba][bd]       = 0;
+			priorGenotypeD2->p[ba][bd]       = 0;
+		    }else{
+			priorGenotype->p[ba][bd]         = logl(dnaDefaultBases.f[ba])  +   logl( (h) * (TStoTVratio/(TStoTVratio+1.0))     );
+			priorGenotypeD1->p[ba][bd]       = 1/(  h );// (d)/(dh)( log(c h) ) = 1/h
+			priorGenotypeD2->p[ba][bd]       = -1.0/(  powl(h,2) ); //d^2/dh^2(log(h)) = -1/h^2			
+		    }
 
 		    
 		    //cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<< ( (h) * (TStoTVratio/(TStoTVratio+1.0)) )<<endl; 
 		}else{//transversion
-		    //priorGenotype->p[ba][bd] = dnaDefaultBases.f[ba]  * (( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0);
-		    priorGenotype->p[ba][bd]      = logl(dnaDefaultBases.f[ba])  +   logl( (h) * ((        1.0/(TStoTVratio+1.0)) /2.0));
+
+
 		    //                                     DER( k*(h) ) = k
 		    // priorGenotypeProb->p[ba][bd]  =      dnaDefaultBases.f[ba]   *       ( (h) * ((        1.0/(TStoTVratio+1.0)) /2.0));
 		    // priorGenotypeProbD->p[ba][bd] =      dnaDefaultBases.f[ba]   *       ( 1.0 * ((        1.0/(TStoTVratio+1.0)) /2.0));
-
-		    priorGenotypeD1->p[ba][bd]   = 1/h; // (d)/(dh)( log(c h) ) = 1/h
-		    priorGenotypeD2->p[ba][bd]   = -1.0/( powl(h,2) ); // d^2/dh^2(log(h)) = -1/h^2
-			
+		    //priorGenotype->p[ba][bd] = dnaDefaultBases.f[ba]  * (( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0);
+		    if(tvonly){
+			priorGenotype->p[ba][bd]      = logl(dnaDefaultBases.f[ba])  +   logl( (h) * (         1.0/2.0  ));
+			priorGenotypeD1->p[ba][bd]   = 1/h; // (d)/(dh)( log(c h) ) = 1/h
+			priorGenotypeD2->p[ba][bd]   = -1.0/( powl(h,2) ); // d^2/dh^2(log(h)) = -1/h^2
+		    }else{
+			priorGenotype->p[ba][bd]      = logl(dnaDefaultBases.f[ba])  +   logl( (h) * ((        1.0/(TStoTVratio+1.0)) /2.0));
+			priorGenotypeD1->p[ba][bd]   = 1/h; // (d)/(dh)( log(c h) ) = 1/h
+			priorGenotypeD2->p[ba][bd]   = -1.0/( powl(h,2) ); // d^2/dh^2(log(h)) = -1/h^2
+		    }
 		    //cerr<<"ACGT"[ba]<<"\t"<<"ACGT"[bd]<<"\t"<<dnaDefaultBases.f[ba]<<" X "<< ( (h) * (        1.0/(TStoTVratio+1.0)) )/2.0<<endl; 
 		}
 	    }
@@ -3683,7 +3697,7 @@ int main (int argc, char *argv[]) {
 	//"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
 	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""             +"\t\t\t"+"Print extensive info  (default: "+booleanAsString(verbose)+")"+"\n"+  
 	//"\t\t"+"-f"+","+""           +"\t\t"      + ""             +"\t\t\t"+"Overwrite any .rginfo.gz (default: "+booleanAsString(ignoreExistingRGINFO)+")"+"\n"+  
-	"\t\t"+""+""+"--nogl"       +"\t\t"      + ""             +"\t\t\t"+"Do not output genotype likelihoods  (default: "+booleanAsString(!outputgenol)+")"+"\n"+  
+	"\t\t"+""+""+"--nogl"       +"\t\t\t"      + ""             +"\t\t\t"+"Do not output genotype likelihoods  (default: "+booleanAsString(!outputgenol)+")"+"\n"+  
 			      
 	"\n\tComputation options:\n"+	
 	"\t\t"+"-t"+"" +""           +"\t\t\t"    + "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
@@ -3691,6 +3705,10 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +"--size"     +"\t\t\t"    + "[bp]"      +"\t\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
 	"\t\t"+""  +"" +"--bed"      +"\t\t\t"    + "[bed file]"+"\t\t"+"Only use the regions in the bed file  (default: none)"+"\n"+	      
 	"\t\t"+""  +"" +"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
+	"\t\t"+""  +"" +"--tvonly"     +"\t\t\t"    + ""  +"\t\t"+"Only consider transversions  (default: "+booleanAsString(tvonly)+")"+"\n"+
+	"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"recommended for highly damaged samples where damage cannot be accurately quantified "+"\n"+
+
+
 	"\t\t"+""  +"" +"--auto"     +"\t\t\t"    + "[file]"  +"\t\t\t"+"Use only the chromosome/scaffolds in this file   (default: use every chromosome)"+"\n"+
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"this is done to avoid including sex chromosomes in the calculation"+"\n"+
 	"\t\t"+""  +"" +"--rohmu"    +"\t\t\t"    + "[rate]"  +"\t\t\t"+"Use this value as the expected mutation rate in ROHs   (default: "+stringify(rohmu)+")"+"\n"+
@@ -3878,6 +3896,11 @@ int main (int argc, char *argv[]) {
         if(string(argv[i]) == "--tstv"  ){
             TStoTVratio         =destringify<long double>(argv[i+1]);
 	    i++;
+            continue;
+        }
+
+        if(string(argv[i]) == "--tvonly"  ){
+	    tvonly  = true;
             continue;
         }
 
