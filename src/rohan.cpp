@@ -6,7 +6,8 @@
 #include <random>
 
 //TODO
-//fix pdf hmm
+//
+// length2pos2mpq2bsq2submatrix should be replaced by vector to pointers
 //TODO: GC bias for coverage?
 
 #include "api/internal/io/BgzfStream_p.h"
@@ -161,8 +162,8 @@ typedef vector< vector<diNucleotideProb> > mpq2bsq2submatrix;
  // 1D: pos away from 5'/3' end
  // 2D: mapping quality 
  // 3D: base qual
-vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix5p;
-vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix3p;
+// vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix5p;
+// vector< mpq2bsq2submatrix >  pos2mpq2BaseQual2SubMatrix3p;
 
 // 1D: length of fragment
 // 2D: pos fragment from the 5' end
@@ -3237,6 +3238,20 @@ void *mainCoverageComputationThread(void * argc){
 hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & heteroEstResults, const int maxChains , const double fracChainsBurnin,const long double rohmu,const unsigned char useminmidmax){
 
     cerr<<"Creating HMM";
+    for(unsigned int i=0;i<heteroEstResults.size();i++){
+
+      cout<<"h:"<<    heteroEstResults[i].h<<endl;
+      cout<<"hlow:"<<    heteroEstResults[i].hlow<<endl;
+      cout<<"hhigh:"<<    heteroEstResults[i].hhigh<<endl;
+      cout<<"errb:"<<    heteroEstResults[i].errb<<endl;
+      cout<<"weight:"<<        heteroEstResults[i].weight    <<endl;
+      cout<<"undef:"<<    heteroEstResults[i].undef<<endl;
+      cout<<"chrBreak:"<<    heteroEstResults[i].chrBreak<<endl;
+      cout<<"rangeGen:"<<    heteroEstResults[i].rangeGen<<endl;
+    }
+
+
+    
     if(useminmidmax == HMMCODEMIN) { cerr<<" for min. values"; }
     if(useminmidmax == HMMCODEMID) { cerr<<" for mid  values"; }
     if(useminmidmax == HMMCODEMAX) { cerr<<" for max. values"; }
@@ -5213,11 +5228,12 @@ int main (int argc, char *argv[]) {
 	//fileSummary << "\t" <<"total\tfraction in %"<<endl;
 	fileSummary << "Segments unclassified    :\t"<<hmmResmid.unsureSegments <<" ("<<MIN3( hmmResmin.unsureSegments, hmmResmid.unsureSegments, hmmResmax.unsureSegments)<<","<<MAX3( hmmResmin.unsureSegments, hmmResmid.unsureSegments, hmmResmax.unsureSegments)<<")"<<endl;
 	fileSummary << "Segments unclassified (%):\t"<<100* (double(hmmResmid.unsureSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments))<<" ("<<
-	    100* (double(MIN3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
-		  double(MAX3(hmmResmin.rohSegments+hmmResmin.nonrohSegments+hmmResmin.unsureSegments,
+	  100* MIN(1.0,
+		   double(MIN3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
+		   double(MAX3(hmmResmin.rohSegments+hmmResmin.nonrohSegments+hmmResmin.unsureSegments,
 			      hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments,
-			      hmmResmax.rohSegments+hmmResmax.nonrohSegments+hmmResmax.unsureSegments)))<<","<<
-	    100* (double(MAX3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
+			       hmmResmax.rohSegments+hmmResmax.nonrohSegments+hmmResmax.unsureSegments)))<<","<<
+	  100* MIN(1.0,double(MAX3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
 		  double(MIN3(hmmResmin.rohSegments+hmmResmin.nonrohSegments+hmmResmin.unsureSegments,
 			      hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments,
 			      hmmResmax.rohSegments+hmmResmax.nonrohSegments+hmmResmax.unsureSegments)))<<")"
@@ -5227,20 +5243,20 @@ int main (int argc, char *argv[]) {
 
 	fileSummary << "Segments in ROH          :\t"      <<hmmResmid.rohSegments    <<" ("<<MIN3( hmmResmin.rohSegments, hmmResmid.rohSegments, hmmResmax.rohSegments)<<","<<MAX3( hmmResmin.rohSegments, hmmResmid.rohSegments, hmmResmax.rohSegments)<<")"<<endl;
 	fileSummary << "Segments in ROH(%)       :\t"      <<100*double(hmmResmid.rohSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments)<<" ("<<
-	    100*double(MIN3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
-	    double( MAX3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments) , (hmmResmid.rohSegments+hmmResmin.nonrohSegments) , (hmmResmax.rohSegments+hmmResmin.nonrohSegments)))
+	  100*MIN(1.0,double(MIN3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
+		  double( MAX3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments) , (hmmResmid.rohSegments+hmmResmin.nonrohSegments) , (hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 		    <<","<<
-	    100*double(MAX3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
-	    double( MIN3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments)))
+	  100*MIN(1.0,double(MAX3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
+		  double( MIN3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 	    <<")"<<endl;
 
 	fileSummary << "Segments in non-ROH      :\t"  <<hmmResmid.nonrohSegments <<" ("<<MIN3( hmmResmin.nonrohSegments, hmmResmid.nonrohSegments, hmmResmax.nonrohSegments)<<","<<MAX3( hmmResmin.nonrohSegments, hmmResmid.nonrohSegments, hmmResmax.nonrohSegments)<<")"<<endl;
 	fileSummary << "Segments in non-ROH (%)  :\t"  <<100*double(hmmResmid.nonrohSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments)<<" ("<<	    
-	    100*double(MIN3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
-	    double( MAX3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments)))
+	  100*MIN(1.0,double(MIN3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
+		  double( MAX3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 		    <<","<<
-	    100*double(MAX3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
-	    double( MIN3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments)))
+	  100*MIN(1.0,double(MAX3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
+		  double( MIN3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 		    <<")"<<endl;
 
 
