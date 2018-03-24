@@ -2177,10 +2177,17 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 
     //h = h*correctionFactor;
     //cout<<setprecision(14)<<h<<"\t"<<(h-errb)<<"\t"<<(h+errb)<<endl;
+
     hresToReturn.h            = (h)     *correctionFactor;
     hresToReturn.hLow         = (h-errb)*correctionFactor;
     hresToReturn.hHigh        = (h+errb)*correctionFactor;
     hresToReturn.errb         = errb    *correctionFactor;
+    if(tvonly){
+      hresToReturn.h            =       hresToReturn.h     * (1.0+TStoTVratio); 
+      hresToReturn.hLow         =       hresToReturn.hLow  * (1.0+TStoTVratio); 
+      hresToReturn.hHigh        =       hresToReturn.hHigh * (1.0+TStoTVratio); 
+      hresToReturn.errb         =       hresToReturn.errb  * (1.0+TStoTVratio);       
+    }
     
     hresToReturn.hasConverged = hasConverged;
 
@@ -3707,6 +3714,7 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
 	"\t\t"+""  +"" +"--tvonly"     +"\t\t\t"    + ""  +"\t\t"+"Only consider transversions  (default: "+booleanAsString(tvonly)+")"+"\n"+
 	"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"recommended for highly damaged samples where damage cannot be accurately quantified "+"\n"+
+	"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"heterozygosity estimates will be multiplied by ([tstv]+1)"+"\n"+
 
 
 	"\t\t"+""  +"" +"--auto"     +"\t\t\t"    + "[file]"  +"\t\t\t"+"Use only the chromosome/scaffolds in this file   (default: use every chromosome)"+"\n"+
