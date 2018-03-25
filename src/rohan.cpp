@@ -6,9 +6,9 @@
 #include <random>
 
 //TODO
-//
-// length2pos2mpq2bsq2submatrix should be replaced by vector to pointers
-//TODO: GC bias for coverage?
+// maybe skip mpq that do not appear to save RAM?
+// fix rginfo
+// TODO: GC bias for coverage?
 
 #include "api/internal/io/BgzfStream_p.h"
 #include <api/BamConstants.h>
@@ -50,7 +50,7 @@ using namespace BamTools;
 //#define DEBUGINITSCORES
 
 // #define DEBUGINITLIKELIHOODSCORES
-//#define DEBUGINITLIKELIHOODSCORES2 55
+#define DEBUGINITLIKELIHOODSCORES2 55
 
 //#define DEBUGDEFAULTFREQ//print the default base frequency 
 //#define DEBUGDEAM //to print deamination scores
@@ -171,7 +171,8 @@ typedef vector< vector<diNucleotideProb> > mpq2bsq2submatrix;
 // 4D: base qual
 // 5D: 4X4 matrix
 
-vector< vector< mpq2bsq2submatrix  > >  length2pos2mpq2bsq2submatrix;
+vector< vector< mpq2bsq2submatrix * > >  length2pos2mpq2bsq2submatrix;
+//vector< vector< mpq2bsq2submatrix  > >  length2pos2mpq2bsq2submatrix;
 
 
 //vector< vector< mpq2bsq2submatrix * > > length2pos2mpq2bsq2submatrix;
@@ -863,25 +864,36 @@ void initDefaultBaseFreq(const string & dnafreqFile){
 void initLikelihoodScores(){
 
 
-
+    //vector< vector< mpq2bsq2submatrix * > >  length2pos2mpq2bsq2submatrix;
     //insert dummy values
     for(int L=0;L<int(MINLENGTHFRAGMENT);L++){//for each fragment length
-	vector< mpq2bsq2submatrix > vectorToAdd;	
+	vector< mpq2bsq2submatrix * >  vectorToAdd ;	
 	length2pos2mpq2bsq2submatrix.push_back(vectorToAdd);
     }
 
-    
+    mpq2bsq2submatrix  * mpq2BaseQualSubMatrix;    
+    bool firstIteration=true;
     for(int L=int(MINLENGTHFRAGMENT);L<=int(MAXLENGTHFRAGMENT);L++){//for each fragment length
 	// if( (L%8)==0){
 	//     cerr<<".";
 	// }
 	printprogressBarCerr( float(L-MINLENGTHFRAGMENT)/float(MAXLENGTHFRAGMENT-MINLENGTHFRAGMENT) );
 
-	vector< mpq2bsq2submatrix  > pos2mpq2BaseQual2SubMatrix;
+	vector< mpq2bsq2submatrix * > pos2mpq2BaseQual2SubMatrix;
 
 	for(int l=0;l<L;l++){//for each pos
-	    mpq2bsq2submatrix  mpq2BaseQualSubMatrix;
 
+	    if(specifiedDeam){//specied deamination rates
+		mpq2BaseQualSubMatrix = new mpq2bsq2submatrix();
+	    }else{
+		if(!firstIteration){//if it's not the first iteration, since every position is the same we reuse the one from the first iteration
+		    pos2mpq2BaseQual2SubMatrix.push_back(mpq2BaseQualSubMatrix);
+		    continue;//skip to next iteration
+		}
+		mpq2BaseQualSubMatrix = new mpq2bsq2submatrix();//we will compute for a single iteration
+		firstIteration=false;
+	    }
+	    
 	    for(int mq=0;mq<=MAXMAPPINGQUAL;mq++){ //for each mapping quality 
 		vector<diNucleotideProb>  baseQual2SubMatrix;//FOR EACH QUAL SCORE
 		
@@ -942,7 +954,7 @@ void initLikelihoodScores(){
 		    
 		}//end for each base quality
 
-		mpq2BaseQualSubMatrix.push_back( baseQual2SubMatrix );
+		mpq2BaseQualSubMatrix->push_back( baseQual2SubMatrix );
 		
 	    }//end for each mapping quality mq
 
@@ -965,8 +977,8 @@ void initLikelihoodScores(){
     for(unsigned int L=MINLENGTHFRAGMENT;L<=MAXLENGTHFRAGMENT;L++){//for each fragment length
 
 	//vector< vector< mpq2bsq2submatrix  > >  length2pos2mpq2bsq2submatrix_;
-	for(int l=0;l<L;l++){//for each pos
-	    cerr<<"pos "<<l<<"/"<<L<<"\t"<<length2pos2mpq2bsq2submatrix[L][l].size()<<endl;
+	for(unsigned int l=0;l<L;l++){//for each pos
+	    cerr<<"pos "<<l<<"/"<<L<<"\t"<<length2pos2mpq2bsq2submatrix[L][l]->size()<<endl;
 	    
 	    if( l == DEBUGINITLIKELIHOODSCORES2){
 
@@ -982,10 +994,11 @@ void initLikelihoodScores(){
 			    long double s=0;//sum of probs
 
 			    for(int nuc2=0;nuc2<4;nuc2++){
-				cerr<<2*exp(length2pos2mpq2bsq2submatrix[L][l][mq][q].p[nuc1][nuc2])<<"\t";
+				cerr<<2*exp(length2pos2mpq2bsq2submatrix[L][l]->at(mq)[q].p[nuc1][nuc2])<<"\t";
+				//cerr<<2*exp(length2pos2mpq2bsq2submatrix[L][l][mq][q].p[nuc1][nuc2])<<"\t";
 				//length2pos2mpq2bsq2submatrix[L][l]->at(mq)
 				//toAddForBaseQual5p.p[nuc1][nuc2]<<"\t";
-				s+=exp( length2pos2mpq2bsq2submatrix[L][l][mq][q].p[nuc1][nuc2] );
+				s+=exp( length2pos2mpq2bsq2submatrix[L][l]->at(mq)[q].p[nuc1][nuc2] );
 			    }
 
 			    cerr<<"\tsum="<<s<<endl;
@@ -1009,6 +1022,25 @@ void initLikelihoodScores(){
 }// END initLikelihoodScores()
 
 
+
+void deleteLikelihoodScores(){
+
+
+    //vector< vector< mpq2bsq2submatrix * > >  length2pos2mpq2bsq2submatrix;
+    //insert dummy values
+    for(int L=0;L<int(MINLENGTHFRAGMENT);L++){//for each fragment length
+	vector< mpq2bsq2submatrix * >  vectorToAdd ;	
+	length2pos2mpq2bsq2submatrix.push_back(vectorToAdd);
+    }
+
+    
+    for(int L=int(MINLENGTHFRAGMENT);L<=int(MAXLENGTHFRAGMENT);L++){//for each fragment length
+	for(int l=0;l<L;l++){//for each pos
+	    delete(length2pos2mpq2bsq2submatrix[L][l]);	   	  
+	}//for each position l
+    }//for each fragment length L
+
+}
 
 
 // //! A method to compute the prob. of seeing an observed base given an original allele
@@ -1231,28 +1263,28 @@ inline void preComputeBaBdLikelihood(const vector<positionInformation> * piForGe
 		    if(piForGenomicWindow->at(p).readsVec[i].isrv){
 			llA = length2pos2mpq2bsq2submatrix
 			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
-			    [piForGenomicWindow->at(p).readsVec[i].pos5p]
-			    [piForGenomicWindow->at(p).readsVec[i].mapq]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at
+			    (piForGenomicWindow->at(p).readsVec[i].mapq)
 			    [piForGenomicWindow->at(p).readsVec[i].qual].p[ba_c][piForGenomicWindow->at(p).readsVec[i].base];
 
 			llD = length2pos2mpq2bsq2submatrix
 			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
-			    [piForGenomicWindow->at(p).readsVec[i].pos5p]
-			    [piForGenomicWindow->at(p).readsVec[i].mapq]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at
+			    (piForGenomicWindow->at(p).readsVec[i].mapq)
 			    [piForGenomicWindow->at(p).readsVec[i].qual].p[bd_c][piForGenomicWindow->at(p).readsVec[i].base];
 
 		    }else{
 
 			llA = length2pos2mpq2bsq2submatrix
 			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
-			    [piForGenomicWindow->at(p).readsVec[i].pos5p]
-			    [piForGenomicWindow->at(p).readsVec[i].mapq]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at
+			    (piForGenomicWindow->at(p).readsVec[i].mapq)
 			    [piForGenomicWindow->at(p).readsVec[i].qual].p[ba][piForGenomicWindow->at(p).readsVec[i].base];
 
 			llD = length2pos2mpq2bsq2submatrix
 			    [piForGenomicWindow->at(p).readsVec[i].lengthF]
-			    [piForGenomicWindow->at(p).readsVec[i].pos5p]
-			    [piForGenomicWindow->at(p).readsVec[i].mapq]
+			    [piForGenomicWindow->at(p).readsVec[i].pos5p]->at
+			    (piForGenomicWindow->at(p).readsVec[i].mapq)
 			    [piForGenomicWindow->at(p).readsVec[i].qual].p[bd][piForGenomicWindow->at(p).readsVec[i].base];
 		    }
 		    //cerr<<"done"<<endl;
@@ -2183,12 +2215,12 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
     hresToReturn.hLow         = (h-errb)*correctionFactor;
     hresToReturn.hHigh        = (h+errb)*correctionFactor;
     hresToReturn.errb         = errb    *correctionFactor;
-    if(tvonly){
-      hresToReturn.h            =       hresToReturn.h     * (1.0+TStoTVratio); 
-      hresToReturn.hLow         =       hresToReturn.hLow  * (1.0+TStoTVratio); 
-      hresToReturn.hHigh        =       hresToReturn.hHigh * (1.0+TStoTVratio); 
-      hresToReturn.errb         =       hresToReturn.errb  * (1.0+TStoTVratio);       
-    }
+    // if(tvonly){
+    //   hresToReturn.h            =       hresToReturn.h     * (1.0+TStoTVratio); 
+    //   hresToReturn.hLow         =       hresToReturn.hLow  * (1.0+TStoTVratio); 
+    //   hresToReturn.hHigh        =       hresToReturn.hHigh * (1.0+TStoTVratio); 
+    //   hresToReturn.errb         =       hresToReturn.errb  * (1.0+TStoTVratio);       
+    // }
     
     hresToReturn.hasConverged = hasConverged;
 
@@ -3729,7 +3761,7 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
 	"\t\t"+""  +"" +"--tvonly"     +"\t\t\t"    + ""  +"\t\t"+"Only consider transversions  (default: "+booleanAsString(tvonly)+")"+"\n"+
 	"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"recommended for highly damaged samples where damage cannot be accurately quantified "+"\n"+
-	"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"heterozygosity estimates will be multiplied by ([tstv]+1)"+"\n"+
+	//"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"heterozygosity estimates will be multiplied by ([tstv]+1)"+"\n"+
 
 
 	"\t\t"+""  +"" +"--auto"     +"\t\t\t"    + "[file]"  +"\t\t\t"+"Use only the chromosome/scaffolds in this file   (default: use every chromosome)"+"\n"+
@@ -5284,7 +5316,9 @@ int main (int argc, char *argv[]) {
     //BEGIN CLEANUP and SHUTDOWN
     
     delete cov2ProbSite;
-    
+    deleteLikelihoodScores();
+
+
     cerr<<"ROHan finished succesfully"<<endl;
     
     return 0;

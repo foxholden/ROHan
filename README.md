@@ -73,7 +73,11 @@ Quick start
 Preparing the BAM file
 -----------------
 
-Do not apply any filter as mapping quality and base quality are all informative. Simply use the fail QC flag to remove reads/fragments that have failed basic quality control (e.g. duplicates). Simply sort and index and provide ROHan the same reference used for mapping. 
+1) Make sure you know the transition/transversion ratio for the species/population you are working with. 
+
+rohan --tstv [TSTV ratio] 
+
+2) Do not apply any filter as mapping quality and base quality are all informative. Simply use the fail QC flag to remove reads/fragments that have failed basic quality control (e.g. duplicates). Simply sort and index and provide ROHan the same reference used for mapping. 
 
 
 Documentation
