@@ -50,7 +50,7 @@ using namespace BamTools;
 //#define DEBUGINITSCORES
 
 // #define DEBUGINITLIKELIHOODSCORES
-#define DEBUGINITLIKELIHOODSCORES2 55
+// #define DEBUGINITLIKELIHOODSCORES2 55
 
 //#define DEBUGDEFAULTFREQ//print the default base frequency 
 //#define DEBUGDEAM //to print deamination scores
@@ -1033,10 +1033,17 @@ void deleteLikelihoodScores(){
 	length2pos2mpq2bsq2submatrix.push_back(vectorToAdd);
     }
 
-    
+    bool firstIteration=true;
     for(int L=int(MINLENGTHFRAGMENT);L<=int(MAXLENGTHFRAGMENT);L++){//for each fragment length
 	for(int l=0;l<L;l++){//for each pos
-	    delete(length2pos2mpq2bsq2submatrix[L][l]);	   	  
+	    if(specifiedDeam){//specied deamination rates
+		delete(length2pos2mpq2bsq2submatrix[L][l]);	   	  
+	    }else{
+		if(!firstIteration){//if it's not the first iteration, since every position is the same we reuse the one from the first iteration
+		    delete(length2pos2mpq2bsq2submatrix[L][l]);	   	  
+		}       	
+		firstIteration=false;
+	    }
 	}//for each position l
     }//for each fragment length L
 
@@ -5316,8 +5323,9 @@ int main (int argc, char *argv[]) {
     //BEGIN CLEANUP and SHUTDOWN
     
     delete cov2ProbSite;
-    deleteLikelihoodScores();
-
+    if(!skipToHMM){
+	deleteLikelihoodScores();
+    }
 
     cerr<<"ROHan finished succesfully"<<endl;
     
