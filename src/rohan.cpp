@@ -3277,17 +3277,17 @@ void *mainCoverageComputationThread(void * argc){
 hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & heteroEstResults, const int maxChains , const double fracChainsBurnin,const long double rohmu,const unsigned char useminmidmax){
 
     cerr<<"Creating HMM";
-    for(unsigned int i=0;i<heteroEstResults.size();i++){
+    // for(unsigned int i=0;i<heteroEstResults.size();i++){
 
-      cout<<"h:"<<    heteroEstResults[i].h<<endl;
-      cout<<"hlow:"<<    heteroEstResults[i].hlow<<endl;
-      cout<<"hhigh:"<<    heteroEstResults[i].hhigh<<endl;
-      cout<<"errb:"<<    heteroEstResults[i].errb<<endl;
-      cout<<"weight:"<<        heteroEstResults[i].weight    <<endl;
-      cout<<"undef:"<<    heteroEstResults[i].undef<<endl;
-      cout<<"chrBreak:"<<    heteroEstResults[i].chrBreak<<endl;
-      cout<<"rangeGen:"<<    heteroEstResults[i].rangeGen<<endl;
-    }
+    //   cout<<"h:"<<    heteroEstResults[i].h<<endl;
+    //   cout<<"hlow:"<<    heteroEstResults[i].hlow<<endl;
+    //   cout<<"hhigh:"<<    heteroEstResults[i].hhigh<<endl;
+    //   cout<<"errb:"<<    heteroEstResults[i].errb<<endl;
+    //   cout<<"weight:"<<        heteroEstResults[i].weight    <<endl;
+    //   cout<<"undef:"<<    heteroEstResults[i].undef<<endl;
+    //   cout<<"chrBreak:"<<    heteroEstResults[i].chrBreak<<endl;
+    //   cout<<"rangeGen:"<<    heteroEstResults[i].rangeGen<<endl;
+    // }
 
 
     
@@ -3406,7 +3406,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     // x_i    =  backwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk);
     // cerr<<"..done"<<endl;
     // cerr<<"x_i "<<x_i<<endl;
-    //    exit(1);
+    // exit(1);
     //return 1;
     
     //cout<<setprecision(10)<<"\tinitial\t"<<h_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
@@ -3500,7 +3500,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     bgzipWriterMCMC.Close();    
 	
     //cerr<<"Baum Welch"<<endl;
-    //baum_welch(&hmm,&emittedH);
+
 	
 
     //hvector and pvector contain the values
@@ -4746,6 +4746,7 @@ int main (int argc, char *argv[]) {
 		}
 		
 		hetResToAdd.weight = ( (long double)(dataToWrite->hetEstResults.sites) ) / ( (long double)(sizeChunk) );
+		hetResToAdd.undef  = (hetResToAdd.undef || isnan(hetResToAdd.h) || isnan(hetResToAdd.hlow) || isnan(hetResToAdd.hhigh) );
 		
 		heteroEstResults.push_back(hetResToAdd);
 				
@@ -4947,7 +4948,7 @@ int main (int argc, char *argv[]) {
 		    hetResToAdd.undef  = true; //window is undefined
 		
 		}
-		
+		hetResToAdd.undef  = (hetResToAdd.undef || isnan(hetResToAdd.h) || isnan(hetResToAdd.hlow) || isnan(hetResToAdd.hhigh) );
 		hetResToAdd.weight = ( (long double)(sitesDefinedLine) ) / ( (long double)(sizeChunk) );
 
 		if(verbose)

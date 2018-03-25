@@ -372,13 +372,26 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 		long double temp =
 		    f[previousState][k-1] +                         // prob stored in previousState
 		    logRobust(hmm->getTrans(previousState,state));  // prob of transition from previousState to state
-		logsum = oplusInitnatl( logsum, temp );
+		logsum        = oplusInitnatl( logsum, temp );
 		logsumNotrans = oplusInitnatl( logsumNotrans, f[previousState][k-1] );
 	    }//end each previous state
 
 #ifdef DEBUGFWD
 	    if(verbose)
-		cerr<<"BEFORE "<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" "<<logsum<<endl;
+		cerr<<"BEFORE "<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" "<<logsum<<" p_e="<<p_e<<" rmidminmax "<<returnMinMidMax(useminmidmax,
+									observed[k].hlow,
+									observed[k].h,
+									observed[k].hhigh,
+									sizeChunk,
+									hmm->getMinSegSitesPerChunk(),
+									hmm->getMaxSegSitesPerChunk())<<" " <<hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax,
+																				   observed[k].hlow,
+																				   observed[k].h,
+																				   observed[k].hhigh,
+																				   sizeChunk,
+																				   hmm->getMinSegSitesPerChunk(),
+																				   hmm->getMaxSegSitesPerChunk()),
+																		   sizeChunk )<<endl;
 #endif
 
 
