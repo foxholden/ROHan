@@ -96,6 +96,10 @@ This is normal, as we use the second derivative for the confidence intervals, th
 
 
 
+### I have regions that have clear signs of being runs of homozygosity however they do not get flagged as such, why?
+
+It is possible that you have genuine ROH but if you have a slight overestimate of the rate of local heterozygosity do to him properly calibrated weapon qualities or  base qualities. Therefore such regions will not be flagged as being ROHs. It is advisable to rerun with --rohmu XXX where XXX is the "heterozygosity rate" in ROH regions you are willing to tolerate
+
 
 
 
