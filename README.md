@@ -100,6 +100,10 @@ This is normal, as we use the second derivative for the confidence intervals, th
 
 It is possible that you have genuine ROH but if you have a slight overestimate of the rate of local heterozygosity do to him properly calibrated weapon qualities or  base qualities. Therefore such regions will not be flagged as being ROHs. It is advisable to rerun with --rohmu XXX where XXX is the "heterozygosity rate" in ROH regions you are willing to tolerate
 
+### What are the 3 different lines on the HMM plot?
+
+-Green is output using the point estimates. Margenta are the estimates using upper bounds for local het. rates whereas red were computed using lower bounds of het. rates.
+
 
 
 
