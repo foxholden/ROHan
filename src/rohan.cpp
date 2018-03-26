@@ -1028,10 +1028,10 @@ void deleteLikelihoodScores(){
 
     //vector< vector< mpq2bsq2submatrix * > >  length2pos2mpq2bsq2submatrix;
     //insert dummy values
-    for(int L=0;L<int(MINLENGTHFRAGMENT);L++){//for each fragment length
-	vector< mpq2bsq2submatrix * >  vectorToAdd ;	
-	length2pos2mpq2bsq2submatrix.push_back(vectorToAdd);
-    }
+    // for(int L=0;L<int(MINLENGTHFRAGMENT);L++){//for each fragment length
+    // 	vector< mpq2bsq2submatrix * >  vectorToAdd ;	
+    // 	length2pos2mpq2bsq2submatrix.push_back(vectorToAdd);
+    // }
 
     bool firstIteration=true;
     for(int L=int(MINLENGTHFRAGMENT);L<=int(MAXLENGTHFRAGMENT);L++){//for each fragment length
@@ -1039,7 +1039,7 @@ void deleteLikelihoodScores(){
 	    if(specifiedDeam){//specied deamination rates
 		delete(length2pos2mpq2bsq2submatrix[L][l]);	   	  
 	    }else{
-		if(!firstIteration){//if it's not the first iteration, since every position is the same we reuse the one from the first iteration
+		if(firstIteration){//if it's not the first iteration, since every position is the same we reuse the one from the first iteration
 		    delete(length2pos2mpq2bsq2submatrix[L][l]);	   	  
 		}       	
 		firstIteration=false;
