@@ -3567,8 +3567,8 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     hmm.recomputeProbsNonROH();
 
     
-    fbreturnVal postprob = forwardBackwardProbUncertaintyMissing(&hmm, heteroEstResults , sizeChunk,useminmidmax);
-
+    fbreturnVal postprob = forwardBackwardProbMissing(&hmm, heteroEstResults , sizeChunk,useminmidmax);
+    
     cerr<<"...HMM done"<<endl;
 
 

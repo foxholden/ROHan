@@ -443,7 +443,7 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
     return toreturn;
 }
 
-//#define DEBUGBWD
+
 
 inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
 
@@ -580,13 +580,18 @@ inline fbreturnVal backwardProbUncertaintyMissing (Hmm * hmm, const vector<emiss
 }
 
 
+//#define DEBUGBWD
+
 inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,const unsigned char useminmidmax,bool verbose=false){
 
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates();
 
     vector< vector<long double > > b ( nStates , vector<long double>(nObservations,0) );//1D # HMM states, 2D #obs,  probability of observation i by state j
-    
+
+#ifdef  DEBUGBWD
+    cerr<<"backwardProbMissing()"<<endl;
+#endif
     
     
     for (int k=(nObservations-2); k>=0; k--) {//each obs
@@ -629,8 +634,8 @@ inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & 
 
 #ifdef DEBUGBWD
 		if(verbose){
-		    cout<<""<<"b["<<nextState<<"]["<<k+1<<"] ="<<b[nextState][k+1]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" logsumNoTrans="<<logsumNoTrans<<" "<<observed[k+1].hlow<<" "<<observed[k+1].hhigh<<" undef="<<observed[k+1].undef<<" chrb="<<observed[k+1].chrBreak<<" w="<<observed[k+1].weight<<endl;
-		    //cout<<"b["<<nextState<<"]["<<(k+1)<<"] "<<b[state][k]<<" = logRobust = "<<logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) << " logsum = "<<logsum<<endl;
+		  cerr<<""<<"b["<<nextState<<"]["<<k+1<<"] ="<<b[nextState][k+1]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" logsumNoTrans="<<logsumNoTrans<<" "<<observed[k+1].hlow<<" "<<observed[k+1].hhigh<<" undef="<<observed[k+1].undef<<" chrb="<<observed[k+1].chrBreak<<" w="<<observed[k+1].weight<<endl;
+		  //cout<<"b["<<nextState<<"]["<<(k+1)<<"] "<<b[state][k]<<" = logRobust = "<<logRobust(hmm->hmmstates[state]->probEmission( (unsigned int)(observed[k]*sizeChunk)  , sizeChunk) ) << " logsum = "<<logsum<<endl;
 		}
 #endif
 		
@@ -655,9 +660,9 @@ inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & 
 	    
 	    b[state][k] =     b[state][k] * observed[k].weight;
 	    
-#ifdef DEBUGFWD
+#ifdef DEBUGBWD
 	    if(verbose){
-		cout<<"b["<<state<<"]["<<k<<"] "<<b[state][k]<<" 1="<<logsum<<" 2="<<logsumNoTrans<<" 3="<<logsumNoTransStart<<" "<<endl;
+	      cerr<<"b["<<state<<"]["<<k<<"] "<<b[state][k]<<" 1="<<logsum<<" 2="<<logsumNoTrans<<" 3="<<logsumNoTransStart<<" "<<endl;
 	    }
 #endif
 	}//each state
@@ -747,9 +752,9 @@ inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & 
 /*     GenomicRange rangeGen; */
 /* } emissionUndef; */
 
-//#define DEBUGFWDBCKWD
 
-    inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
+
+inline fbreturnVal forwardBackwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
 
 
     /* cout<<"forwardBackward"<<endl; */
@@ -861,6 +866,7 @@ inline fbreturnVal backwardProbMissing(Hmm * hmm, const vector<emissionUndef> & 
 }
 
 
+//#define DEBUGFWDBCKWD
 
 inline fbreturnVal forwardBackwardProbMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,const unsigned char useminmidmax,bool verbose=false){
 
@@ -871,6 +877,10 @@ inline fbreturnVal forwardBackwardProbMissing (Hmm * hmm, const vector<emissionU
     int nObservations  = int(observed.size());
     int nStates        = hmm->getNumberStates(); 
 
+#ifdef DEBUGFWDBCKWD
+    cerr<<"forwardBackwardProbMissing()"<<endl;
+#endif
+    
     fbreturnVal  f = forwardProbMissing( hmm,  observed, sizeChunk, useminmidmax, verbose);
     fbreturnVal  b = backwardProbMissing(hmm,  observed, sizeChunk, useminmidmax, verbose);
     ///    exit(1);
@@ -879,13 +889,16 @@ inline fbreturnVal forwardBackwardProbMissing (Hmm * hmm, const vector<emissionU
     /* cout<<"FWBW test postprob"<<endl; */
     for(int i=0;i<nObservations;i++){
 	long double temp = 0.0;
+
 #ifdef DEBUGFWDBCKWD
-	cout<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh<<" "<<observed[i].weight;
+	if(verbose)
+	cerr<<"obs#"<<i<<" "<<observed[i].h<<" "<<observed[i].hlow<<" "<<observed[i].hhigh<<" "<<observed[i].weight;
 #endif
 	for(int x=0;x<nStates;x++){	    
 	    postProb[x][i]   = f.m[x][i] + b.m[x][i];
 #ifdef DEBUGFWDBCKWD
-	    cout<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f.m[x][i] <<" b="<< b.m[x][i]<<" ";
+	    if(verbose)
+	    cerr<<" state#"<<x<<" p="<<postProb[x][i]<<" f="<<f.m[x][i] <<" b="<< b.m[x][i]<<" ";
 #endif
 	    /* //cout<<" state#"<<x<<" p="<<postProb[x][i]<<" "<<temp<<" ";  */
 	    
@@ -906,7 +919,8 @@ inline fbreturnVal forwardBackwardProbMissing (Hmm * hmm, const vector<emissionU
 	    }
 	}
 #ifdef DEBUGFWDBCKWD
-	cout<<"num overflow "<<numericalOverflow<<" "<<temp<<endl;
+	if(verbose)
+	  cerr<<"num overflow "<<numericalOverflow<<" "<<temp<<endl;
 #endif
 	if( numericalOverflow ){
 	    //temp=temp-numeric_limits<long double>::min();
