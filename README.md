@@ -77,7 +77,8 @@ Preparing the BAM file
 
 rohan --tstv [TSTV ratio] 
 
-2) Do not apply any filter as mapping quality and base quality are all informative. Simply use the fail QC flag to remove reads/fragments that have failed basic quality control (e.g. duplicates). Simply sort and index and provide ROHan the same reference used for mapping. 
+2) Do not apply any filter as mapping quality and base quality are all informative. Duplicate removal is very recommended. Simply use the fail QC flag to remove reads/fragments that have failed basic quality control (e.g. for duplicates). Simply sort and index and provide ROHan the same reference used for mapping. 
+
 
 
 Documentation

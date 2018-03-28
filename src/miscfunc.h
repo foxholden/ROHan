@@ -72,6 +72,8 @@ typedef struct {
     uint64_t nonrohSegments;
     uint64_t unsureSegments;
 
+    double avgLengthROHSegments;
+
     fbreturnVal postprob;
  } hmmRes;
 

@@ -3592,26 +3592,68 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     uint64_t nonrohSegments=0;
     uint64_t unsureSegments=0;
 
+    uint64_t rohSegmentsContiguousSum=0;
+    vector<uint64_t> rohSegmentsContiguous;
+    bool inROH=false;
+    
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	string strToWrite=heteroEstResults[c].rangeGen.asBed()+"\t";//+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
 
+	if(heteroEstResults[c].chrBreak){
+	    if(inROH && c!=0){//was already in ROH
+		rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+		rohSegmentsContiguousSum=0;//reset
+	    }
+	    inROH=false;
+	}
+
 	if(heteroEstResults[c].undef){
 	    strToWrite+="NA\tNA\n";
+	    
+	    if(inROH && c!=0){//was already in ROH
+		rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+		rohSegmentsContiguousSum=0;//reset
+	    }
+	    inROH=false;
+
 	}else{
 	    strToWrite+=stringify( exp(postprob.m[0][c]) )+"\t"+stringify( exp(postprob.m[1][c]) )+"\n";
 	}
 
 	if(     exp(postprob.m[0][c]) > 0.9){
 	    rohSegments        += sizeChunk;
+
+	    if(inROH){//was already in ROH
+		rohSegmentsContiguousSum += sizeChunk;
+	    }else{//new ROH
+		rohSegmentsContiguousSum  = sizeChunk;
+	    }
+	    inROH=true;
+
 	}else{
 	    if( exp(postprob.m[1][c]) > 0.9){
 		nonrohSegments += sizeChunk;
+		
+		if(inROH){//was already in ROH
+		    rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+		    rohSegmentsContiguousSum=0;//reset
+		}else{//do nothing
+		    rohSegmentsContiguousSum  = 0;//superfluous
+		}
+		inROH=false;
+
 	    }else{
 		unsureSegments += sizeChunk;
 	    }
 	}
 	bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());	
     }
+
+    if(inROH ){//was already in ROH
+	rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+    }
+
+
     bgzipWriterHMMpost.Close();    
     cerr<<"Written trace to "<<(outFilePrefix+outFileSuffixHMMpost)<<endl;
 
@@ -3634,6 +3676,16 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     toreturn.nonrohSegments = nonrohSegments;
     toreturn.unsureSegments = unsureSegments;
     
+    double rohSegmentsContiguousS=0;
+    double rohSegmentsContiguousN=0;
+
+    for(unsigned int i=0;i<rohSegmentsContiguous.size();i++){
+	rohSegmentsContiguousS += double(  rohSegmentsContiguous[i] );
+	rohSegmentsContiguousN += 1.0;
+    }
+    toreturn.avgLengthROHSegments =     (rohSegmentsContiguousS / rohSegmentsContiguousN);
+
+
     toreturn.postprob       = postprob;
 
     
@@ -5299,6 +5351,8 @@ int main (int argc, char *argv[]) {
 		  double( MIN3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 		    <<")"<<endl;
 
+
+	fileSummary << "Avg. length of ROH       :\t"      <<hmmResmid.avgLengthROHSegments    <<" ("<<MIN3( hmmResmin.avgLengthROHSegments, hmmResmid.avgLengthROHSegments, hmmResmax.avgLengthROHSegments)<<","<<MAX3( hmmResmin.avgLengthROHSegments, hmmResmid.avgLengthROHSegments, hmmResmax.avgLengthROHSegments)<<")"<<endl;
 
 
 	
