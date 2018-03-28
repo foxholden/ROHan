@@ -3601,8 +3601,8 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 
 	if(heteroEstResults[c].chrBreak){
 	    if(inROH && c!=0){//was already in ROH
-		rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
-		rohSegmentsContiguousSum=0;//reset
+	      rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+	      rohSegmentsContiguousSum=0;//reset
 	    }
 	    inROH=false;
 	}
@@ -3610,9 +3610,9 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	if(heteroEstResults[c].undef){
 	    strToWrite+="NA\tNA\n";
 	    
-	    if(inROH && c!=0){//was already in ROH
-		rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
-		rohSegmentsContiguousSum=0;//reset
+	    if(inROH && c!=0){//was already in ROH	      
+	      rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+	      rohSegmentsContiguousSum=0;//reset
 	    }
 	    inROH=false;
 
@@ -3635,8 +3635,9 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 		nonrohSegments += sizeChunk;
 		
 		if(inROH){//was already in ROH
-		    rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
-		    rohSegmentsContiguousSum=0;//reset
+
+		  rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+		  rohSegmentsContiguousSum=0;//reset
 		}else{//do nothing
 		    rohSegmentsContiguousSum  = 0;//superfluous
 		}
@@ -3650,7 +3651,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     }
 
     if(inROH ){//was already in ROH
-	rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+      rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
     }
 
 
@@ -3680,11 +3681,14 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     double rohSegmentsContiguousN=0;
 
     for(unsigned int i=0;i<rohSegmentsContiguous.size();i++){
-	rohSegmentsContiguousS += double(  rohSegmentsContiguous[i] );
-	rohSegmentsContiguousN += 1.0;
+      rohSegmentsContiguousS += double(  rohSegmentsContiguous[i] );
+      rohSegmentsContiguousN += 1.0;
     }
-    toreturn.avgLengthROHSegments =     (rohSegmentsContiguousS / rohSegmentsContiguousN);
 
+    if(rohSegmentsContiguousN!=0)
+      toreturn.avgLengthROHSegments =     (rohSegmentsContiguousS / rohSegmentsContiguousN);
+    else
+      toreturn.avgLengthROHSegments =     0.0;
 
     toreturn.postprob       = postprob;
 
