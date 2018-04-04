@@ -37,7 +37,7 @@ using namespace BamTools;
 //#define MAX(a,b) (((a)>(b))?(a):(b))
 
 //#define DEBUGFIRSTWINDOWS 3
-#define CORRECTCOV
+//#define CORRECTCOV
 //#define ONLYUSECOV 12
 // #define ONLYUSECOVMIN 5
 // #define ONLYUSECOVMAX 49
