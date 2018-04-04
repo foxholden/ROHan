@@ -37,7 +37,7 @@ using namespace BamTools;
 //#define MAX(a,b) (((a)>(b))?(a):(b))
 
 //#define DEBUGFIRSTWINDOWS 3
-//#define CORRECTCOV
+#define CORRECTCOV
 //#define ONLYUSECOV 12
 // #define ONLYUSECOVMIN 5
 // #define ONLYUSECOVMAX 49
@@ -63,7 +63,7 @@ using namespace BamTools;
 
 
 //#define HETVERBOSE
-#define COVERAGETVERBOSE
+//#define COVERAGETVERBOSE
 //#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
 // #define MINLENGTHFRAGMENT     35      // mininam length for fragment
