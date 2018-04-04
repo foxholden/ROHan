@@ -63,7 +63,7 @@ using namespace BamTools;
 
 
 //#define HETVERBOSE
-//#define COVERAGETVERBOSE
+#define COVERAGETVERBOSE
 //#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
 // #define MINLENGTHFRAGMENT     35      // mininam length for fragment
@@ -293,6 +293,9 @@ pthread_mutex_t  mutexQueueToWrite          = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t  mutexRank                  = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t  mutexCERR                  = PTHREAD_MUTEX_INITIALIZER;
 
+
+pthread_mutex_t  mutexCOUNTCOV              = PTHREAD_MUTEX_INITIALIZER;
+unsigned int queueDataForCoverageOrigsizeSum=0;
 
 // pthread_mutex_t  mutexCoverageCounter = PTHREAD_MUTEX_INITIALIZER;
 
@@ -3045,6 +3048,9 @@ void *mainCoverageComputationThread(void * argc){
     const RefVector  references = reader.GetReferenceData();
     const int        refID      = reader.GetReferenceID( currentChunk->rangeGen.getChrName() );
 
+    // if(verbose){
+    //   cerr<<"Thread #"<<rankThread<<" refID "<<refID<<" "<<currentChunk->rangeGen.getStartCoord()<<" "<<currentChunk->rangeGen.getEndCoord()<<endl;    
+    // }
 
 #ifdef COVERAGETVERBOSE    
     cerr<<"Thread #"<<rankThread<<" refID "<<refID<<" "<<currentChunk->rangeGen.getStartCoord()<<" "<<currentChunk->rangeGen.getEndCoord()<<endl;    
@@ -4270,6 +4276,7 @@ int main (int argc, char *argv[]) {
 		
 	    }else{//found
 		newV.push_back( v[i] );
+		cerr<<v[i]<<endl;
 	    }
 	}
 
@@ -4319,16 +4326,19 @@ int main (int argc, char *argv[]) {
     
 
 	//TODO to renable
-	//queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
-	queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
+	queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
+	//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
+	//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
 	unsigned int queueDataForCoverageOrigsize = queueDataForCoverage.size();
-	
+	cerr<<queueDataForCoverageOrigsize<<endl;
 
 	pthread_mutex_init(&mutexQueueToRead,   NULL);
 	pthread_mutex_init(&mutexQueueToWrite,  NULL);
 	pthread_mutex_init(&mutexRank ,         NULL);
 	pthread_mutex_init(&mutexCERR ,         NULL);
-	
+	pthread_mutex_init(&mutexCOUNTCOV ,     NULL);
+
+
 	for(int i=0;i<numberOfThreads;i++){
 	    rc = pthread_create(&threadCov[i], NULL, mainCoverageComputationThread, NULL);
 	    checkResults("pthread_create()\n", rc);
@@ -4337,6 +4347,21 @@ int main (int argc, char *argv[]) {
 	if(verbose){	    
 	    cerr<<"Creating threads for coverage calculation, need to process="<<queueDataForCoverage.size()<<" out of a total of "<<queueDataToprocess.size()<<endl;
 	}
+
+
+	//TODO to code?
+	// rc = pthread_mutex_lock(&mutexCERR);
+	// checkResults("pthread_mutex_lock()\n", rc);
+
+	// if(verbose){
+	// 	cerr<<"Thread#"<<threadID<<" starting pre-computations size of window: "<<thousandSeparator(piForGenomicWindow->size())<<endl;
+	// }
+    
+	// rc = pthread_mutex_unlock(&mutexCERR);
+	// checkResults("pthread_mutex_unlock()\n", rc);
+
+	// pthread_mutex_t  mutexCOUNTCOV              = PTHREAD_MUTEX_INITIALIZER;
+	// unsigned int queueDataForCoverageOrigsizeSum;
 
 	while(queueDataForCoverage.size()!=0){
 	    if(verbose){	    
@@ -4363,13 +4388,17 @@ int main (int argc, char *argv[]) {
 	pthread_mutex_destroy(&mutexQueueToRead);
 	pthread_mutex_destroy(&mutexQueueToWrite);
 	pthread_mutex_destroy(&mutexCERR);
+	pthread_mutex_destroy(&mutexCOUNTCOV);
+
+
 
 	//    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
 	
 	rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
 	if(totalSitesSum ==0 ){
-	    cerr<<"No data was found for the entire BAM file or the regions you defined, please verify the BAM file"<<endl;
-	    return 1;
+	  //cerr<<"No data was found for the entire BAM file for the region "<<endl;
+	  cerr<<"No data was found for the entire BAM file for the regions you defined, please verify the BAM file"<<endl;
+	  return 1;
 	}
 	cerr<<"Final computation:" <<" bases="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda coverage="<<rateForPoissonCov<<endl;
 	//pthread_exit(NULL);	
