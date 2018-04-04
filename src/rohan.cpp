@@ -2689,6 +2689,7 @@ void *mainHeteroComputationThread(void * argc){
 
     BamAlignment al;
     //unsigned int numReads=0;
+    //cerr<<MINLENGTHFRAGMENT<<" "<<MAXLENGTHFRAGMENT<<endl;
     while ( reader.GetNextAlignment(al) ) {
         //cout<<"mainHeteroComputationThread al.Name="<<al.Name<<endl;
 
@@ -3094,11 +3095,11 @@ void *mainCoverageComputationThread(void * argc){
 	if(rg2info.find(rg) == rg2info.end()){
 	    rgInfo toadd;
 	    toadd.isPe          = al.IsPaired();
-	    toadd.maxReadLength = MAX(al.Length,al.InsertSize);
+	    toadd.maxReadLength = MIN( MAX(al.Length,al.InsertSize), 255);
 	    rg2info[rg]         = toadd;
 	}else{
 	    rg2info[rg].isPe          = rg2info[rg].isPe || al.IsPaired();
-	    rg2info[rg].maxReadLength = MAX( MAX(al.Length,al.InsertSize), rg2info[rg].maxReadLength );
+	    rg2info[rg].maxReadLength = MIN( MAX( MAX(al.Length,al.InsertSize), rg2info[rg].maxReadLength ), 255);
 	}
 
 
@@ -4388,7 +4389,7 @@ int main (int argc, char *argv[]) {
 	    if(it->second.isPe)
 		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)it->second.maxReadLength );
 	    else
-		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(it->second.maxReadLength-1) );
+		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(it->second.maxReadLength) );
 
 	    MAXLENGTHFRAGMENT = MIN( 255, MAXLENGTHFRAGMENT );//as the length is stored on 8 bits (for now)
 	    
@@ -4430,7 +4431,7 @@ int main (int argc, char *argv[]) {
 		if(toadd.isPe)
 		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)toadd.maxReadLength );
 		else
-		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(toadd.maxReadLength -1) );
+		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(toadd.maxReadLength) );
 
 		MAXLENGTHFRAGMENT = MIN( 255, MAXLENGTHFRAGMENT );//as the length is stored on 8 bits (for now)
 		
