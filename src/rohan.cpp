@@ -4276,7 +4276,6 @@ int main (int argc, char *argv[]) {
 		
 	    }else{//found
 		newV.push_back( v[i] );
-		cerr<<v[i]<<endl;
 	    }
 	}
 
@@ -4325,12 +4324,12 @@ int main (int argc, char *argv[]) {
 	}
     
 
-	//TODO to renable
+	//renabled
 	queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
 	//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
 	//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
 	unsigned int queueDataForCoverageOrigsize = queueDataForCoverage.size();
-	cerr<<queueDataForCoverageOrigsize<<endl;
+	//cerr<<queueDataForCoverageOrigsize<<endl;
 
 	pthread_mutex_init(&mutexQueueToRead,   NULL);
 	pthread_mutex_init(&mutexQueueToWrite,  NULL);
