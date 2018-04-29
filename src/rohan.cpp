@@ -18,6 +18,29 @@
 #include <utils/bamtools_pileup_engine.h>
 #include <utils/bamtools_utilities.h>
 
+
+extern "C" {
+#include "htslib/sam.h"
+#include "samtools.h"
+#include "sam_opts.h"
+#include "bedidx.h"
+}
+#define bam_is_paired(b)    (((b)->core.flag&BAM_FPAIRED) != 0)
+#define bam_is_pair1(b)     (((b)->core.flag&BAM_FREAD1)  != 0)
+#define bam_is_pair2(b)     (((b)->core.flag&BAM_FREAD2)  != 0)
+#define bam_is_qcfailed(b)  (((b)->core.flag&BAM_FQCFAIL)     != 0)
+#define bam_is_rmdup(b)     (((b)->core.flag&BAM_FDUP)        != 0)
+#define bam_is_failed(b)    ( bam_is_qcfailed(b) || bam_is_rmdup(b) )
+
+
+typedef struct {     // auxiliary data structure
+    samFile *fp;     // the file handle
+    bam_hdr_t *hdr;  // the file header
+    hts_itr_t *iter; // NULL if a region not specified
+    int min_mapQ, min_len; // mapQ filter; length filter
+} aux_t;
+
+
 #include "PdfWriter.h"
 #include "GenomicWindows.h"
 #include "Hmm.h"
@@ -76,6 +99,21 @@ using namespace BamTools;
 
 //#define MAXMAPPINGBASEQUAL    64      // maximal base quality score, should be sufficient as mapping qualities are encoded using 8 bits
 
+static int read_bam(void *data, bam1_t *b) // read level filters better go here to avoid pileup
+{
+    aux_t *aux = (aux_t*)data; // data in fact is a pointer to an auxiliary structure
+    int ret;
+    while (1)
+    {
+        ret = aux->iter? sam_itr_next(aux->fp, aux->iter, b) : sam_read1(aux->fp, aux->hdr, b);
+        if ( ret<0 ) break;
+        if ( b->core.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP) ) continue;
+        if ( (int)b->core.qual < aux->min_mapQ ) continue;
+        if ( aux->min_len && bam_cigar2qlen(b->core.n_cigar, bam_get_cigar(b)) < aux->min_len ) continue;
+        break;
+    }
+    return ret;
+}
 
 
 

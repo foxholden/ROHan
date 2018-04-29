@@ -2,9 +2,9 @@
 CXX      = g++ -std=c++11 #-g#-fpermissive #-g # -pg
 LIBGAB   = ../lib/libgab/
 
-CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/libharu/include/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c
+CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/samtools/ -I../lib/htslib/ -I../lib/libharu/include/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c
 LDFLAGS  = -lgsl -lgslcblas -lz  -lpthread 
-LDLIBS   = ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../lib/bamtools/build/src/api/libbamtools.a
+LDLIBS   = ../lib/htslib/libhts.a ../lib/samtools/libbam.a ../lib/samtools/libst.a ../lib/tabix/libtabix.a  ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../lib/bamtools/build/src/api/libbamtools.a
 
 
 all: ../lib/bamtools/build/src/api/libbamtools.a ../lib/libgab/utils.o ../lib/libharu/src/.libs/libhpdf.a rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
