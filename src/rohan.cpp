@@ -101,21 +101,6 @@ using namespace BamTools;
 
 string alphabet = "NACNGNNNTNNNNNNN";
 
-static int read_bam(void *data, bam1_t *b) // read level filters better go here to avoid pileup
-{
-    aux_t *aux = (aux_t*)data; // data in fact is a pointer to an auxiliary structure
-    int ret;
-    while (1)
-    {
-        ret = aux->iter? sam_itr_next(aux->fp, aux->iter, b) : sam_read1(aux->fp, aux->hdr, b);
-        if ( ret<0 ) break;
-        if ( b->core.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP) ) continue;
-        if ( (int)b->core.qual < aux->min_mapQ ) continue;
-        if ( aux->min_len && bam_cigar2qlen(b->core.n_cigar, bam_get_cigar(b)) < aux->min_len ) continue;
-        break;
-    }
-    return ret;
-}
 
 
 
@@ -2982,6 +2967,42 @@ queue< DataChunk * >  subFirstElemsQueue(const queue< DataChunk * > queueDataToS
 // };//end coverageComputeVisitor
 
 
+static int read_bamCOV(void *data, bam1_t *b){ // read level filters better go here to avoid pileup
+    cerr<<"read_bamCOV"<<endl;
+    aux_t *aux = (aux_t*)data; // data in fact is a pointer to an auxiliary structure
+    int ret;
+    while (1){
+        ret = aux->iter? sam_itr_next(aux->fp, aux->iter, b) : sam_read1(aux->fp, aux->hdr, b);
+        if ( ret<0 ) break;
+	int32_t qlen  = bam_cigar2qlen(b->core.n_cigar, bam_get_cigar(b));
+        if ( b->core.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP) ) continue;
+        if ( (int)b->core.qual < aux->min_mapQ ) continue;
+        if ( aux->min_len && qlen < aux->min_len ) continue;
+	uint8_t *rgptr = bam_aux_get(b, "RG");
+	cerr<<"rg1 "<<rgptr<<endl;
+	if(rgptr){
+	    string rg = string( (const char*)(rg+1));
+	    //cerr<<"rg2 "<<rgstr<<endl;
+
+	    if(rg2info.find(rg) == rg2info.end()){
+		rgInfo toadd;
+		toadd.isPe          = bam_is_paired( b); //al.IsPaired();
+		toadd.maxReadLength = MIN2( MAX2(qlen,al.InsertSize), 255);//TODO port InsertSize 
+		rg2info[rg]         = toadd;
+	    }else{
+		rg2info[rg].isPe          = rg2info[rg].isPe || al.IsPaired();
+		rg2info[rg].maxReadLength = MIN2( MAX2( MAX2(al.Length,al.InsertSize), rg2info[rg].maxReadLength ), 255);
+	    }
+	    
+	}
+	if(specifiedDeam){
+	    if( bam_is_paired( b) ) continue; //skip paired-end reads because we cannot get proper deamination
+	}
+
+        break;
+    }
+    return ret;
+}
 
 
 void *mainCoverageComputationThread(void * argc){
@@ -3094,7 +3115,7 @@ void *mainCoverageComputationThread(void * argc){
     //int bamdepth( const string &   bamfilename, const string & region, const string & bedfilename){
        
 
-    int i, n, tid, reg_tid, beg, end, pos, *n_plp, baseQ = 0, mapQ = 0, min_len = 0;
+    int i, n, tid, reg_tid, beg, end, pos, *n_plp, baseQ = 0, mapQ = 0, min_len = MINLENGTHFRAGMENT;
     //int all = 0, status = EXIT_SUCCESS, nfiles, max_depth = -1;
     int all = 0; //status = EXIT_SUCCESS, 
     //int max_depth = -1;
@@ -3191,7 +3212,7 @@ void *mainCoverageComputationThread(void * argc){
     }
 
     // the core multi-pileup loop
-    mplp = bam_mplp_init(n, read_bam, (void**)data); // initialization
+    mplp = bam_mplp_init(n, read_bamCOV, (void**)data); // initialization
     if (0 < max_depth)
         bam_mplp_set_maxcnt(mplp,max_depth);  // set maximum coverage depth
     else if (!max_depth)
@@ -3242,16 +3263,19 @@ void *mainCoverageComputationThread(void * argc){
         fputs(h->target_name[tid], stdout); 
 	printf("\t%d\t", pos+1); // a customized printf() would be faster
         for (i = 0; i < n; ++i) { // base level filters have to go here
-            int j, m = 0;
+            int j;
+	    int m = 0;//amount of invalid bases at site j that need to be removed from coverage calculations
 	    
             for (j = 0; j < n_plp[i]; ++j) {
                 const bam_pileup1_t *p = plp[i] + j; // DON'T modfity plp[][] unless you really know
-                
+		//base level filters go here
 		if (p->is_del || p->is_refskip) 
 		    ++m; // having dels or refskips at tid:pos
                 else 
 		    if(bam_get_qual(p->b)[p->qpos] < baseQ) 
 			++m; // low base quality
+		
+
 		// printf("%d,",p->b);
 		// printf("%d,",bam_get_seq(p->b));
 		// @discussion Each base is encoded in 4 bits: 1 for A, 2 for C, 4 for G,
