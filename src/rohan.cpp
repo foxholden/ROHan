@@ -99,6 +99,8 @@ using namespace BamTools;
 
 //#define MAXMAPPINGBASEQUAL    64      // maximal base quality score, should be sufficient as mapping qualities are encoded using 8 bits
 
+string alphabet = "NACNGNNNTNNNNNNN";
+
 static int read_bam(void *data, bam1_t *b) // read level filters better go here to avoid pileup
 {
     aux_t *aux = (aux_t*)data; // data in fact is a pointer to an auxiliary structure
@@ -474,7 +476,7 @@ void initScores(){
 */
 void combineDeamRates(long double f1[4],long double f2[4],long double f[4],int b){
     
-    long double minFreq = MIN( f1[b] , f2[b] );
+    long double minFreq = MIN2( f1[b] , f2[b] );
     //cout<<b<<"\t"<<f1[b]<<"\t"<<f2[b]<<"\t"<<f[b]<<"\t"<<minFreq<<endl;
 
     if(f1[b] == minFreq){//use f1
@@ -2074,7 +2076,7 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 
 		//if we spent too much on either side, reduce alpha
 		if( ((iterationWithPositiveD1+iterationWithNegativeD1 )>12 ) &&
-		    ((double(MIN(iterationWithPositiveD1,iterationWithNegativeD1))/double(iterationWithPositiveD1+iterationWithNegativeD1))>0.25) ){ //if more than 25% of iterations are on the other side, adjust alpha
+		    ((double(MIN2(iterationWithPositiveD1,iterationWithNegativeD1))/double(iterationWithPositiveD1+iterationWithNegativeD1))>0.25) ){ //if more than 25% of iterations are on the other side, adjust alpha
 
 		    if(verbose){
 			rc = pthread_mutex_lock(&mutexCERR);
@@ -2096,7 +2098,7 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 		    //if spend too much time on one side, increase alpha
 
 		    if( ((iterationWithPositiveD1+iterationWithNegativeD1 )>12 ) &&
-			((double(MIN(iterationWithPositiveD1,iterationWithNegativeD1))/double(iterationWithPositiveD1+iterationWithNegativeD1))<0.05) ){ //if more than 25% of iterations are on the other side, adjust alpha
+			((double(MIN2(iterationWithPositiveD1,iterationWithNegativeD1))/double(iterationWithPositiveD1+iterationWithNegativeD1))<0.05) ){ //if more than 25% of iterations are on the other side, adjust alpha
 			
 			if(verbose){
 			    rc = pthread_mutex_lock(&mutexCERR);
@@ -2417,8 +2419,8 @@ public:
 	    }
 
 	    int bIndex = baseResolved2int(b);
-	    int   q    = MIN( int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual), MAXBASEQUAL);
-	    int   m    = MIN( int(pileupData.PileupAlignments[i].Alignment.MapQuality), MAXMAPPINGQUAL );
+	    int   q    = MIN2( int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual), MAXBASEQUAL);
+	    int   m    = MIN2( int(pileupData.PileupAlignments[i].Alignment.MapQuality), MAXMAPPINGQUAL );
 	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
 	    // if(posAlign == 74310){
 	    // 	cout<<m<<" "<<probMM<<" "<<likeMismatchProbMap[m]<<endl;
@@ -2916,68 +2918,68 @@ queue< DataChunk * >  subFirstElemsQueue(const queue< DataChunk * > queueDataToS
 //                                                                  //
 //////////////////////////////////////////////////////////////////////
 
-class coverageComputeVisitor : public PileupVisitor {
+// class coverageComputeVisitor : public PileupVisitor {
   
-public:
-    coverageComputeVisitor(const RefVector& references,unsigned int leftCoord, unsigned int rightCoord)
-	: PileupVisitor()
-	, m_references(references)
-	, m_leftCoord(leftCoord)
-	, m_rightCoord(rightCoord)
-    { 
-	totalBases=0;
-	totalSites=0;
+// public:
+//     coverageComputeVisitor(const RefVector& references,unsigned int leftCoord, unsigned int rightCoord)
+// 	: PileupVisitor()
+// 	, m_references(references)
+// 	, m_leftCoord(leftCoord)
+// 	, m_rightCoord(rightCoord)
+//     { 
+// 	totalBases=0;
+// 	totalSites=0;
 	
-    }
-    ~coverageComputeVisitor(void) {}
+//     }
+//     ~coverageComputeVisitor(void) {}
   
-    // PileupVisitor interface implementation
+//     // PileupVisitor interface implementation
 
     
-    void Visit(const PileupPosition& pileupData) {   
-	//bool foundOneFragment=false;
-	if(pileupData.Position < int(m_leftCoord)   || 
-	   pileupData.Position > int(m_rightCoord) ){
-	    return ;
-	}
-	//cout<<m_leftCoord<<"\t"<<m_rightCoord<<"\t"<<pileupData.Position<<endl;
+//     void Visit(const PileupPosition& pileupData) {   
+// 	//bool foundOneFragment=false;
+// 	if(pileupData.Position < int(m_leftCoord)   || 
+// 	   pileupData.Position > int(m_rightCoord) ){
+// 	    return ;
+// 	}
+// 	//cout<<m_leftCoord<<"\t"<<m_rightCoord<<"\t"<<pileupData.Position<<endl;
 
-	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-	    //skip reads that were QC failed
-	    if(  pileupData.PileupAlignments[i].Alignment.IsFailedQC() ){
-		continue;
-	    }
+// 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
+// 	    //skip reads that were QC failed
+// 	    if(  pileupData.PileupAlignments[i].Alignment.IsFailedQC() ){
+// 		continue;
+// 	    }
 
-	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
-	    	pileupData.PileupAlignments[i].IsNextInsertion ){
-	    	continue;
-	    }
-	    //foundOneFragment=true;		  
-	    totalBases++;
-	}
+// 	    if( pileupData.PileupAlignments[i].IsCurrentDeletion &&
+// 	    	pileupData.PileupAlignments[i].IsNextInsertion ){
+// 	    	continue;
+// 	    }
+// 	    //foundOneFragment=true;		  
+// 	    totalBases++;
+// 	}
 
-	//if(foundOneFragment)
-	totalSites++;
-    }
+// 	//if(foundOneFragment)
+// 	totalSites++;
+//     }
     
-    unsigned int getTotalBases() const{
-    	return totalBases;
-    }
+//     unsigned int getTotalBases() const{
+//     	return totalBases;
+//     }
 
-    unsigned int getTotalSites() const{
-    	return totalSites;
-    }
+//     unsigned int getTotalSites() const{
+//     	return totalSites;
+//     }
 
-private:
-    RefVector m_references;
-    //Fasta * m_fastaReference;
-    unsigned int m_leftCoord;
-    unsigned int m_rightCoord;
-    unsigned int totalBases;
-    unsigned int totalSites;
+// private:
+//     RefVector m_references;
+//     //Fasta * m_fastaReference;
+//     unsigned int m_leftCoord;
+//     unsigned int m_rightCoord;
+//     unsigned int totalBases;
+//     unsigned int totalSites;
 
     
-};//end coverageComputeVisitor
+// };//end coverageComputeVisitor
 
 
 
@@ -3069,6 +3071,284 @@ void *mainCoverageComputationThread(void * argc){
     
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+    unsigned int totalBasesL=0;
+    unsigned int totalSitesL=0;
+    
+
+    string bamfilename = bamFileToOpen;
+    string region      = currentChunk->rangeGen.getChrName()+":"+stringify(currentChunk->rangeGen.getStartCoord())+"-"+stringify(currentChunk->rangeGen.getEndCoord());
+    string bedfilename = "";
+    //int bamdepth( const string &   bamfilename, const string & region, const string & bedfilename){
+       
+
+    int i, n, tid, reg_tid, beg, end, pos, *n_plp, baseQ = 0, mapQ = 0, min_len = 0;
+    //int all = 0, status = EXIT_SUCCESS, nfiles, max_depth = -1;
+    int all = 0; //status = EXIT_SUCCESS, 
+    //int max_depth = -1;
+    int max_depth = MAXCOV;
+    const bam_pileup1_t **plp;
+    bool reg = !region.empty();
+    //bool bed = !bedfilename.empty();
+    //char *reg = 0; // specified region
+    void *bed = 0; // BED data structure
+    if(!bedfilename.empty()){
+	bed = bed_read(bedfilename.c_str()); // BED or position list file can be parsed now
+    }
+
+    bam_hdr_t *h = NULL; // BAM header of the 1st input
+    aux_t **data;
+    bam_mplp_t mplp;
+    int last_pos = -1, last_tid = -1, ret;
+
+    n =1;
+
+    
+    data = (aux_t **)calloc(1, sizeof(aux_t*)); // data[i] for the i-th input
+    reg_tid = 0; beg = 0; end = INT_MAX;  // set the default region
+
+    for (i = 0; i < n; ++i) {
+	//cerr<<"i ="<<i<<endl;
+	//for (i = 0; i < 1; ++i) {
+        int rf;
+        data[i] = (aux_t *)calloc(1, sizeof(aux_t));
+
+	//cerr<<"bamfilename1 "<<bamfilename<<endl;
+
+	data[i]->fp = sam_open_format(bamfilename.c_str(), "r", NULL); // open BAM
+	//cerr<<"bamfilename2 "<<bamfilename<<endl;
+        if (data[i]->fp == NULL) {
+	    cerr<<"Could not open \""<<bamfilename<<"\""<<endl;
+	    exit(1);
+            //status = EXIT_FAILURE;
+            //goto depth_end;
+        }
+        rf = SAM_FLAG | SAM_RNAME | SAM_POS | SAM_MAPQ | SAM_CIGAR | SAM_SEQ;
+        if (baseQ) rf |= SAM_QUAL;
+        // if (hts_set_opt(data[i]->fp, CRAM_OPT_REQUIRED_FIELDS, rf)) {
+        //     fprintf(stderr, "Failed to set CRAM_OPT_REQUIRED_FIELDS value\n");
+        //     return 1;
+        // }
+        // if (hts_set_opt(data[i]->fp, CRAM_OPT_DECODE_MD, 0)) {
+        //     fprintf(stderr, "Failed to set CRAM_OPT_DECODE_MD value\n");
+        //     return 1;
+        // }
+        data[i]->min_mapQ = mapQ;                    // set the mapQ filter
+        data[i]->min_len  = min_len;                 // set the qlen filter
+        data[i]->hdr = sam_hdr_read(data[i]->fp);    // read the BAM header
+        
+	if (data[i]->hdr == NULL) {
+	    cerr<<"Could not read header for \""<<bamfilename<<"\""<<endl;
+	    exit(1);
+            //status = EXIT_FAILURE;
+            //goto depth_end;
+        }
+        if (reg) { // if a region is specified
+	//if (true) { // if a region is specified
+            //hts_idx_t *idx = sam_index_load(data[i]->fp, argv[optind+i]);  // load the index
+	    hts_idx_t *idx = sam_index_load(data[i]->fp, bamfilename.c_str());  // load the index
+            if (idx == NULL) {
+                //print_error("depth", "can't load index for \"%s\"", argv[optind+i]);
+		cerr<<"cannot load index for \""<<bamfilename<<"\""<<endl;
+		exit(1);
+                //status = EXIT_FAILURE;
+                //goto depth_end;
+            }else{
+		//cerr<<"index ok"<<endl;
+	    }
+            data[i]->iter = sam_itr_querys(idx, data[i]->hdr, region.c_str()); // set the iterator
+            hts_idx_destroy(idx); // the index is not needed any more; free the memory
+            if (data[i]->iter == NULL) {
+                //print_error("depth", "can't parse region \"%s\"", reg);
+		cerr<<"cannot parse region \""<<region<<"\""<<endl;
+		exit(1);
+                //status = EXIT_FAILURE;
+                //goto depth_end;
+            }else{
+		//cerr<<"region ok"<<endl;
+	    }
+        }
+    }
+
+    h = data[0]->hdr; // easy access to the header of the 1st BAM
+    if (reg) {
+    //if(true){
+        beg     = data[0]->iter->beg; // and to the parsed region coordinates
+        end     = data[0]->iter->end;
+        reg_tid = data[0]->iter->tid;
+    }
+
+    // the core multi-pileup loop
+    mplp = bam_mplp_init(n, read_bam, (void**)data); // initialization
+    if (0 < max_depth)
+        bam_mplp_set_maxcnt(mplp,max_depth);  // set maximum coverage depth
+    else if (!max_depth)
+        bam_mplp_set_maxcnt(mplp,INT_MAX);
+    n_plp = (int *)calloc(n, sizeof(int)); // n_plp[i] is the number of covering reads from the i-th BAM
+    plp   = (const bam_pileup1_t **)calloc(n, sizeof(bam_pileup1_t*)); // plp[i] points to the array of covering reads (internal in mplp)
+
+    while ((ret=bam_mplp_auto(mplp, &tid, &pos, n_plp, plp)) > 0) { // come to the next covered position
+        if (pos < beg || pos >= end) continue; // out of range; skip
+        if (tid >= h->n_targets) continue;     // diff number of @SQ lines per file?
+        if (all) {
+            while (tid > last_tid) {
+                if (last_tid >= 0 && !reg) {
+                    // Deal with remainder or entirety of last tid.
+                    while (++last_pos < int(h->target_len[last_tid])) {
+                        // // Horribly inefficient, but the bed API is an obfuscated black box.
+                        if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
+                            continue;
+                        fputs(h->target_name[last_tid], stdout); 
+			printf("\t%d", last_pos+1);
+                        for (i = 0; i < n; i++)
+                            putchar('\t'), putchar('0');
+                        putchar('\n');
+                    }
+                }
+                last_tid++;
+                last_pos = -1;
+                if (all < 2)
+                    break;
+            }
+
+            // Deal with missing portion of current tid
+            while (++last_pos < pos) {
+                if (last_pos < beg) continue; // out of range; skip
+                if (bed && bed_overlap(bed, h->target_name[tid], last_pos, last_pos + 1) == 0)
+                    continue;
+                fputs(h->target_name[tid], stdout); 
+		printf("\t%d", last_pos+1);
+                for (i = 0; i < n; i++)
+                    putchar('\t'), putchar('0');
+                putchar('\n');
+            }
+
+            last_tid = tid;
+            last_pos = pos;
+        }
+	if (bed && bed_overlap(bed, h->target_name[tid], pos, pos + 1) == 0) continue;
+        fputs(h->target_name[tid], stdout); 
+	printf("\t%d\t", pos+1); // a customized printf() would be faster
+        for (i = 0; i < n; ++i) { // base level filters have to go here
+            int j, m = 0;
+	    
+            for (j = 0; j < n_plp[i]; ++j) {
+                const bam_pileup1_t *p = plp[i] + j; // DON'T modfity plp[][] unless you really know
+                
+		if (p->is_del || p->is_refskip) 
+		    ++m; // having dels or refskips at tid:pos
+                else 
+		    if(bam_get_qual(p->b)[p->qpos] < baseQ) 
+			++m; // low base quality
+		// printf("%d,",p->b);
+		// printf("%d,",bam_get_seq(p->b));
+		// @discussion Each base is encoded in 4 bits: 1 for A, 2 for C, 4 for G,
+		//  8 for T and 15 for N. Two bases are packed in one byte with the base
+		//  at the higher 4 bits having smaller coordinate on the read. It is
+		//  recommended to use bam_seqi() macro to get the base.
+		//  */
+		//coord
+		//printf("%d,",p->qpos);
+		cout<<p->qpos<<",";
+		//flag
+		//printf("%d,",(p->b)->core.flag);
+		cout<<((p->b)->core.flag)<<",";
+		//base
+		//printf("%d,",bam_seqi(bam_get_seq(p->b),p->qpos));
+		//printf("%c,",alphabet[ bam_seqi(bam_get_seq(p->b),p->qpos) ]);
+		cout<<alphabet[ bam_seqi(bam_get_seq(p->b),p->qpos) ]<<",";
+		
+		//int c = seq_nt16_int[bam_seqi(seq, p->qpos)];
+		//qual
+		//printf("%d,",bam_get_qual(p->b)[p->qpos]);
+		cout<<int(bam_get_qual(p->b)[p->qpos])<<",";
+		//strand
+		//printf("%d,",bam_is_rev(p->b));
+		cout<<bam_is_rev(p->b)<<",";
+		
+		//paired
+		//printf("%d,",bam_is_paired(p->b));
+		cout<<bam_is_paired(p->b)<<",";
+		cout<<"D="<<p->is_del<<",RS="<<p->is_refskip<<",";
+		//fail
+		//printf("%d-",bam_is_failed(p->b));
+		cout<<bam_is_failed(p->b)<<"-";
+
+            }
+            //printf("\tc=%d", n_plp[i] - m); // this the depth to output
+	    cout<<(n_plp[i] - m); // this the depth to output
+	    totalBasesL += (n_plp[i] - m); // this the depth to output
+	    totalSitesL ++ ;
+
+        }
+        //putchar('\n');
+	cout<<endl;
+    }
+    
+    if (ret < 0){ //status = EXIT_FAILURE;
+	cerr<<"Problem parsing region:"<<region<<" in bamfile "<<bamfilename<<endl;
+	exit(1);
+    }
+    free(n_plp); free(plp);
+    bam_mplp_destroy(mplp);
+
+    if (all) {
+        // Handle terminating region
+        if (last_tid < 0 && reg && all > 1) {
+            last_tid = reg_tid;
+            last_pos = beg-1;
+        }
+        while (last_tid >= 0 && last_tid < h->n_targets) {
+            while (++last_pos < int(h->target_len[last_tid])) {
+                if (last_pos >= end) break;
+                if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
+                    continue;
+                fputs(h->target_name[last_tid], stdout); 
+		printf("\t%d", last_pos+1);
+                for (i = 0; i < n; i++)
+                    putchar('\t'), putchar('0');
+                putchar('\n');
+            }
+            last_tid++;
+            last_pos = -1;
+            if (all < 2 || reg)
+                break;
+        }
+    }
+
+    //depth_end:
+    for (i = 0; i < n && data[i]; ++i) {
+        bam_hdr_destroy(data[i]->hdr);
+        if (data[i]->fp) sam_close(data[i]->fp);
+        hts_itr_destroy(data[i]->iter);
+        free(data[i]);
+    }
+    free(data); 
+    
+    //free(reg);
+    if (bed) bed_destroy(bed);
+    // if ( file_list )
+    // {
+    //     for (i=0; i<n; i++) free(fn[i]);
+    //     free(fn);
+    // }
+    //sam_global_args_free(&ga);
+    //return status;
+
+
+    /*
     BamReader reader;
     if ( !reader.Open(bamFileToOpen) ) {
 	cerr << "Could not open input BAM file:" << bamFileToOpen <<endl;
@@ -3139,11 +3419,11 @@ void *mainCoverageComputationThread(void * argc){
 	if(rg2info.find(rg) == rg2info.end()){
 	    rgInfo toadd;
 	    toadd.isPe          = al.IsPaired();
-	    toadd.maxReadLength = MIN( MAX(al.Length,al.InsertSize), 255);
+	    toadd.maxReadLength = MIN2( MAX2(al.Length,al.InsertSize), 255);
 	    rg2info[rg]         = toadd;
 	}else{
 	    rg2info[rg].isPe          = rg2info[rg].isPe || al.IsPaired();
-	    rg2info[rg].maxReadLength = MIN( MAX( MAX(al.Length,al.InsertSize), rg2info[rg].maxReadLength ), 255);
+	    rg2info[rg].maxReadLength = MIN2( MAX2( MAX2(al.Length,al.InsertSize), rg2info[rg].maxReadLength ), 255);
 	}
 
 
@@ -3166,6 +3446,7 @@ void *mainCoverageComputationThread(void * argc){
 
 
     delete cv;
+    */
 	
 #ifdef COVERAGETVERBOSE    
     cerr<<"Thread #"<<rankThread <<" is done with computations"<<endl;
@@ -3508,7 +3789,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	    pTlower = pTlowerSecondHalf;
 	}
 
-	long double acceptance = min( (long double)(1.0)  , expl(x_i_1-x_i) );
+	long double acceptance = MIN2( (long double)(1.0)  , expl(x_i_1-x_i) );
 	if( (long double)(randomProb()) < acceptance){
 	    h_i           =  h_i_1;
 	    s_i           =  s_i_1;
@@ -4453,11 +4734,11 @@ int main (int argc, char *argv[]) {
 	    string s = stringify(it->first)+"\t"+stringify(it->second.isPe)+"\t"+stringify(it->second.maxReadLength)+"\n";
 	    
 	    if(it->second.isPe)
-		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)it->second.maxReadLength );
+		MAXLENGTHFRAGMENT   = MAX2( MAXLENGTHFRAGMENT , (unsigned int)it->second.maxReadLength );
 	    else
-		MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(it->second.maxReadLength) );
+		MAXLENGTHFRAGMENT   = MAX2( MAXLENGTHFRAGMENT , (unsigned int)(it->second.maxReadLength) );
 
-	    MAXLENGTHFRAGMENT = MIN( 255, MAXLENGTHFRAGMENT );//as the length is stored on 8 bits (for now)
+	    MAXLENGTHFRAGMENT = MIN2( 255, MAXLENGTHFRAGMENT );//as the length is stored on 8 bits (for now)
 	    
 	    //cerr<<"RG:\t" <<s<<endl;
 	    cerr<<"RG:\t"<<stringify(it->first)<<"\t"<<(it->second.isPe?"PE":"SE")<<"\t"<<stringify(it->second.maxReadLength)<<endl;
@@ -4495,11 +4776,11 @@ int main (int argc, char *argv[]) {
 		toadd.isPe          =                 (tempv[1]=="1");
 		toadd.maxReadLength = destringify<int>(tempv[2]);
 		if(toadd.isPe)
-		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)toadd.maxReadLength );
+		    MAXLENGTHFRAGMENT   = MAX2( MAXLENGTHFRAGMENT , (unsigned int)toadd.maxReadLength );
 		else
-		    MAXLENGTHFRAGMENT   = MAX( MAXLENGTHFRAGMENT , (unsigned int)(toadd.maxReadLength) );
+		    MAXLENGTHFRAGMENT   = MAX2( MAXLENGTHFRAGMENT , (unsigned int)(toadd.maxReadLength) );
 
-		MAXLENGTHFRAGMENT = MIN( 255, MAXLENGTHFRAGMENT );//as the length is stored on 8 bits (for now)
+		MAXLENGTHFRAGMENT = MIN2( 255, MAXLENGTHFRAGMENT );//as the length is stored on 8 bits (for now)
 		
 		rg2info[ tempv[0] ] = toadd;
 
@@ -5216,7 +5497,7 @@ int main (int argc, char *argv[]) {
 						     (heteroEstResults[c].h ),
 						     // ( (heteroEstResults[c].h )-6.0188e-05),
 						     // ( (heteroEstResults[c].h )+6.0188e-05),				   				   
-						     MAX(heteroEstResults[c].hlow,0),
+						     MAX2(heteroEstResults[c].hlow,0),
 						     heteroEstResults[c].hhigh,
 						     minHFoundPlotting,//0.0,//double( minSegSitesPer1M )/double(1000000),
 						     maxHFoundPlotting, // 0.00500    = 4*2e-8*62500
@@ -5391,12 +5672,12 @@ int main (int argc, char *argv[]) {
 	//fileSummary << "\t" <<"total\tfraction in %"<<endl;
 	fileSummary << "Segments unclassified    :\t"<<hmmResmid.unsureSegments <<" ("<<MIN3( hmmResmin.unsureSegments, hmmResmid.unsureSegments, hmmResmax.unsureSegments)<<","<<MAX3( hmmResmin.unsureSegments, hmmResmid.unsureSegments, hmmResmax.unsureSegments)<<")"<<endl;
 	fileSummary << "Segments unclassified (%):\t"<<100* (double(hmmResmid.unsureSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments))<<" ("<<
-	  100* MIN(1.0,
+	  100* MIN2(1.0,
 		   double(MIN3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
 		   double(MAX3(hmmResmin.rohSegments+hmmResmin.nonrohSegments+hmmResmin.unsureSegments,
 			      hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments,
 			       hmmResmax.rohSegments+hmmResmax.nonrohSegments+hmmResmax.unsureSegments)))<<","<<
-	  100* MIN(1.0,double(MAX3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
+	  100* MIN2(1.0,double(MAX3(hmmResmin.unsureSegments,hmmResmid.unsureSegments,hmmResmax.unsureSegments))/
 		  double(MIN3(hmmResmin.rohSegments+hmmResmin.nonrohSegments+hmmResmin.unsureSegments,
 			      hmmResmid.rohSegments+hmmResmid.nonrohSegments+hmmResmid.unsureSegments,
 			      hmmResmax.rohSegments+hmmResmax.nonrohSegments+hmmResmax.unsureSegments)))<<")"
@@ -5406,19 +5687,19 @@ int main (int argc, char *argv[]) {
 
 	fileSummary << "Segments in ROH          :\t"      <<hmmResmid.rohSegments    <<" ("<<MIN3( hmmResmin.rohSegments, hmmResmid.rohSegments, hmmResmax.rohSegments)<<","<<MAX3( hmmResmin.rohSegments, hmmResmid.rohSegments, hmmResmax.rohSegments)<<")"<<endl;
 	fileSummary << "Segments in ROH(%)       :\t"      <<100*double(hmmResmid.rohSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments)<<" ("<<
-	  100*MIN(1.0,double(MIN3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
+	  100*MIN2(1.0,double(MIN3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
 		  double( MAX3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments) , (hmmResmid.rohSegments+hmmResmin.nonrohSegments) , (hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 		    <<","<<
-	  100*MIN(1.0,double(MAX3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
+	  100*MIN2(1.0,double(MAX3(hmmResmin.rohSegments,hmmResmid.rohSegments,hmmResmax.rohSegments))/
 		  double( MIN3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 	    <<")"<<endl;
 
 	fileSummary << "Segments in non-ROH      :\t"  <<hmmResmid.nonrohSegments <<" ("<<MIN3( hmmResmin.nonrohSegments, hmmResmid.nonrohSegments, hmmResmax.nonrohSegments)<<","<<MAX3( hmmResmin.nonrohSegments, hmmResmid.nonrohSegments, hmmResmax.nonrohSegments)<<")"<<endl;
 	fileSummary << "Segments in non-ROH (%)  :\t"  <<100*double(hmmResmid.nonrohSegments)/double(hmmResmid.rohSegments+hmmResmid.nonrohSegments)<<" ("<<	    
-	  100*MIN(1.0,double(MIN3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
+	  100*MIN2(1.0,double(MIN3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
 		  double( MAX3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 		    <<","<<
-	  100*MIN(1.0,double(MAX3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
+	  100*MIN2(1.0,double(MAX3(hmmResmin.nonrohSegments,hmmResmid.nonrohSegments,hmmResmax.nonrohSegments))/
 		  double( MIN3( (hmmResmin.rohSegments+hmmResmin.nonrohSegments),(hmmResmid.rohSegments+hmmResmin.nonrohSegments),(hmmResmax.rohSegments+hmmResmin.nonrohSegments))))
 		    <<")"<<endl;
 
