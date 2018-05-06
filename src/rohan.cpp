@@ -2974,24 +2974,27 @@ static int read_bamCOV(void *data, bam1_t *b){ // read level filters better go h
     while (1){
         ret = aux->iter? sam_itr_next(aux->fp, aux->iter, b) : sam_read1(aux->fp, aux->hdr, b);
         if ( ret<0 ) break;
-	int32_t qlen  = bam_cigar2qlen(b->core.n_cigar, bam_get_cigar(b));
+	int32_t qlen   = bam_cigar2qlen(b->core.n_cigar, bam_get_cigar(b));
+	int32_t isize  = b->core.n_cigar;
+	
         if ( b->core.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP) ) continue;
         if ( (int)b->core.qual < aux->min_mapQ ) continue;
         if ( aux->min_len && qlen < aux->min_len ) continue;
 	uint8_t *rgptr = bam_aux_get(b, "RG");
 	cerr<<"rg1 "<<rgptr<<endl;
+	cout<<"isize "<<isize<<endl;
 	if(rgptr){
-	    string rg = string( (const char*)(rg+1));
-	    //cerr<<"rg2 "<<rgstr<<endl;
+	    string rg = string( (const char*)(rgptr+1));
+	    cerr<<"rg2 "<<rg<<endl;
 
 	    if(rg2info.find(rg) == rg2info.end()){
 		rgInfo toadd;
 		toadd.isPe          = bam_is_paired( b); //al.IsPaired();
-		toadd.maxReadLength = MIN2( MAX2(qlen,al.InsertSize), 255);//TODO port InsertSize 
+		toadd.maxReadLength = MIN2( MAX2(qlen,isize), 255);
 		rg2info[rg]         = toadd;
 	    }else{
-		rg2info[rg].isPe          = rg2info[rg].isPe || al.IsPaired();
-		rg2info[rg].maxReadLength = MIN2( MAX2( MAX2(al.Length,al.InsertSize), rg2info[rg].maxReadLength ), 255);
+		rg2info[rg].isPe          = rg2info[rg].isPe || bam_is_paired(b); //al.IsPaired();
+		rg2info[rg].maxReadLength = MIN2( MAX2( MAX2(qlen,isize), rg2info[rg].maxReadLength ), 255);
 	    }
 	    
 	}
