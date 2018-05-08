@@ -2501,6 +2501,45 @@ private:
 
 
 
+static int read_bamHET(void *data, bam1_t *b){ // read level filters better go here to avoid pileup
+    //cerr<<"read_bamCOV"<<endl;
+    aux_t *aux = (aux_t*)data; // data in fact is a pointer to an auxiliary structure
+    int ret;
+    while (1){
+        ret = aux->iter? sam_itr_next(aux->fp, aux->iter, b) : sam_read1(aux->fp, aux->hdr, b);
+        if ( ret<0 ) break;
+	int32_t qlen   = bam_cigar2qlen(b->core.n_cigar, bam_get_cigar(b));
+	int32_t isize  = b->core.n_cigar;
+	
+        if ( b->core.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP) ) continue;
+        if ( (int)b->core.qual < aux->min_mapQ ) continue;
+        if ( aux->min_len && qlen < aux->min_len ) continue;
+	uint8_t *rgptr = bam_aux_get(b, "RG");
+	// cerr<<"rg1 "<<rgptr<<endl;
+	// cout<<"isize "<<isize<<endl;
+	if(rgptr){
+	    string rg = string( (const char*)(rgptr+1));
+	    //cerr<<"rg2 "<<rg<<endl;
+	    
+	    if(rg2info.find(rg) == rg2info.end()){
+		rgInfo toadd;
+		toadd.isPe          = bam_is_paired( b); //al.IsPaired();
+		toadd.maxReadLength = MIN2( MAX2(qlen,isize), 255);
+		rg2info[rg]         = toadd;
+	    }else{
+		rg2info[rg].isPe          = rg2info[rg].isPe || bam_is_paired(b); //al.IsPaired();
+		rg2info[rg].maxReadLength = MIN2( MAX2( MAX2(qlen,isize), rg2info[rg].maxReadLength ), 255);
+	    }
+	    
+	}
+	if(specifiedDeam){
+	    if( bam_is_paired( b) ) continue; //skip paired-end reads because we cannot get proper deamination
+	}
+
+        break;
+    }
+    return ret;
+}
 
 
 
@@ -2700,76 +2739,333 @@ void *mainHeteroComputationThread(void * argc){
 
     vector<positionInformation> * piForGenomicWindow = new vector<positionInformation> ();
 
+
+
+    string bamfilename = bamFileToOpen;
+    string region      = currentChunk->rangeGen.getChrName()+":"+stringify(currentChunk->rangeGen.getStartCoord())+"-"+stringify(currentChunk->rangeGen.getEndCoord());
+    string bedfilename = "";
+    //int bamdepth( const string &   bamfilename, const string & region, const string & bedfilename){
+       
+
+    int i, n, tid, reg_tid, beg, end, pos, *n_plp, baseQ = 0, mapQ = 0, min_len = MINLENGTHFRAGMENT;
+    //int all = 0, status = EXIT_SUCCESS, nfiles, max_depth = -1;
+    int all = 0; //status = EXIT_SUCCESS, 
+    //int max_depth = -1;
+    int max_depth = MAXCOV;
+    const bam_pileup1_t **plp;
+    bool reg = !region.empty();
+    //bool bed = !bedfilename.empty();
+    //char *reg = 0; // specified region
+    void *bed = 0; // BED data structure
+    if(!bedfilename.empty()){
+	bed = bed_read(bedfilename.c_str()); // BED or position list file can be parsed now
+    }
+
+    bam_hdr_t *h = NULL; // BAM header of the 1st input
+    aux_t **data;
+    bam_mplp_t mplp;
+    int last_pos = -1, last_tid = -1, ret;
+
+    n =1;
+
+    
+    data = (aux_t **)calloc(1, sizeof(aux_t*)); // data[i] for the i-th input
+    reg_tid = 0; beg = 0; end = INT_MAX;  // set the default region
+
+    for (i = 0; i < n; ++i) {
+	//cerr<<"i ="<<i<<endl;
+	//for (i = 0; i < 1; ++i) {
+        int rf;
+        data[i] = (aux_t *)calloc(1, sizeof(aux_t));
+
+	//cerr<<"bamfilename1 "<<bamfilename<<endl;
+
+	data[i]->fp = sam_open_format(bamfilename.c_str(), "r", NULL); // open BAM
+	//cerr<<"bamfilename2 "<<bamfilename<<endl;
+        if (data[i]->fp == NULL) {
+	    cerr<<"Could not open \""<<bamfilename<<"\""<<endl;
+	    exit(1);
+            //status = EXIT_FAILURE;
+            //goto depth_end;
+        }
+        rf = SAM_FLAG | SAM_RNAME | SAM_POS | SAM_MAPQ | SAM_CIGAR | SAM_SEQ;
+        if (baseQ) rf |= SAM_QUAL;
+        // if (hts_set_opt(data[i]->fp, CRAM_OPT_REQUIRED_FIELDS, rf)) {
+        //     fprintf(stderr, "Failed to set CRAM_OPT_REQUIRED_FIELDS value\n");
+        //     return 1;
+        // }
+        // if (hts_set_opt(data[i]->fp, CRAM_OPT_DECODE_MD, 0)) {
+        //     fprintf(stderr, "Failed to set CRAM_OPT_DECODE_MD value\n");
+        //     return 1;
+        // }
+        data[i]->min_mapQ = mapQ;                    // set the mapQ filter
+        data[i]->min_len  = min_len;                 // set the qlen filter
+        data[i]->hdr = sam_hdr_read(data[i]->fp);    // read the BAM header
+        
+	if (data[i]->hdr == NULL) {
+	    cerr<<"Could not read header for \""<<bamfilename<<"\""<<endl;
+	    exit(1);
+            //status = EXIT_FAILURE;
+            //goto depth_end;
+        }
+        if (reg) { // if a region is specified
+	//if (true) { // if a region is specified
+            //hts_idx_t *idx = sam_index_load(data[i]->fp, argv[optind+i]);  // load the index
+	    hts_idx_t *idx = sam_index_load(data[i]->fp, bamfilename.c_str());  // load the index
+            if (idx == NULL) {
+                //print_error("depth", "can't load index for \"%s\"", argv[optind+i]);
+		cerr<<"cannot load index for \""<<bamfilename<<"\""<<endl;
+		exit(1);
+                //status = EXIT_FAILURE;
+                //goto depth_end;
+            }else{
+		//cerr<<"index ok"<<endl;
+	    }
+            data[i]->iter = sam_itr_querys(idx, data[i]->hdr, region.c_str()); // set the iterator
+            hts_idx_destroy(idx); // the index is not needed any more; free the memory
+            if (data[i]->iter == NULL) {
+                //print_error("depth", "can't parse region \"%s\"", reg);
+		cerr<<"cannot parse region \""<<region<<"\""<<endl;
+		exit(1);
+                //status = EXIT_FAILURE;
+                //goto depth_end;
+            }else{
+		//cerr<<"region ok"<<endl;
+	    }
+        }
+    }
+
+    h = data[0]->hdr; // easy access to the header of the 1st BAM
+    if (reg) {
+    //if(true){
+        beg     = data[0]->iter->beg; // and to the parsed region coordinates
+        end     = data[0]->iter->end;
+        reg_tid = data[0]->iter->tid;
+    }
+
+    // the core multi-pileup loop
+    mplp = bam_mplp_init(n, read_bamHET, (void**)data); // initialization
+    if (0 < max_depth)
+        bam_mplp_set_maxcnt(mplp,max_depth);  // set maximum coverage depth
+    else if (!max_depth)
+        bam_mplp_set_maxcnt(mplp,INT_MAX);
+    n_plp = (int *)calloc(n, sizeof(int)); // n_plp[i] is the number of covering reads from the i-th BAM
+    plp   = (const bam_pileup1_t **)calloc(n, sizeof(bam_pileup1_t*)); // plp[i] points to the array of covering reads (internal in mplp)
+
+    while ((ret=bam_mplp_auto(mplp, &tid, &pos, n_plp, plp)) > 0) { // come to the next covered position
+        if (pos < beg || pos >= end) continue; // out of range; skip
+        if (tid >= h->n_targets) continue;     // diff number of @SQ lines per file?
+        if (all) {
+            while (tid > last_tid) {
+                if (last_tid >= 0 && !reg) {
+                    // Deal with remainder or entirety of last tid.
+                    while (++last_pos < int(h->target_len[last_tid])) {
+                        // // Horribly inefficient, but the bed API is an obfuscated black box.
+                        if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
+                            continue;
+                        fputs(h->target_name[last_tid], stdout); 
+			//printf("\t%d", last_pos+1);
+                        // for (i = 0; i < n; i++)
+                        //     putchar('\t'), putchar('0');
+                        // putchar('\n');
+                    }
+                }
+                last_tid++;
+                last_pos = -1;
+                if (all < 2)
+                    break;
+            }
+
+            // Deal with missing portion of current tid
+            while (++last_pos < pos) {
+                if (last_pos < beg) continue; // out of range; skip
+                if (bed && bed_overlap(bed, h->target_name[tid], last_pos, last_pos + 1) == 0)
+                    continue;
+                fputs(h->target_name[tid], stdout); 
+		//printf("\t%d", last_pos+1);
+                // for (i = 0; i < n; i++)
+                //     putchar('\t'), putchar('0');
+                // putchar('\n');
+            }
+
+            last_tid = tid;
+            last_pos = pos;
+        }
+	if (bed && bed_overlap(bed, h->target_name[tid], pos, pos + 1) == 0) continue;
+        //fputs(h->target_name[tid], stdout); 
+	//printf("\t%d\t", pos+1); // a customized printf() would be faster
+        for (i = 0; i < n; ++i) { // base level filters have to go here
+            int j;
+	    int m = 0;//amount of invalid bases at site j that need to be removed from coverage calculations
+	    
+            for (j = 0; j < n_plp[i]; ++j) {
+                const bam_pileup1_t *p = plp[i] + j; // DON'T modfity plp[][] unless you really know
+		//base level filters go here
+		if (p->is_del || p->is_refskip) 
+		    ++m; // having dels or refskips at tid:pos
+                else 
+		    if(bam_get_qual(p->b)[p->qpos] < baseQ) 
+			++m; // low base quality
+		
+#ifdef NOTDEF
+		// printf("%d,",p->b);
+		// printf("%d,",bam_get_seq(p->b));
+		// @discussion Each base is encoded in 4 bits: 1 for A, 2 for C, 4 for G,
+		//  8 for T and 15 for N. Two bases are packed in one byte with the base
+		//  at the higher 4 bits having smaller coordinate on the read. It is
+		//  recommended to use bam_seqi() macro to get the base.
+		//  */
+		//coord
+		//printf("%d,",p->qpos);
+		cout<<p->qpos<<",";
+		//flag
+		//printf("%d,",(p->b)->core.flag);
+		cout<<((p->b)->core.flag)<<",";
+		//base
+		//printf("%d,",bam_seqi(bam_get_seq(p->b),p->qpos));
+		//printf("%c,",alphabet[ bam_seqi(bam_get_seq(p->b),p->qpos) ]);
+		cout<<alphabet[ bam_seqi(bam_get_seq(p->b),p->qpos) ]<<",";
+		
+		//int c = seq_nt16_int[bam_seqi(seq, p->qpos)];
+		//qual
+		//printf("%d,",bam_get_qual(p->b)[p->qpos]);
+		cout<<int(bam_get_qual(p->b)[p->qpos])<<",";
+		//strand
+		//printf("%d,",bam_is_rev(p->b));
+		cout<<bam_is_rev(p->b)<<",";
+		
+		//paired
+		//printf("%d,",bam_is_paired(p->b));
+		cout<<bam_is_paired(p->b)<<",";
+		cout<<"D="<<p->is_del<<",RS="<<p->is_refskip<<",";
+		//fail
+		//printf("%d-",bam_is_failed(p->b));
+		cout<<bam_is_failed(p->b)<<"-";
+#endif
+            }
+            //printf("\tc=%d", n_plp[i] - m); // this the depth to output
+	    //cout<<(n_plp[i] - m); // this the depth to output
+	    totalBasesL += (n_plp[i] - m); // this the depth to output
+	    totalSitesL ++ ;
+
+        }
+        //putchar('\n');
+	//cout<<endl;
+    }
+    
+    if (ret < 0){ //status = EXIT_FAILURE;
+	cerr<<"Problem parsing region:"<<region<<" in bamfile "<<bamfilename<<endl;
+	exit(1);
+    }
+    free(n_plp); free(plp);
+    bam_mplp_destroy(mplp);
+
+    if (all) {
+        // Handle terminating region
+        if (last_tid < 0 && reg && all > 1) {
+            last_tid = reg_tid;
+            last_pos = beg-1;
+        }
+        while (last_tid >= 0 && last_tid < h->n_targets) {
+            while (++last_pos < int(h->target_len[last_tid])) {
+                if (last_pos >= end) break;
+                if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
+                    continue;
+                fputs(h->target_name[last_tid], stdout); 
+		printf("\t%d", last_pos+1);
+                for (i = 0; i < n; i++)
+                    putchar('\t'), putchar('0');
+                putchar('\n');
+            }
+            last_tid++;
+            last_pos = -1;
+            if (all < 2 || reg)
+                break;
+        }
+    }
+
+    //depth_end:
+    for (i = 0; i < n && data[i]; ++i) {
+        bam_hdr_destroy(data[i]->hdr);
+        if (data[i]->fp) sam_close(data[i]->fp);
+        hts_itr_destroy(data[i]->iter);
+        free(data[i]);
+    }
+    free(data); 
+    
+    //free(reg);
+    if (bed) bed_destroy(bed);
+
     //dataToWrite->dataToWriteOut=new vector<PositionResult *>();
-    heteroComputerVisitor* hv = new heteroComputerVisitor(references,
-							  refID,
-							  currentChunk->rangeGen.getStartCoord(), 
-							  currentChunk->rangeGen.getEndCoord()  ,
-							  // dataToWrite->vecPositionResults,
-							  rankThread,
-							  piForGenomicWindow,
-							  &fastaReference);
+    // heteroComputerVisitor* hv = new heteroComputerVisitor(references,
+    // 							  refID,
+    // 							  currentChunk->rangeGen.getStartCoord(), 
+    // 							  currentChunk->rangeGen.getEndCoord()  ,
+    // 							  // dataToWrite->vecPositionResults,
+    // 							  rankThread,
+    // 							  piForGenomicWindow,
+    // 							  &fastaReference);
 
     
 
-    PileupEngine pileup;
-    pileup.AddVisitor(hv);
+    // PileupEngine pileup;
+    // pileup.AddVisitor(hv);
 
-    BamAlignment al;
-    //unsigned int numReads=0;
-    //cerr<<MINLENGTHFRAGMENT<<" "<<MAXLENGTHFRAGMENT<<endl;
-    while ( reader.GetNextAlignment(al) ) {
-        //cout<<"mainHeteroComputationThread al.Name="<<al.Name<<endl;
+    // BamAlignment al;
+    // //unsigned int numReads=0;
+    // //cerr<<MINLENGTHFRAGMENT<<" "<<MAXLENGTHFRAGMENT<<endl;
+    // while ( reader.GetNextAlignment(al) ) {
+    //     //cout<<"mainHeteroComputationThread al.Name="<<al.Name<<endl;
 
-	//if we have specified deamination rates	
-	if(specifiedDeam){
-	    if( al.IsPaired() ) continue; //skip paired-end reads because we cannot get proper deamination
-	    string rg;
-	    if(al.HasTag("RG")) {
-		if(!al.GetTag("RG",rg) ){ 
-		    cerr << "Heterozygosity computation: could not retrieve the RG tag from  "<<al.Name<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<endl;
-		    exit(1);	
-		}
-	    }else{
-		rg="NA";
-	    }
+    // 	//if we have specified deamination rates	
+    // 	if(specifiedDeam){
+    // 	    if( al.IsPaired() ) continue; //skip paired-end reads because we cannot get proper deamination
+    // 	    string rg;
+    // 	    if(al.HasTag("RG")) {
+    // 		if(!al.GetTag("RG",rg) ){ 
+    // 		    cerr << "Heterozygosity computation: could not retrieve the RG tag from  "<<al.Name<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<endl;
+    // 		    exit(1);	
+    // 		}
+    // 	    }else{
+    // 		rg="NA";
+    // 	    }
 
-	    //The goal of the code below is to avoid having 
-	    //fragments for which we cannot quantify misincorporations
-	    //due to deamination at a given position
-	    if(rg2info.find(rg) == rg2info.end()){
-		cerr << "Heterozygosity computation: found an unknown RG tag from  "<<al.Name<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<endl;
-		exit(1);	
-	    }else{
-		if(!rg2info[rg].isPe){ //if single end
-		    if(al.Length == rg2info[rg].maxReadLength){//probably reached the end of the read length, we will keep maxlength-1 and under		
-			//cerr<<"name "<<al.Name<<"\t"<<rg<<endl;
-			continue;
-		    }
-		}else{
-		    //since we skipped the paired reads, if we have reached here
-		    //we can add single-end fragments 		    
-		}
-	    }
-	}
+    // 	    //The goal of the code below is to avoid having 
+    // 	    //fragments for which we cannot quantify misincorporations
+    // 	    //due to deamination at a given position
+    // 	    if(rg2info.find(rg) == rg2info.end()){
+    // 		cerr << "Heterozygosity computation: found an unknown RG tag from  "<<al.Name<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<endl;
+    // 		exit(1);	
+    // 	    }else{
+    // 		if(!rg2info[rg].isPe){ //if single end
+    // 		    if(al.Length == rg2info[rg].maxReadLength){//probably reached the end of the read length, we will keep maxlength-1 and under		
+    // 			//cerr<<"name "<<al.Name<<"\t"<<rg<<endl;
+    // 			continue;
+    // 		    }
+    // 		}else{
+    // 		    //since we skipped the paired reads, if we have reached here
+    // 		    //we can add single-end fragments 		    
+    // 		}
+    // 	    }
+    // 	}
 
-	if(al.Length>=int(MINLENGTHFRAGMENT) &&
-	   al.Length<=int(MAXLENGTHFRAGMENT) ){	   
-	    pileup.AddAlignment(al);
-	}// else{
-	//     cout<<"removed "<<al.Name<<endl;
-	// }
-    }
+    // 	if(al.Length>=int(MINLENGTHFRAGMENT) &&
+    // 	   al.Length<=int(MAXLENGTHFRAGMENT) ){	   
+    // 	    pileup.AddAlignment(al);
+    // 	}// else{
+    // 	//     cout<<"removed "<<al.Name<<endl;
+    // 	// }
+    // }
 
-    //clean up
-    pileup.Flush();
-    reader.Close();
+    // //clean up
+    // pileup.Flush();
+    // reader.Close();
     //fastaReference.Close();
     if(verbose){
 	rc = pthread_mutex_lock(&mutexCERR);
 	checkResults("pthread_mutex_lock()\n", rc);
 	
-	cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(hv->getTotalBases())<<" bases on "<<thousandSeparator(hv->getTotalSites())<<" sites average coverage: "<<(hv->getTotalSites()!=0 ? stringify(double(hv->getTotalBases())/double(hv->getTotalSites())) : "no sites found" )<<endl;
+	//cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(hv->getTotalBases())<<" bases on "<<thousandSeparator(hv->getTotalSites())<<" sites average coverage: "<<(hv->getTotalSites()!=0 ? stringify(double(hv->getTotalBases())/double(hv->getTotalSites())) : "no sites found" )<<endl;
 	
 	rc = pthread_mutex_unlock(&mutexCERR);
 	checkResults("pthread_mutex_unlock()\n", rc);
@@ -2779,7 +3075,7 @@ void *mainHeteroComputationThread(void * argc){
 
 
     delete hv;
-
+    //TODO populate piForGenomicWindow using htslib
 
     dataToWrite->hetEstResults = computeLL(piForGenomicWindow,
 					   dataToWrite->vecPositionResults,
@@ -2968,7 +3264,7 @@ queue< DataChunk * >  subFirstElemsQueue(const queue< DataChunk * > queueDataToS
 
 
 static int read_bamCOV(void *data, bam1_t *b){ // read level filters better go here to avoid pileup
-    cerr<<"read_bamCOV"<<endl;
+    //cerr<<"read_bamCOV"<<endl;
     aux_t *aux = (aux_t*)data; // data in fact is a pointer to an auxiliary structure
     int ret;
     while (1){
@@ -2981,12 +3277,12 @@ static int read_bamCOV(void *data, bam1_t *b){ // read level filters better go h
         if ( (int)b->core.qual < aux->min_mapQ ) continue;
         if ( aux->min_len && qlen < aux->min_len ) continue;
 	uint8_t *rgptr = bam_aux_get(b, "RG");
-	cerr<<"rg1 "<<rgptr<<endl;
-	cout<<"isize "<<isize<<endl;
+	// cerr<<"rg1 "<<rgptr<<endl;
+	// cout<<"isize "<<isize<<endl;
 	if(rgptr){
 	    string rg = string( (const char*)(rgptr+1));
-	    cerr<<"rg2 "<<rg<<endl;
-
+	    //cerr<<"rg2 "<<rg<<endl;
+	    
 	    if(rg2info.find(rg) == rg2info.end()){
 		rgInfo toadd;
 		toadd.isPe          = bam_is_paired( b); //al.IsPaired();
@@ -3235,10 +3531,10 @@ void *mainCoverageComputationThread(void * argc){
                         if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
                             continue;
                         fputs(h->target_name[last_tid], stdout); 
-			printf("\t%d", last_pos+1);
-                        for (i = 0; i < n; i++)
-                            putchar('\t'), putchar('0');
-                        putchar('\n');
+			//printf("\t%d", last_pos+1);
+                        // for (i = 0; i < n; i++)
+                        //     putchar('\t'), putchar('0');
+                        // putchar('\n');
                     }
                 }
                 last_tid++;
@@ -3253,18 +3549,18 @@ void *mainCoverageComputationThread(void * argc){
                 if (bed && bed_overlap(bed, h->target_name[tid], last_pos, last_pos + 1) == 0)
                     continue;
                 fputs(h->target_name[tid], stdout); 
-		printf("\t%d", last_pos+1);
-                for (i = 0; i < n; i++)
-                    putchar('\t'), putchar('0');
-                putchar('\n');
+		//printf("\t%d", last_pos+1);
+                // for (i = 0; i < n; i++)
+                //     putchar('\t'), putchar('0');
+                // putchar('\n');
             }
 
             last_tid = tid;
             last_pos = pos;
         }
 	if (bed && bed_overlap(bed, h->target_name[tid], pos, pos + 1) == 0) continue;
-        fputs(h->target_name[tid], stdout); 
-	printf("\t%d\t", pos+1); // a customized printf() would be faster
+        //fputs(h->target_name[tid], stdout); 
+	//printf("\t%d\t", pos+1); // a customized printf() would be faster
         for (i = 0; i < n; ++i) { // base level filters have to go here
             int j;
 	    int m = 0;//amount of invalid bases at site j that need to be removed from coverage calculations
@@ -3278,7 +3574,7 @@ void *mainCoverageComputationThread(void * argc){
 		    if(bam_get_qual(p->b)[p->qpos] < baseQ) 
 			++m; // low base quality
 		
-
+#ifdef NOTDEF
 		// printf("%d,",p->b);
 		// printf("%d,",bam_get_seq(p->b));
 		// @discussion Each base is encoded in 4 bits: 1 for A, 2 for C, 4 for G,
@@ -3312,16 +3608,16 @@ void *mainCoverageComputationThread(void * argc){
 		//fail
 		//printf("%d-",bam_is_failed(p->b));
 		cout<<bam_is_failed(p->b)<<"-";
-
+#endif
             }
             //printf("\tc=%d", n_plp[i] - m); // this the depth to output
-	    cout<<(n_plp[i] - m); // this the depth to output
+	    //cout<<(n_plp[i] - m); // this the depth to output
 	    totalBasesL += (n_plp[i] - m); // this the depth to output
 	    totalSitesL ++ ;
 
         }
         //putchar('\n');
-	cout<<endl;
+	//cout<<endl;
     }
     
     if (ret < 0){ //status = EXIT_FAILURE;
