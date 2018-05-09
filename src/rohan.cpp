@@ -20,7 +20,13 @@
 
 
 extern "C" {
+    //#include "tabix.h"
+    //#include "bam.h"
 #include "htslib/sam.h"
+#include "htslib/faidx.h"
+#include "htslib/tbx.h"
+
+
 #include "samtools.h"
 #include "sam_opts.h"
 #include "bedidx.h"
@@ -2502,7 +2508,7 @@ private:
 
 
 static int read_bamHET(void *data, bam1_t *b){ // read level filters better go here to avoid pileup
-    //cerr<<"read_bamCOV"<<endl;
+    //cerr<<"read_bamHET"<<endl;
     aux_t *aux = (aux_t*)data; // data in fact is a pointer to an auxiliary structure
     int ret;
     while (1){
@@ -2672,77 +2678,91 @@ void *mainHeteroComputationThread(void * argc){
     cerr<<"Thread #"<<rankThread<<" is reading BAM file: "<<bamFileToOpen<<endl;
 #endif
 
-    BamReader reader;
-    if ( !reader.Open(bamFileToOpen) ) {
-	cerr << "Could not open input BAM file:" << bamFileToOpen <<endl;
-    	exit(1);
-    }
+    // BamReader reader;
+    // if ( !reader.Open(bamFileToOpen) ) {
+    // 	cerr << "Could not open input BAM file:" << bamFileToOpen <<endl;
+    // 	exit(1);
+    // }
 
-    reader.LocateIndex();
+    // reader.LocateIndex();
 
-    if(!reader.HasIndex()){
-    	cerr << "The BAM file: " << bamFileToOpen <<" does not have an index"<<endl;
-    	exit(1);
-    }
+    // if(!reader.HasIndex()){
+    // 	cerr << "The BAM file: " << bamFileToOpen <<" does not have an index"<<endl;
+    // 	exit(1);
+    // }
 
-    // retrieve reference data
-    const RefVector  references = reader.GetReferenceData();
-    const int        refID      = reader.GetReferenceID( currentChunk->rangeGen.getChrName() );
+    // // retrieve reference data
+    // const RefVector  references = reader.GetReferenceData();
+    // const int        refID      = reader.GetReferenceID( currentChunk->rangeGen.getChrName() );
 
-#ifdef HETVERBOSE
-    cerr<<"Thread #"<<rankThread<<" refID   "<<refID<<endl;    
-    cerr<<"Thread #"<<rankThread<<" refName "<<references[refID].RefName<<endl;
-#endif
+// #ifdef HETVERBOSE
+//     cerr<<"Thread #"<<rankThread<<" refID   "<<refID<<endl;    
+//      cerr<<"Thread #"<<rankThread<<" refName "<<references[refID].RefName<<endl;
+// #endif
 
-    BamRegion bregion (refID, 
-		       currentChunk->rangeGen.getStartCoord(), 
-		       refID, 
-		       currentChunk->rangeGen.getEndCoord()   );
+    // BamRegion bregion (refID, 
+    // 		       currentChunk->rangeGen.getStartCoord(), 
+    // 		       refID, 
+    // 		       currentChunk->rangeGen.getEndCoord()   );
 
-    bool setRegionRes=reader.SetRegion( bregion   );
+    // bool setRegionRes=reader.SetRegion( bregion   );
 
     //if(verbose){
-    if(verbose){
-	rc = pthread_mutex_lock(&mutexCERR);
-	checkResults("pthread_mutex_lock()\n", rc);
+    // if(verbose){
+    // 	rc = pthread_mutex_lock(&mutexCERR);
+    // 	checkResults("pthread_mutex_lock()\n", rc);
 	
-	cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
+    // 	cerr<<"Thread #"<<rankThread<<" setting region: "<<references[refID].RefName<<":"<<currentChunk->rangeGen.getStartCoord()<<"-"<<currentChunk->rangeGen.getEndCoord()<<"\t"<<(setRegionRes?"success!":"failed")<<endl;
 	
-	rc = pthread_mutex_unlock(&mutexCERR);
-	checkResults("pthread_mutex_unlock()\n", rc);
-    }
+    // 	rc = pthread_mutex_unlock(&mutexCERR);
+    // 	checkResults("pthread_mutex_unlock()\n", rc);
+    // }
     
     //}
 #ifdef HETVERBOSE
 
 #endif
 
-    if( refID==-1 ||
-       !setRegionRes){
-    	cerr << "Heterozygous computation: could not set region "<<currentChunk->rangeGen<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<" "<< currentChunk->rangeGen.getEndCoord()<< endl;
-    	exit(1);
-    }
+    // if( refID==-1 ||
+    //    !setRegionRes){
+    // 	cerr << "Heterozygous computation: could not set region "<<currentChunk->rangeGen<<" for BAM file:" << bamFileToOpen <<" "<<currentChunk->rangeGen.getStartCoord()<<" "<< currentChunk->rangeGen.getEndCoord()<< endl;
+    // 	exit(1);
+    // }
 
     DataToWrite  * dataToWrite = new DataToWrite();
     //cout<<"range1 "<<currentChunk->rangeGen<<endl;
     dataToWrite->rangeGen      =  currentChunk->rangeGen;
     //cout<<"range2 "<<currentChunk->rangeGen<<endl;
     dataToWrite->rank          =  currentChunk->rank;
-    dataToWrite->refID         =  refID;
+    //dataToWrite->refID         =  refID;
 
-    Fasta fastaReference;
-    
-    if ( !fastaReference.Open(fastaFile , fastaIndex) ){        //from bamtools
+    string region      = currentChunk->rangeGen.getChrName()+":"+stringify(currentChunk->rangeGen.getStartCoord())+"-"+stringify(currentChunk->rangeGen.getEndCoord());
+
+    faidx_t *fai = fai_load(fastaFile.c_str());
+   
+    if ( !fai ) {
          cerr << "ERROR: failed to open fasta file " <<fastaFile<<" and fasta index " << fastaIndex<<""<<endl;
          exit(1);
-     }
+    }
+    int seq_len;
+    char *seq = fai_fetch(fai, region.c_str(), &seq_len);
+    if ( seq_len < 0 ) {
+	cerr << "ERROR: failed to retrieve sequence from fasta file " <<fastaFile<<" and fasta index " << fastaIndex<<" and region "<<region<<endl;
+         exit(1);
+    }
+
+    // Fasta fastaReference;
+    
+    // if ( !fastaReference.Open(fastaFile , fastaIndex) ){        //from bamtools
+    //      cerr << "ERROR: failed to open fasta file " <<fastaFile<<" and fasta index " << fastaIndex<<""<<endl;
+    //      exit(1);
+    //  }
 
     vector<positionInformation> * piForGenomicWindow = new vector<positionInformation> ();
 
 
 
     string bamfilename = bamFileToOpen;
-    string region      = currentChunk->rangeGen.getChrName()+":"+stringify(currentChunk->rangeGen.getStartCoord())+"-"+stringify(currentChunk->rangeGen.getEndCoord());
     string bedfilename = "";
     //int bamdepth( const string &   bamfilename, const string & region, const string & bedfilename){
        
@@ -2768,9 +2788,13 @@ void *mainHeteroComputationThread(void * argc){
 
     n =1;
 
+    unsigned int totalBasesL=0;//=cv->getTotalBases();
+    unsigned int totalSitesL=0; //=cv->getTotalSites();
+
     
     data = (aux_t **)calloc(1, sizeof(aux_t*)); // data[i] for the i-th input
     reg_tid = 0; beg = 0; end = INT_MAX;  // set the default region
+    // bam_hdr_t *hin;
 
     for (i = 0; i < n; ++i) {
 	//cerr<<"i ="<<i<<endl;
@@ -2782,12 +2806,21 @@ void *mainHeteroComputationThread(void * argc){
 
 	data[i]->fp = sam_open_format(bamfilename.c_str(), "r", NULL); // open BAM
 	//cerr<<"bamfilename2 "<<bamfilename<<endl;
+        
+
         if (data[i]->fp == NULL) {
 	    cerr<<"Could not open \""<<bamfilename<<"\""<<endl;
 	    exit(1);
             //status = EXIT_FAILURE;
             //goto depth_end;
         }
+	// hin = sam_hdr_read(fp[i]);
+	// if (hin == NULL) {
+	//     cerr<<"Could not read header from  \""<<bamfilename<<"\""<<endl;
+	//     exit(1);
+        // }
+
+
         rf = SAM_FLAG | SAM_RNAME | SAM_POS | SAM_MAPQ | SAM_CIGAR | SAM_SEQ;
         if (baseQ) rf |= SAM_QUAL;
         // if (hts_set_opt(data[i]->fp, CRAM_OPT_REQUIRED_FIELDS, rf)) {
@@ -2810,8 +2843,14 @@ void *mainHeteroComputationThread(void * argc){
         }
         if (reg) { // if a region is specified
 	//if (true) { // if a region is specified
-            //hts_idx_t *idx = sam_index_load(data[i]->fp, argv[optind+i]);  // load the index
+            // hts_idx_t *idx = sam_index_load(data[i]->fp, argv[optind+i]);  // load the index
 	    hts_idx_t *idx = sam_index_load(data[i]->fp, bamfilename.c_str());  // load the index
+	    // //int testingIDX = ti_get_tid( (const ti_index_t* )idx, currentChunk->rangeGen.getChrName().c_str()); // set the iterator
+	    // //int testingIDX = get_tid( (const tbx_t* )idx, currentChunk->rangeGen.getChrName().c_str(),0); // set the iterator
+	    // int32_t tempREFID = bam_get_tid(data[i]->hdr, currentChunk->rangeGen.getChrName().c_str() ); // set the iterator
+	    // cout<<"tempREFID "<<tempREFID<<endl;
+	    // dataToWrite->refID         =  tempREFID;
+	    // exit(1);
             if (idx == NULL) {
                 //print_error("depth", "can't load index for \"%s\"", argv[optind+i]);
 		cerr<<"cannot load index for \""<<bamfilename<<"\""<<endl;
@@ -2832,6 +2871,18 @@ void *mainHeteroComputationThread(void * argc){
             }else{
 		//cerr<<"region ok"<<endl;
 	    }
+
+	    if(verbose){
+		rc = pthread_mutex_lock(&mutexCERR);
+		checkResults("pthread_mutex_lock()\n", rc);
+	
+		cerr<<"Thread #"<<rankThread<<" setting region: "<<region<<"\t"<<"success!"<<endl;
+	
+		rc = pthread_mutex_unlock(&mutexCERR);
+		checkResults("pthread_mutex_unlock()\n", rc);
+	    }
+
+
         }
     }
 
@@ -2841,6 +2892,7 @@ void *mainHeteroComputationThread(void * argc){
         beg     = data[0]->iter->beg; // and to the parsed region coordinates
         end     = data[0]->iter->end;
         reg_tid = data[0]->iter->tid;
+	dataToWrite->refID = reg_tid ;
     }
 
     // the core multi-pileup loop
@@ -2855,42 +2907,44 @@ void *mainHeteroComputationThread(void * argc){
     while ((ret=bam_mplp_auto(mplp, &tid, &pos, n_plp, plp)) > 0) { // come to the next covered position
         if (pos < beg || pos >= end) continue; // out of range; skip
         if (tid >= h->n_targets) continue;     // diff number of @SQ lines per file?
-        if (all) {
-            while (tid > last_tid) {
-                if (last_tid >= 0 && !reg) {
-                    // Deal with remainder or entirety of last tid.
-                    while (++last_pos < int(h->target_len[last_tid])) {
-                        // // Horribly inefficient, but the bed API is an obfuscated black box.
-                        if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
-                            continue;
-                        fputs(h->target_name[last_tid], stdout); 
-			//printf("\t%d", last_pos+1);
-                        // for (i = 0; i < n; i++)
-                        //     putchar('\t'), putchar('0');
-                        // putchar('\n');
-                    }
-                }
-                last_tid++;
-                last_pos = -1;
-                if (all < 2)
-                    break;
-            }
+	//cout<<pos<<endl;
+        // if (all) {
+        //     while (tid > last_tid) {
+        //         if (last_tid >= 0 && !reg) {
+        //             // Deal with remainder or entirety of last tid.
+        //             while (++last_pos < int(h->target_len[last_tid])) {
+        //                 // // Horribly inefficient, but the bed API is an obfuscated black box.
+        //                 if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
+        //                     continue;
+        //                 //fputs(h->target_name[last_tid], stdout); 
+	// 		//printf("\t%d", last_pos+1);
+	// 		//cout<<(last_pos+1)<<endl;
+        //                 // for (i = 0; i < n; i++)
+        //                 //     putchar('\t'), putchar('0');
+        //                 // putchar('\n');
+        //             }
+        //         }
+        //         last_tid++;
+        //         last_pos = -1;
+        //         if (all < 2)
+        //             break;
+        //     }
 
-            // Deal with missing portion of current tid
-            while (++last_pos < pos) {
-                if (last_pos < beg) continue; // out of range; skip
-                if (bed && bed_overlap(bed, h->target_name[tid], last_pos, last_pos + 1) == 0)
-                    continue;
-                fputs(h->target_name[tid], stdout); 
-		//printf("\t%d", last_pos+1);
-                // for (i = 0; i < n; i++)
-                //     putchar('\t'), putchar('0');
-                // putchar('\n');
-            }
+        //     // Deal with missing portion of current tid
+        //     while (++last_pos < pos) {
+        //         if (last_pos < beg) continue; // out of range; skip
+        //         if (bed && bed_overlap(bed, h->target_name[tid], last_pos, last_pos + 1) == 0)
+        //             continue;
+        //         fputs(h->target_name[tid], stdout); 
+	// 	//printf("\t%d", last_pos+1);
+        //         // for (i = 0; i < n; i++)
+        //         //     putchar('\t'), putchar('0');
+        //         // putchar('\n');
+        //     }
 
-            last_tid = tid;
-            last_pos = pos;
-        }
+        //     last_tid = tid;
+        //     last_pos = pos;
+        // }
 	if (bed && bed_overlap(bed, h->target_name[tid], pos, pos + 1) == 0) continue;
         //fputs(h->target_name[tid], stdout); 
 	//printf("\t%d\t", pos+1); // a customized printf() would be faster
@@ -2898,6 +2952,9 @@ void *mainHeteroComputationThread(void * argc){
             int j;
 	    int m = 0;//amount of invalid bases at site j that need to be removed from coverage calculations
 	    
+    
+	    totalSitesL++; //=cv->getTotalSites();
+
             for (j = 0; j < n_plp[i]; ++j) {
                 const bam_pileup1_t *p = plp[i] + j; // DON'T modfity plp[][] unless you really know
 		//base level filters go here
@@ -2906,7 +2963,8 @@ void *mainHeteroComputationThread(void * argc){
                 else 
 		    if(bam_get_qual(p->b)[p->qpos] < baseQ) 
 			++m; // low base quality
-		
+	
+		totalBasesL++;//=cv->getTotalBases();
 #ifdef NOTDEF
 		// printf("%d,",p->b);
 		// printf("%d,",bam_get_seq(p->b));
@@ -2995,6 +3053,8 @@ void *mainHeteroComputationThread(void * argc){
     
     //free(reg);
     if (bed) bed_destroy(bed);
+    free(seq);
+    fai_destroy(fai);
 
     //dataToWrite->dataToWriteOut=new vector<PositionResult *>();
     // heteroComputerVisitor* hv = new heteroComputerVisitor(references,
@@ -3074,7 +3134,7 @@ void *mainHeteroComputationThread(void * argc){
 
 
 
-    delete hv;
+    //delete hv;
     //TODO populate piForGenomicWindow using htslib
 
     dataToWrite->hetEstResults = computeLL(piForGenomicWindow,
@@ -3434,7 +3494,6 @@ void *mainCoverageComputationThread(void * argc){
     int last_pos = -1, last_tid = -1, ret;
 
     n =1;
-
     
     data = (aux_t **)calloc(1, sizeof(aux_t*)); // data[i] for the i-th input
     reg_tid = 0; beg = 0; end = INT_MAX;  // set the default region
@@ -3522,48 +3581,56 @@ void *mainCoverageComputationThread(void * argc){
     while ((ret=bam_mplp_auto(mplp, &tid, &pos, n_plp, plp)) > 0) { // come to the next covered position
         if (pos < beg || pos >= end) continue; // out of range; skip
         if (tid >= h->n_targets) continue;     // diff number of @SQ lines per file?
-        if (all) {
-            while (tid > last_tid) {
-                if (last_tid >= 0 && !reg) {
-                    // Deal with remainder or entirety of last tid.
-                    while (++last_pos < int(h->target_len[last_tid])) {
-                        // // Horribly inefficient, but the bed API is an obfuscated black box.
-                        if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
-                            continue;
-                        fputs(h->target_name[last_tid], stdout); 
-			//printf("\t%d", last_pos+1);
-                        // for (i = 0; i < n; i++)
-                        //     putchar('\t'), putchar('0');
-                        // putchar('\n');
-                    }
-                }
-                last_tid++;
-                last_pos = -1;
-                if (all < 2)
-                    break;
-            }
+        // if (all) {
+        //     while (tid > last_tid) {
+        //         if (last_tid >= 0 && !reg) {
+        //             // Deal with remainder or entirety of last tid.
+        //             while (++last_pos < int(h->target_len[last_tid])) {
+	// 		cout<<(last_pos+1)<<endl;
+	// 		//exit(1);
+	// 		// // Horribly inefficient, but the bed API is an obfuscated black box.
+        //                 if (bed && bed_overlap(bed, h->target_name[last_tid], last_pos, last_pos + 1) == 0)
+        //                     continue;
+        //                 //fputs(h->target_name[last_tid], stdout); 
+	// 		//printf("\t%d", last_pos+1);
+	// 		// 
+	// 		// exit(1);
+        //                 // for (i = 0; i < n; i++)
+        //                 //     putchar('\t'), putchar('0');
+        //                 // putchar('\n');
+        //             }
+        //         }
+        //         last_tid++;
+        //         last_pos = -1;
+        //         if (all < 2)
+        //             break;
+        //     }
 
-            // Deal with missing portion of current tid
-            while (++last_pos < pos) {
-                if (last_pos < beg) continue; // out of range; skip
-                if (bed && bed_overlap(bed, h->target_name[tid], last_pos, last_pos + 1) == 0)
-                    continue;
-                fputs(h->target_name[tid], stdout); 
-		//printf("\t%d", last_pos+1);
-                // for (i = 0; i < n; i++)
-                //     putchar('\t'), putchar('0');
-                // putchar('\n');
-            }
+        //     // Deal with missing portion of current tid
+        //     while (++last_pos < pos) {
+        //         if (last_pos < beg) continue; // out of range; skip
+        //         if (bed && bed_overlap(bed, h->target_name[tid], last_pos, last_pos + 1) == 0)
+        //             continue;
+        //         //fputs(h->target_name[tid], stdout); 
+	// 	//printf("\t%d", last_pos+1);
+        //         // for (i = 0; i < n; i++)
+        //         //     putchar('\t'), putchar('0');
+        //         // putchar('\n');
+        //     }
 
-            last_tid = tid;
-            last_pos = pos;
-        }
+        //     last_tid = tid;
+        //     last_pos = pos;
+        // }
 	if (bed && bed_overlap(bed, h->target_name[tid], pos, pos + 1) == 0) continue;
         //fputs(h->target_name[tid], stdout); 
 	//printf("\t%d\t", pos+1); // a customized printf() would be faster
+	//cout<<(pos+1)<<endl;
         for (i = 0; i < n; ++i) { // base level filters have to go here
             int j;
 	    int m = 0;//amount of invalid bases at site j that need to be removed from coverage calculations
+
+	    
+	    //cout<<"-------------"<<endl;
 	    
             for (j = 0; j < n_plp[i]; ++j) {
                 const bam_pileup1_t *p = plp[i] + j; // DON'T modfity plp[][] unless you really know
@@ -3573,6 +3640,8 @@ void *mainCoverageComputationThread(void * argc){
                 else 
 		    if(bam_get_qual(p->b)[p->qpos] < baseQ) 
 			++m; // low base quality
+
+		//cout<<"name "<<"\t"<<bam_get_qname(p->b)<<endl;
 		
 #ifdef NOTDEF
 		// printf("%d,",p->b);
@@ -4958,7 +5027,6 @@ int main (int argc, char *argv[]) {
     if( ignoreExistingRGINFO || (!isFile(outFilePrefix+".rginfo.gz")) ){
 
 	// if(!genoFileAsInputFlag){
-
 	int bpToComputeCoverage = 10000000;
 	int genomicRegionsToUse = bpToComputeCoverage/bpToExtract;
 	if( genomicRegionsToUse > int(queueDataToprocess.size())){
@@ -4967,8 +5035,8 @@ int main (int argc, char *argv[]) {
     
 
 	//renabled
-	queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
-	//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
+	//queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
+	queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
 	//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
 	unsigned int queueDataForCoverageOrigsize = queueDataForCoverage.size();
 	//cerr<<queueDataForCoverageOrigsize<<endl;
@@ -5165,7 +5233,7 @@ int main (int argc, char *argv[]) {
 
     cerr<<"..done"<<endl;
 
-    // return 1;
+    return 1;
 
     // pthread_exit(NULL);
 
