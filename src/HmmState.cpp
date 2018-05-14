@@ -242,7 +242,7 @@ void HmmState::recomputeProbs(){
 	if(isnan(probMut) || isinf(probMut) ){
 	  probMut = numeric_limits<double>::min();
 	}else{
-	  probMut = MAX( probMut , numeric_limits<double>::min() );
+	  probMut = MAX2( probMut , numeric_limits<double>::min() );
 	}
 	//cerr<<"theta "<<theta<<"\t"<<mutations<<"\t"<<probMut<<endl;
 	probabilitiesForEmission->at(mutations) = probMut;

@@ -279,9 +279,9 @@ void populatedCoverateVector(const string  programName, vector<long double> * co
     vector<long double>  cov2ProbSiteFloor;
     vector<long double>  cov2ProbSiteCeil;
 
-    rateForPoissonCovFloor = MAX(rateForPoissonCovFloor, (long double)1);
-    rateForPoissonCovFloor = MIN(rateForPoissonCovFloor, (long double)maxcov);
-    rateForPoissonCovCeil  = MIN(rateForPoissonCovCeil,  (long double)maxcov);
+    rateForPoissonCovFloor = MAX2(rateForPoissonCovFloor, (long double)1);
+    rateForPoissonCovFloor = MIN2(rateForPoissonCovFloor, (long double)maxcov);
+    rateForPoissonCovCeil  = MIN2(rateForPoissonCovCeil,  (long double)maxcov);
     string directoryProgram;
     string commandPath=string(programName);
     size_t posSlash=commandPath.find_last_of("/");
