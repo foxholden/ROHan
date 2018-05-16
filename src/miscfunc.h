@@ -207,6 +207,8 @@ typedef struct {
     uint8_t lengthF;             
     /* int dist5p; */
     /* int dist3p; */
+
+
 #ifdef DEBUGSINGLEREAD
     //string name; //TO REMOVE
 #endif
@@ -230,6 +232,7 @@ typedef struct {
     //int refID;
     int posAlign;
     int avgMQ;
+
     int          baseC[4];
     bool skipPosition;
 } positionInformation;

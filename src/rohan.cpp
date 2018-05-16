@@ -2575,7 +2575,7 @@ static int read_bamHET(void *data, bam1_t *b){ // read level filters better go h
     return ret;
 }
 
-
+#define AROUNDINDELS
 
 //! Method called for each thread
 /*!
@@ -2817,6 +2817,7 @@ void *mainHeteroComputationThread(void * argc){
 
 
     int i, n, tid, reg_tid, beg, end, pos, *n_plp, baseQ = 0, mapQ = 0, min_len = MINLENGTHFRAGMENT;
+    int prevPos=-1000;
 
     int all = 0; //status = EXIT_SUCCESS, 
 
@@ -2904,6 +2905,12 @@ void *mainHeteroComputationThread(void * argc){
     n_plp = (int *)calloc(n, sizeof(int)); // n_plp[i] is the number of covering reads from the i-th BAM
     plp   = (const bam_pileup1_t **)calloc(n, sizeof(bam_pileup1_t*)); // plp[i] points to the array of covering reads (internal in mplp)
     //int seqptr=0;
+
+#ifdef AROUNDINDELS
+    bool prevIndel   =false;
+    int  prevLevels   [2*MAXCOV];
+    int  prevLevelsi =0;
+#endif
     
     while ((ret=bam_mplp_auto(mplp, &tid, &pos, n_plp, plp)) > 0) { // come to the next covered position	
 	//cerr<<endl<<(pos+1)<<" "<<" -----------------------"<<endl;
@@ -2916,9 +2923,9 @@ void *mainHeteroComputationThread(void * argc){
 	    continue;
 	}
 
-// #ifdef DEBUGHTS
-// 	cerr<<endl<<(pos+1)<<" "<<refc<<" -----------------------"<<endl;
-// #endif
+	// #ifdef DEBUGHTS
+	// 	cerr<<endl<<(pos+1)<<" "<<refc<<" -----------------------"<<endl;
+	// #endif
 	
         if (all) {
             while (tid > last_tid) {
@@ -2962,6 +2969,8 @@ void *mainHeteroComputationThread(void * argc){
 	//fputs(h->target_name[tid], stdout); 
 	//printf("\t%d\t", pos+1); // a customized printf() would be faster
 	//cerr<<(pos+1)<<endl;
+	//previous indels
+
         for (i = 0; i < n; ++i) { // base level filters have to go here
             int j;
 	    int m = 0;//amount of invalid bases at site j that need to be removed from coverage calculations
@@ -2979,7 +2988,14 @@ void *mainHeteroComputationThread(void * argc){
 	    for(int n=0;n<4;n++){
 		piToAdd.baseC[n]=0;
 	    }
-
+	    
+#ifdef AROUNDINDELS
+	    bool currIndel   =false;
+	    int  currLevels   [2*MAXCOV];
+	    int  currLevelsi =0;	    
+	    //	    vector<int> currLevelVec;
+#endif
+	    
             for (j = 0; j < n_plp[i]; ++j) {
                 const bam_pileup1_t *p = plp[i] + j; // DON'T modfity plp[][] unless you really know
 		// if( (pos+1) == 16050348){
@@ -2988,9 +3004,38 @@ void *mainHeteroComputationThread(void * argc){
 
 		//base level filters go here
 		if (p->is_del || p->is_refskip){
+
+#ifdef AROUNDINDELS	    
+		    currLevels[currLevelsi++] = p->level;
+		    currIndel   = true;
+#endif
 		    ++m; // having dels or refskips at tid:pos
 		    continue;
-		}// else{ 
+		}
+
+#ifdef AROUNDINDELS
+		if ( p->indel != 0 ){// having dels or refskips at the next
+		    ++m; 
+		    continue;
+		}
+		
+		if(prevIndel){
+		    bool skippos=false;
+		    for(int pi=0;pi<prevLevelsi;pi++){
+			if(p->level == prevLevels[prevLevelsi]){
+			    skippos=true;
+			    break;
+			}
+		    }
+		    if(skippos){
+			continue;
+		    }
+		}
+#endif		
+
+
+
+		// else{ 
 		//     if(bam_get_qual(p->b)[p->qpos] < baseQ) 
 		// 	++m; // low base quality
 		// }
@@ -3026,6 +3071,7 @@ void *mainHeteroComputationThread(void * argc){
 		    sr_.pos5p = uint8_t( p->qpos ); 
 		}
 		sr_.isrv=isRev;
+
 #ifdef DEBUGHTS
 		cerr<<isRev<<" "<<int(sr_.base)<<" "<<int(sr_.qual)<<" "<<int(sr_.mapq)<<" "<<int(m)<<" "<<int(sr_.lengthF)<<" "<<int(sr_.pos5p)<<" "<< bam1_qname(p->b)<<" "<<int((p->b)->core.flag)<<" "<<p->b->core.n_cigar<<" p="<<(p->cd.p)<<" i="<<int(p->cd.i)<<" f="<<float(p->cd.f)<<" "<<p->indel<<" "<<p->level<<endl;
 #endif
@@ -3038,6 +3084,8 @@ void *mainHeteroComputationThread(void * argc){
 		// }
 		// sr_.isrv=isRev;
 		piToAdd.readsVec.push_back(sr_);
+
+//currLevelVec.push_back(p->level);
 		totalBasesL ++;
 
 		
@@ -3082,13 +3130,30 @@ void *mainHeteroComputationThread(void * argc){
 	    //cout<<(n_plp[i] - m); // this the depth to output
 	    // totalSitesL ++ ;
 
+#ifdef AROUNDINDELS
+	    //if indels are found, remove 
+	    if( (prevPos+1) == pos){
+		prevIndel   = currIndel;
+		prevLevelsi = currLevelsi;
+		for(int ci=0;ci<currLevelsi;ci++){
+		    prevLevels[ci] = currLevels[ci];
+		}
+		
+	    }else{
+		prevIndel   =false;
+		prevLevelsi =0;
+	    }
+#endif
+	    
 	    if( foundSites ){
 		piToAdd.avgMQ =  round(-10*log10(probMM/double(basesRetained)));
 		totalSitesL++;
 	     }
 
 	    piForGenomicWindow->push_back(piToAdd);
-	    
+
+	    prevPos = pos;
+
 	}//end for all pos
 
 
