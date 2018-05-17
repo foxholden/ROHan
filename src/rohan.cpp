@@ -2923,7 +2923,7 @@ void *mainHeteroComputationThread(void * argc){
 #endif
     
     while ((ret=bam_mplp_auto(mplp, &tid, &pos, n_plp, plp)) > 0) { // come to the next covered position	
-	//cerr<<endl<<(pos+1)<<" "<<" -----------------------"<<endl;
+	cerr<<endl<<(pos+1)<<" "<<" -----------------------"<<endl;
 	
 	if (pos < beg || pos >= end) continue; // out of range; skip
         if (tid >= h->n_targets) continue;     // diff number of @SQ lines per file?
@@ -3142,7 +3142,7 @@ void *mainHeteroComputationThread(void * argc){
 		totalBasesL ++;
 
 		
-#ifndef DEBUGHTS
+#ifdef DEBUGHTS
 		// printf("%d,",p->b);
 		// printf("%d,",bam_get_seq(p->b));
 		// @discussion Each base is encoded in 4 bits: 1 for A, 2 for C, 4 for G,
@@ -3187,18 +3187,18 @@ void *mainHeteroComputationThread(void * argc){
 	    if( foundSites ){
 		piToAdd.avgMQ =  round(-10*log10(probMM/double(basesRetained)));
 		totalSitesL++;
-	     }
+	    }
 
 	    piForGenomicWindow->push_back(piToAdd);
-
+	    cerr<<piToAdd.readsVec.size()<<endl;
 	    prevPos = pos;
 
 	}//end for all pos
 
 
- // #ifdef DEBUGHTS
- // 	cerr<<endl<<" -----------------------"<<endl;
- // #endif
+	// #ifdef DEBUGHTS
+	// 	cerr<<endl<<" -----------------------"<<endl;
+	// #endif
         
         //putchar('\n');
 	//cout<<endl;
@@ -5274,13 +5274,17 @@ int main (int argc, char *argv[]) {
     //Testing BAM file
 
     //bam_hdr_t *h = NULL; // BAM header of the 1st input
-    
+
+    data = (aux_t *)calloc(1, sizeof(aux_t));
+
+
     data->fp = sam_open_format(bamFileToOpen.c_str(), "r", NULL); // open BAM
 
     if(data->fp == NULL) {
 	cerr<<"ERROR: Could not open input BAM file "<<bamFileToOpen<<""<<endl;
 	exit(1);
     }
+
     idx = sam_index_load(data->fp, bamFileToOpen.c_str());  // load the index
     if (idx == NULL) {
 	cerr<<"ERROR: Cannot load index for bamfile "<<bamFileToOpen<<""<<endl;
