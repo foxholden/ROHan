@@ -2575,7 +2575,8 @@ static int read_bamHET(void *data, bam1_t *b){ // read level filters better go h
     return ret;
 }
 
-#define AROUNDINDELS
+//#define AROUNDINDELS
+//#define AROUNDINDELS
 
 //! Method called for each thread
 /*!
@@ -2821,7 +2822,7 @@ void *mainHeteroComputationThread(void * argc){
 
     int all = 0; //status = EXIT_SUCCESS, 
 
-    int max_depth = 2*MAXCOV;
+    int max_depth = 20*MAXCOV;
     const bam_pileup1_t **plp;
     bool reg = !region.empty();
 
@@ -2908,8 +2909,16 @@ void *mainHeteroComputationThread(void * argc){
 
 #ifdef AROUNDINDELS
     bool prevIndel   =false;
-    int  prevLevels   [2*MAXCOV];
-    int  prevLevelsi =0;
+    // int  prevLevels   [2*MAXCOV];
+    // int  prevLevelsi =0;
+    set<string> prevIndelSet;
+
+    bool currIndel   =false;
+    // int  currLevels   [2*MAXCOV];
+    // int  currLevelsi =0;	    
+    set<string> currIndelSet;
+
+	    
 #endif
     
     while ((ret=bam_mplp_auto(mplp, &tid, &pos, n_plp, plp)) > 0) { // come to the next covered position	
@@ -2961,9 +2970,25 @@ void *mainHeteroComputationThread(void * argc){
 
 	
 #ifdef DEBUGHTS
-	cerr<<endl<<(pos+1)<<" "<<refC<<" -----------------------"<<endl;
+	cout<<endl<<(pos+1)<<" "<<refC<<" -----------------------"<<endl;
 #endif
 	
+#ifdef AROUNDINDELS
+	    //if indels are found, remove 
+	    if( (prevPos+1) == pos){
+		prevIndel     = currIndel;
+		prevIndelSet  = currIndelSet;
+		// prevLevelsi = currLevelsi;
+		// for(int ci=0;ci<currLevelsi;ci++){
+		//     prevLevels[ci] = currLevels[ci];
+		// }		
+	    }else{
+		prevIndel   =false;
+		//prevLevelsi =0;
+		prevIndelSet.clear();
+	    }
+#endif
+
 	//totalSitesL++;
 
 	//fputs(h->target_name[tid], stdout); 
@@ -2990,10 +3015,10 @@ void *mainHeteroComputationThread(void * argc){
 	    }
 	    
 #ifdef AROUNDINDELS
-	    bool currIndel   =false;
-	    int  currLevels   [2*MAXCOV];
-	    int  currLevelsi =0;	    
-	    //	    vector<int> currLevelVec;
+	    currIndel   =false;
+	    // int  currLevels   [2*MAXCOV];
+	    // int  currLevelsi =0;	    
+	    currIndelSet.clear();
 #endif
 	    
             for (j = 0; j < n_plp[i]; ++j) {
@@ -3001,35 +3026,61 @@ void *mainHeteroComputationThread(void * argc){
 		// if( (pos+1) == 16050348){
 		//     cerr<<bam1_qname(p->b)<<endl;	  
 		// }
+#ifdef DEBUGHTS
+		//cerr<< bam1_qname(p->b)<<" "<<j<<" "<<int((p->b)->core.flag)<<" "<<p->b->core.n_cigar<<" p="<<(p->cd.p)<<" i="<<int(p->cd.i)<<" f="<<float(p->cd.f)<<" "<<p->is_del<<" "<<p->is_refskip<<" "<<p->indel<<" "<<p->level<<" "<<p->aux<<" "<<endl;
 
+#endif
+
+#ifdef AROUNDINDELS	    
+		//cerr<<"prevIndel1: "<<prevIndel<<" "<<prevIndelSet.size()<<endl;
+#endif
+		//prevIndel<<endl;
+		
 		//base level filters go here
 		if (p->is_del || p->is_refskip){
 
 #ifdef AROUNDINDELS	    
-		    currLevels[currLevelsi++] = p->level;
+		    //currLevels[currLevelsi++] = p->level;
 		    currIndel   = true;
+		    //cerr<<"inserting "<<bam1_qname(p->b)<<endl;
+		    currIndelSet.insert( bam1_qname(p->b) );
 #endif
 		    ++m; // having dels or refskips at tid:pos
 		    continue;
 		}
 
-#ifdef AROUNDINDELS
+		//cerr<<"prevIndel2: "<<prevIndel<<endl;
+
 		if ( p->indel != 0 ){// having dels or refskips at the next
 		    ++m; 
 		    continue;
 		}
+
+#ifdef AROUNDINDELS
+
+		//cerr<<"prevIndel3: "<<prevIndel<<" "<<prevIndelSet.size()<<endl;
 		
 		if(prevIndel){
-		    bool skippos=false;
-		    for(int pi=0;pi<prevLevelsi;pi++){
-			if(p->level == prevLevels[prevLevelsi]){
-			    skippos=true;
-			    break;
-			}
-		    }
-		    if(skippos){
+		    //cerr<<"prevIndel, testing  "<<bam1_qname(p->b)<<""<<endl;
+		    
+		    // for(set<string>::iterator it = prevIndelSet.begin(); it != prevIndelSet.end(); it++)  {
+		    //  	cerr<<"record: "<<*it<<endl;
+		    //  }
+		    
+		    if( prevIndelSet.find(bam1_qname(p->b)) != prevIndelSet.end() ){//skip reads previously flagged as indels. Since indels are few, this should be a quicker solution than to read ahead 
+			//cerr<<"found  "<<bam1_qname(p->b)<<" in a previous indel"<<endl;			
 			continue;
 		    }
+		    // bool skippos=false;
+		    // for(int pi=0;pi<prevLevelsi;pi++){
+		    // 	if(p->level == prevLevels[prevLevelsi]){
+		    // 	    skippos=true;
+		    // 	    break;
+		    // 	}
+		    // }
+		    // if(skippos){
+		    // 	continue;
+		    // }
 		}
 #endif		
 
@@ -3073,7 +3124,8 @@ void *mainHeteroComputationThread(void * argc){
 		sr_.isrv=isRev;
 
 #ifdef DEBUGHTS
-		cerr<<isRev<<" "<<int(sr_.base)<<" "<<int(sr_.qual)<<" "<<int(sr_.mapq)<<" "<<int(m)<<" "<<int(sr_.lengthF)<<" "<<int(sr_.pos5p)<<" "<< bam1_qname(p->b)<<" "<<int((p->b)->core.flag)<<" "<<p->b->core.n_cigar<<" p="<<(p->cd.p)<<" i="<<int(p->cd.i)<<" f="<<float(p->cd.f)<<" "<<p->indel<<" "<<p->level<<endl;
+		//cerr<<isRev<<" "<<"ACGT"[int(sr_.base)]<<" "<<int(sr_.qual)<<" "<<int(sr_.mapq)<<" "<<int(m)<<" "<<int(sr_.lengthF)<<" "<<int(sr_.pos5p)<<" "<< bam1_qname(p->b)<<" "<<int((p->b)->core.flag)<<" "<<p->b->core.n_cigar<<" p="<<(p->cd.p)<<" i="<<int(p->cd.i)<<" f="<<float(p->cd.f)<<" "<<p->indel<<" "<<p->level<<endl;
+		cout<<isRev<<" "<<int(sr_.base)<<" "<<int(sr_.qual)<<" "<<int(sr_.mapq)<<" "<<int(m)<<" "<<int(sr_.lengthF)<<" "<<int(sr_.pos5p)<<" "<< bam1_qname(p->b)<<" "<<int((p->b)->core.flag)<<endl;
 #endif
 		
 		// if(isRev){
@@ -3130,20 +3182,6 @@ void *mainHeteroComputationThread(void * argc){
 	    //cout<<(n_plp[i] - m); // this the depth to output
 	    // totalSitesL ++ ;
 
-#ifdef AROUNDINDELS
-	    //if indels are found, remove 
-	    if( (prevPos+1) == pos){
-		prevIndel   = currIndel;
-		prevLevelsi = currLevelsi;
-		for(int ci=0;ci<currLevelsi;ci++){
-		    prevLevels[ci] = currLevels[ci];
-		}
-		
-	    }else{
-		prevIndel   =false;
-		prevLevelsi =0;
-	    }
-#endif
 	    
 	    if( foundSites ){
 		piToAdd.avgMQ =  round(-10*log10(probMM/double(basesRetained)));
