@@ -3092,7 +3092,7 @@ void *mainHeteroComputationThread(void * argc){
 		// 	++m; // low base quality
 		// }
 		//TODO reenable
-		if(false && j>=MAXCOV){
+		if( j>=MAXCOV){
 		    break;
 		}
 
@@ -4848,7 +4848,9 @@ int main (int argc, char *argv[]) {
     string cwdProg=getCWD(argv[0]);    
     string deam5pfreqE  = getFullPath(cwdProg+"../deaminationProfile/none.prof");
     string deam3pfreqE  = getFullPath(cwdProg+"../deaminationProfile/none.prof");
-    string illuminafreq = getFullPath(cwdProg+"../illuminaProf/null.prof");
+    //string illuminafreq = getFullPath(cwdProg+"../illuminaProf/null.prof");
+    string illuminafreq = getFullPath(cwdProg+"../illuminaProf/error.prof");
+    
     string dnafreqFile  = getFullPath(cwdProg+"../DNAprof/default_30_20_20_30.freq");
 
     // cout<<deam5pfreqE<<endl;
