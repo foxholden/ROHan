@@ -37,7 +37,7 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 
 
 ../lib/htslib/libhts.a:  ../lib/htslib/hts_internal.h
-	cd ../lib/htslib/ && make && cd ../
+	cd ../lib/htslib/ && make && cd ../..
 
 ../htslib/hts_internal.h:
 	rm -rf ../lib/htslib/
@@ -45,14 +45,14 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 
 
 ../lib/samtools/bedidx.o:  ../lib/samtools/sam.h
-	cd ../lib/samtools/ && make && cd ../
+	cd ../lib/samtools/ && make && cd ../..
 
 ../lib/samtools/sam.h:
 	rm -rf ../lib/samtools/
         git clone --recursive https://github.com/samtools/samtools.git ../samtools/
 
 ../lib/libgab/utils.o:  ../lib/libgab/utils.h
-	make -C ../lib/libgab/
+	cd ../lib/libgab/ &&  make utils.o && cd ../..
 
 ../lib/libgab/utils.h:
 	rm -rfv ../lib/libgab/
