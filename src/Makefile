@@ -2,12 +2,12 @@
 CXX      = g++ -std=c++11 -g -pg #-fpermissive #-g # -pg
 LIBGAB   = ../lib/libgab/
 
-CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/samtools/ -I../lib/htslib/  -I../lib/libharu/include/ -I../lib/bamtools/include/ -I../lib/bamtools/src/  -c
+CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/samtools/ -I../lib/htslib/  -I../lib/libharu/include/   -c
 LDFLAGS  = -lgsl -lgslcblas -llzma -lbz2 -lz  -lpthread 
-LDLIBS   = ../lib/samtools/bedidx.o ../lib/htslib/libhts.a ../lib/samtools/libbam.a ../lib/samtools/libst.a   ../lib/bamtools/build/src/utils/CMakeFiles/BamTools-utils.dir/*cpp.o ../lib/bamtools/build/src/api/libbamtools.a
+LDLIBS   = ../lib/samtools/bedidx.o ../lib/htslib/libhts.a ../lib/samtools/libbam.a ../lib/samtools/libst.a 
 
 
-all: ../lib/bamtools/build/src/api/libbamtools.a ../lib/libgab/utils.o ../lib/libharu/src/.libs/libhpdf.a rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
+all:  ../lib/libgab/utils.o ../lib/libharu/src/.libs/libhpdf.a rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
 
 %.o: %.cpp #../lib/libgab/utils.o  
 	${CXX} ${CXXFLAGS} $^ -o $@
@@ -24,13 +24,9 @@ refPlusSegToGeno:	refPlusSegToGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstr
 sitesPlusGeno:	sitesPlusGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-rohan:       rohan.o PdfWriter.o Hmm.o HmmState.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o ../lib/bamtools/build/src/api/libbamtools.a GenomicWindows.o GenomicRange.o  ../lib/libgab/FastQObj.o ../lib/libgab/FastQParser.o ../lib/libharu/src/.libs/libhpdf.a ../lib/libgab/utils.o  ../lib/libgab/gzstream/libgzstream.a 
+rohan:       rohan.o PdfWriter.o Hmm.o HmmState.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o  GenomicWindows.o GenomicRange.o  ../lib/libgab/FastQObj.o ../lib/libgab/FastQParser.o ../lib/libharu/src/.libs/libhpdf.a ../lib/libgab/utils.o  ../lib/libgab/gzstream/libgzstream.a 
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-../lib/libgab/utils.h:
-	rm -rfv ../lib/libgab/
-	mkdir ../lib/libgab/
-	git clone --depth 1 https://github.com/grenaud/libgab.git ../lib/libgab/
 
 ref2DNAprof.o:	ref2DNAprof.cpp
 	${CXX} ${CXXFLAGS} ref2DNAprof.cpp
@@ -40,17 +36,28 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 
+../lib/htslib/libhts.a:  ../lib/htslib/hts_internal.h
+	cd ../lib/htslib/ && make && cd ../
 
-../lib/libgab/utils.o: ../lib/bamtools/build/src/api/libbamtools.a  ../lib/libgab/utils.h
+../htslib/hts_internal.h:
+	rm -rf ../lib/htslib/
+        git clone --recursive https://github.com/samtools/htslib.git ../htslib/
+
+
+../lib/samtools/bedidx.o:  ../lib/samtools/sam.h
+	cd ../lib/samtools/ && make && cd ../
+
+../lib/samtools/sam.h:
+	rm -rf ../lib/samtools/
+        git clone --recursive https://github.com/samtools/samtools.git ../samtools/
+
+../lib/libgab/utils.o:  ../lib/libgab/utils.h
 	make -C ../lib/libgab/
 
-../lib/bamtools/src/api/BamAlignment.h:
-	rm -rf ../lib/bamtools/
-	mkdir ../lib/bamtools/
-	git clone --depth 1 https://github.com/pezmaster31/bamtools.git ../lib/bamtools/
-
-../lib/bamtools/build/src/api/libbamtools.a: ../lib/bamtools/src/api/BamAlignment.h
-	cd ../lib/bamtools/ && mkdir -p build/  && cd build/ && cmake .. && make && cd ../..
+../lib/libgab/utils.h:
+	rm -rfv ../lib/libgab/
+	mkdir ../lib/libgab/
+	git clone --depth 1 https://github.com/grenaud/libgab.git ../lib/libgab/
 
 ../lib/libharu/include/hpdf.h:
 	rm -rf ../lib/libharu/

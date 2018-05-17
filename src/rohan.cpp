@@ -10,13 +10,13 @@
 // fix rginfo
 // TODO: GC bias for coverage?
 
-#include "api/internal/io/BgzfStream_p.h"
-#include <api/BamConstants.h>
-#include <api/BamMultiReader.h>
-#include <utils/bamtools_fasta.h>
-#include <utils/bamtools_options.h>
-#include <utils/bamtools_pileup_engine.h>
-#include <utils/bamtools_utilities.h>
+//#include "api/internal/io/BgzfStream_p.h"
+//#include <api/BamConstants.h>
+//#include <api/BamMultiReader.h>
+//#include <utils/bamtools_fasta.h>
+//#include <utils/bamtools_options.h>
+//#include <utils/bamtools_pileup_engine.h>
+//#include <utils/bamtools_utilities.h>
 
 
 extern "C" {
@@ -25,6 +25,7 @@ extern "C" {
 #include "htslib/sam.h"
 #include "htslib/faidx.h"
 #include "htslib/tbx.h"
+#include "htslib/bgzf.h"
 
 #include "samtools.h"
 #include "sam_opts.h"
@@ -59,7 +60,7 @@ typedef struct {     // auxiliary data structure
 #include "utils.h"
 
 using namespace std;
-using namespace BamTools;
+// using namespace BamTools;
 
 
 //#define MIN(a,b) (((a)<(b))?(a):(b))
@@ -2292,221 +2293,221 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 
 
 
-class heteroComputerVisitor : public PileupVisitor {
+// class heteroComputerVisitor : public PileupVisitor {
   
-public:
-    heteroComputerVisitor(const RefVector& references, 
-			  const int refID,
-			  const unsigned int leftCoord,
-			  const unsigned int rightCoord,
-			  //vector<PositionResult *> * dataToWriteOut,
-			  const int threadID,
-			  vector<positionInformation> * piForGenomicWindow,
-			  Fasta * fastaReference)
-	: PileupVisitor()
-	, m_references(references)
-	, m_refID(refID)
-	, m_leftCoord(leftCoord)
-	, m_rightCoord(rightCoord)
-	  //, m_dataToWriteOut( dataToWriteOut)
-	, m_threadID( threadID )
-	, m_numberOfSites( 0 )
-	, totalBases(0)
-	, totalSites(0)   
-	, m_piForGenomicWindow( piForGenomicWindow )
-	, m_fastaReference(fastaReference)
-    { 
-	//cerr<<"heteroComputerVisitor constructor"<<endl;
-    }
-    ~heteroComputerVisitor(void) { }
+// public:
+//     heteroComputerVisitor(const RefVector& references, 
+// 			  const int refID,
+// 			  const unsigned int leftCoord,
+// 			  const unsigned int rightCoord,
+// 			  //vector<PositionResult *> * dataToWriteOut,
+// 			  const int threadID,
+// 			  vector<positionInformation> * piForGenomicWindow,
+// 			  Fasta * fastaReference)
+// 	: PileupVisitor()
+// 	, m_references(references)
+// 	, m_refID(refID)
+// 	, m_leftCoord(leftCoord)
+// 	, m_rightCoord(rightCoord)
+// 	  //, m_dataToWriteOut( dataToWriteOut)
+// 	, m_threadID( threadID )
+// 	, m_numberOfSites( 0 )
+// 	, totalBases(0)
+// 	, totalSites(0)   
+// 	, m_piForGenomicWindow( piForGenomicWindow )
+// 	, m_fastaReference(fastaReference)
+//     { 
+// 	//cerr<<"heteroComputerVisitor constructor"<<endl;
+//     }
+//     ~heteroComputerVisitor(void) { }
   
-    // PileupVisitor interface implementation
+//     // PileupVisitor interface implementation
 
     
-    void Visit(const PileupPosition& pileupData) {   
+//     void Visit(const PileupPosition& pileupData) {   
 	
 
 
-	if(pileupData.Position < int(m_leftCoord)   || 
-	   pileupData.Position > int(m_rightCoord) ){
-	    return ;
-	}
+// 	if(pileupData.Position < int(m_leftCoord)   || 
+// 	   pileupData.Position > int(m_rightCoord) ){
+// 	    return ;
+// 	}
 
-	if( (m_numberOfSites%50000)==0 &&
-	    m_numberOfSites != 0 ){
-	    int rc = pthread_mutex_lock(&mutexCERR);
-	    checkResults("pthread_mutex_lock()\n", rc);
+// 	if( (m_numberOfSites%50000)==0 &&
+// 	    m_numberOfSites != 0 ){
+// 	    int rc = pthread_mutex_lock(&mutexCERR);
+// 	    checkResults("pthread_mutex_lock()\n", rc);
 
-	    if(verbose)
-		cerr<<"Thread#"<<m_threadID<<" reading: "<<m_references[m_refID].RefName<<":"<<pileupData.Position<<" valid sites:\t"<<thousandSeparator(totalSites)<<endl;
+// 	    if(verbose)
+// 		cerr<<"Thread#"<<m_threadID<<" reading: "<<m_references[m_refID].RefName<<":"<<pileupData.Position<<" valid sites:\t"<<thousandSeparator(totalSites)<<endl;
 
-	    rc = pthread_mutex_unlock(&mutexCERR);
-	    checkResults("pthread_mutex_unlock()\n", rc);
+// 	    rc = pthread_mutex_unlock(&mutexCERR);
+// 	    checkResults("pthread_mutex_unlock()\n", rc);
 
-	}
+// 	}
 
-	m_numberOfSites++;
-
-
-	// int                 totalBases=0 ;
-	//int                 counterB  [4];
-	//long double         llBaseDeam[4];
+// 	m_numberOfSites++;
 
 
-	// vector<int>              obsBase      ;
-	// vector<int>              obsQual      ;
-	// vector<int>              mmQual       ; //mismapping probability
-	// vector<bool>             isRevVec;
-	//vector<singleRead> singleReadToAdd;
+// 	// int                 totalBases=0 ;
+// 	//int                 counterB  [4];
+// 	//long double         llBaseDeam[4];
+
+
+// 	// vector<int>              obsBase      ;
+// 	// vector<int>              obsQual      ;
+// 	// vector<int>              mmQual       ; //mismapping probability
+// 	// vector<bool>             isRevVec;
+// 	//vector<singleRead> singleReadToAdd;
 
 
 
-	unsigned int                posAlign = pileupData.Position+1;
+// 	unsigned int                posAlign = pileupData.Position+1;
 
-	char referenceBase = 'N';
-	if ( !m_fastaReference->GetBase(pileupData.RefId, posAlign-1, referenceBase ) ) {
-	    cerr << "rohan convert ERROR: pileup conversion - could not read reference base from FASTA file" << endl;
-	    return;
-	}
-	referenceBase = toupper(referenceBase);
+// 	char referenceBase = 'N';
+// 	if ( !m_fastaReference->GetBase(pileupData.RefId, posAlign-1, referenceBase ) ) {
+// 	    cerr << "rohan convert ERROR: pileup conversion - could not read reference base from FASTA file" << endl;
+// 	    return;
+// 	}
+// 	referenceBase = toupper(referenceBase);
 	
-	if(!isResolvedDNA(referenceBase)){ //avoid Ns
-	    return; 
-	}
+// 	if(!isResolvedDNA(referenceBase)){ //avoid Ns
+// 	    return; 
+// 	}
 
-	positionInformation piToAdd;
+// 	positionInformation piToAdd;
 
-	piToAdd.skipPosition = false;
+// 	piToAdd.skipPosition = false;
 
-	piToAdd.posAlign                     = posAlign;
-	//piToAdd.refID                        = posAlign;
-	piToAdd.refBase                      = referenceBase;
-	//
-	double probMM=0;
-	int    basesRetained=0;
-	bool foundSites=false;
+// 	piToAdd.posAlign                     = posAlign;
+// 	//piToAdd.refID                        = posAlign;
+// 	piToAdd.refBase                      = referenceBase;
+// 	//
+// 	double probMM=0;
+// 	int    basesRetained=0;
+// 	bool foundSites=false;
 
-	for(int n=0;n<4;n++){
-	    piToAdd.baseC[n]=0;
-	}
+// 	for(int n=0;n<4;n++){
+// 	    piToAdd.baseC[n]=0;
+// 	}
 
-	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
-	    //cerr<<i<<" "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
+// 	for(unsigned int i=0;i<pileupData.PileupAlignments.size();i++){
+// 	    //cerr<<i<<" "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
 	    
-	    if( pileupData.PileupAlignments[i].IsCurrentDeletion   ||
-	    	pileupData.PileupAlignments[i].IsNextInsertion     ||
-	    	pileupData.PileupAlignments[i].IsNextDeletion      ||
-		(pileupData.PileupAlignments[i].DeletionLength>0)  ||
-		(pileupData.PileupAlignments[i].InsertionLength>0) ){		
-		//includeFragment was initialized as false
-	    	continue;
-	    }
+// 	    if( pileupData.PileupAlignments[i].IsCurrentDeletion   ||
+// 	    	pileupData.PileupAlignments[i].IsNextInsertion     ||
+// 	    	pileupData.PileupAlignments[i].IsNextDeletion      ||
+// 		(pileupData.PileupAlignments[i].DeletionLength>0)  ||
+// 		(pileupData.PileupAlignments[i].InsertionLength>0) ){		
+// 		//includeFragment was initialized as false
+// 	    	continue;
+// 	    }
 
-	    //skip reads that were QC failed
-	    if(  pileupData.PileupAlignments[i].Alignment.IsFailedQC() ){
-		continue;
-	    }
+// 	    //skip reads that were QC failed
+// 	    if(  pileupData.PileupAlignments[i].Alignment.IsFailedQC() ){
+// 		continue;
+// 	    }
 
-	    //skip fragments below the minimum length
-	    if(  pileupData.PileupAlignments[i].Alignment.Length < int(MINLENGTHFRAGMENT) ){ 
-		cerr<<"skipped minlength "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
-		continue;
-	    }
+// 	    //skip fragments below the minimum length
+// 	    if(  pileupData.PileupAlignments[i].Alignment.Length < int(MINLENGTHFRAGMENT) ){ 
+// 		cerr<<"skipped minlength "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
+// 		continue;
+// 	    }
 
-	    if(  pileupData.PileupAlignments[i].Alignment.Length > int(MAXLENGTHFRAGMENT) ){ 
-		cerr<<"skipped maxlength "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
-		continue;
-	    }
+// 	    if(  pileupData.PileupAlignments[i].Alignment.Length > int(MAXLENGTHFRAGMENT) ){ 
+// 		cerr<<"skipped maxlength "<<pileupData.PileupAlignments[i].Alignment.Name<<endl;
+// 		continue;
+// 	    }
 	    
-	    if(i>=MAXCOV){
-		break;
-	    }
+// 	    if(i>=MAXCOV){
+// 		break;
+// 	    }
 
-	    char  b   =     pileupData.PileupAlignments[i].Alignment.QueryBases[ pileupData.PileupAlignments[i].PositionInAlignment ];
-	    if(!isResolvedDNA(b)){ //avoid Ns
-		continue; 
-	    }
+// 	    char  b   =     pileupData.PileupAlignments[i].Alignment.QueryBases[ pileupData.PileupAlignments[i].PositionInAlignment ];
+// 	    if(!isResolvedDNA(b)){ //avoid Ns
+// 		continue; 
+// 	    }
 
-	    int bIndex = baseResolved2int(b);
-	    int   q    = MIN2( int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual), MAXBASEQUAL);
-	    int   m    = MIN2( int(pileupData.PileupAlignments[i].Alignment.MapQuality), MAXMAPPINGQUAL );
-	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
-	    // if(posAlign == 74310){
-	    // 	cout<<m<<" "<<probMM<<" "<<likeMismatchProbMap[m]<<endl;
-	    // }
-	    piToAdd.baseC[bIndex]++;
-	    probMM += likeMismatchProbMap[m]; 
-	    basesRetained++;
+// 	    int bIndex = baseResolved2int(b);
+// 	    int   q    = MIN2( int(pileupData.PileupAlignments[i].Alignment.Qualities[  pileupData.PileupAlignments[i].PositionInAlignment ]-offsetQual), MAXBASEQUAL);
+// 	    int   m    = MIN2( int(pileupData.PileupAlignments[i].Alignment.MapQuality), MAXMAPPINGQUAL );
+// 	    bool isRev = pileupData.PileupAlignments[i].Alignment.IsReverseStrand();
+// 	    // if(posAlign == 74310){
+// 	    // 	cout<<m<<" "<<probMM<<" "<<likeMismatchProbMap[m]<<endl;
+// 	    // }
+// 	    piToAdd.baseC[bIndex]++;
+// 	    probMM += likeMismatchProbMap[m]; 
+// 	    basesRetained++;
 
-	    totalBases++;
-	    foundSites=true;
+// 	    totalBases++;
+// 	    foundSites=true;
 
-	    singleRead sr_;
-	    sr_.base    = uint8_t(bIndex);
-	    sr_.qual    = uint8_t(q);	    
-	    sr_.mapq    = uint8_t(m);
-	    sr_.lengthF = uint8_t(pileupData.PileupAlignments[i].Alignment.Length);
+// 	    singleRead sr_;
+// 	    sr_.base    = uint8_t(bIndex);
+// 	    sr_.qual    = uint8_t(q);	    
+// 	    sr_.mapq    = uint8_t(m);
+// 	    sr_.lengthF = uint8_t(pileupData.PileupAlignments[i].Alignment.Length);
 
-	    if(isRev){
-		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].Alignment.Length-pileupData.PileupAlignments[i].PositionInAlignment-1 ); 
-		sr_.base = 3 - sr_.base;//complement
-	    }else{
-		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].PositionInAlignment ); 
-	    }
-	    sr_.isrv=isRev;
+// 	    if(isRev){
+// 		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].Alignment.Length-pileupData.PileupAlignments[i].PositionInAlignment-1 ); 
+// 		sr_.base = 3 - sr_.base;//complement
+// 	    }else{
+// 		sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].PositionInAlignment ); 
+// 	    }
+// 	    sr_.isrv=isRev;
 
-#ifdef DEBUGSINGLEREAD
-	    sr_.name=pileupData.PileupAlignments[i].Alignment.Name;//to remove
-#endif
+// #ifdef DEBUGSINGLEREAD
+// 	    sr_.name=pileupData.PileupAlignments[i].Alignment.Name;//to remove
+// #endif
 	    
-	    piToAdd.readsVec.push_back(sr_);
-	    // obsBase.push_back( bIndex  );
-	    // obsQual.push_back( q        );
-	    // mmQual.push_back(  m        );
-	    // isRevVec.push_back(isRev);	    
-	    //mmProb.push_back(  likeMismatchProbMap[m]  );
-	    // substitutionRatesPerRead.push_back( probSubMatchToUseEndo );
-	    //	    includeFragment[i]=true;
+// 	    piToAdd.readsVec.push_back(sr_);
+// 	    // obsBase.push_back( bIndex  );
+// 	    // obsQual.push_back( q        );
+// 	    // mmQual.push_back(  m        );
+// 	    // isRevVec.push_back(isRev);	    
+// 	    //mmProb.push_back(  likeMismatchProbMap[m]  );
+// 	    // substitutionRatesPerRead.push_back( probSubMatchToUseEndo );
+// 	    //	    includeFragment[i]=true;
 
-	}//END FOR EACH READ
+// 	}//END FOR EACH READ
 
-	if( foundSites ){
-	    piToAdd.avgMQ =  round(-10*log10(probMM/double(basesRetained)));
-	    // if(posAlign == 74310){
-	    // 	cout<<piToAdd.avgMQ<<" "<<probMM<<" "<<basesRetained<<endl;
-	    // }
+// 	if( foundSites ){
+// 	    piToAdd.avgMQ =  round(-10*log10(probMM/double(basesRetained)));
+// 	    // if(posAlign == 74310){
+// 	    // 	cout<<piToAdd.avgMQ<<" "<<probMM<<" "<<basesRetained<<endl;
+// 	    // }
 
-	    totalSites++;
-	}
+// 	    totalSites++;
+// 	}
 	
-	m_piForGenomicWindow->push_back(piToAdd);
+// 	m_piForGenomicWindow->push_back(piToAdd);
 
-    }//end Visit()
+//     }//end Visit()
     
-    unsigned int getTotalSites() const{
-	return totalSites;
-    }
+//     unsigned int getTotalSites() const{
+// 	return totalSites;
+//     }
 
-    unsigned int getTotalBases() const{
-	return totalBases;
-    }
+//     unsigned int getTotalBases() const{
+// 	return totalBases;
+//     }
 
-private:
-    RefVector m_references;
-    int          m_refID;
-    unsigned int m_leftCoord;
-    unsigned int m_rightCoord;
-    int          m_threadID;
-    unsigned int m_numberOfSites;
+// private:
+//     RefVector m_references;
+//     int          m_refID;
+//     unsigned int m_leftCoord;
+//     unsigned int m_rightCoord;
+//     int          m_threadID;
+//     unsigned int m_numberOfSites;
 
-    unsigned int totalBases;
-    unsigned int totalSites;
+//     unsigned int totalBases;
+//     unsigned int totalSites;
 
-    vector<positionInformation> * m_piForGenomicWindow;
-    Fasta * m_fastaReference;
+//     vector<positionInformation> * m_piForGenomicWindow;
+//     Fasta * m_fastaReference;
 
-    //vector<PositionResult *> * m_dataToWriteOut;
-};//heteroComputerVisitor
+//     //vector<PositionResult *> * m_dataToWriteOut;
+// };//heteroComputerVisitor
 
 
 	// , m_references(references)
@@ -2523,7 +2524,7 @@ private:
 
 
 
-#define DEBUGHTS
+//#define DEBUGHTS
 
 static int read_bamHET(void *data, bam1_t *b){ // read level filters better go here to avoid pileup
     //cerr<<"read_bamHET"<<endl;
@@ -2575,8 +2576,8 @@ static int read_bamHET(void *data, bam1_t *b){ // read level filters better go h
     return ret;
 }
 
-//#define AROUNDINDELS
-//#define AROUNDINDELS
+#define AROUNDINDELS //if enabled, will remove the base after an indel at the cost of a bit of time
+
 
 //! Method called for each thread
 /*!
@@ -2724,11 +2725,11 @@ void *mainHeteroComputationThread(void * argc){
     // const RefVector  references = reader.GetReferenceData();
     // const int        refID      = reader.GetReferenceID( currentChunk->rangeGen.getChrName() );
 
-// #ifdef HETVERBOSE
-//     cerr<<"Thread #"<<rankThread<<" refID   "<<refID<<endl;    
-//      cerr<<"Thread #"<<rankThread<<" refName "<<references[refID].RefName<<endl;
-// #endif
-
+    // #ifdef HETVERBOSE
+    //     cerr<<"Thread #"<<rankThread<<" refID   "<<refID<<endl;    
+    //      cerr<<"Thread #"<<rankThread<<" refName "<<references[refID].RefName<<endl;
+    // #endif
+    
     // BamRegion bregion (refID, 
     // 		       currentChunk->rangeGen.getStartCoord(), 
     // 		       refID, 
@@ -4398,7 +4399,8 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     //write chains to output
     //bgzipWriterMCMC
     string headerHMMMCMC = "#llik\th\ts\tp\taccepted\tchains\tacptrate\n";
-    Internal::BgzfStream  bgzipWriterMCMC;
+    //Internal::BgzfStream  bgzipWriterMCMC;
+    BGZF *  bgzipWriterMCMC=NULL;
 
 
     string outFileSuffixMCMC;
@@ -4407,12 +4409,17 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     if(useminmidmax == HMMCODEMAX) { outFileSuffixMCMC = ".max"; }
     outFileSuffixMCMC += ".hmmmcmc.gz";
 
-    
-    bgzipWriterMCMC.Open(outFilePrefix+outFileSuffixMCMC, IBamIODevice::WriteOnly);
-    if(!bgzipWriterMCMC.IsOpen()){
+    bgzipWriterMCMC = bgzf_open(string(outFilePrefix+outFileSuffixMCMC).c_str(), "w");
+    if (bgzipWriterMCMC == NULL) { // region invalid or reference name not found
 	cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixMCMC)<<" in bgzip writer"<<endl;
-	exit(1);
+	exit(1);	
     }
+
+    // bgzipWriterMCMC.Open(outFilePrefix+outFileSuffixMCMC, IBamIODevice::WriteOnly);
+    // if(!bgzipWriterMCMC.IsOpen()){
+    // 	cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixMCMC)<<" in bgzip writer"<<endl;
+    // 	exit(1);
+    // }
 
     //computing the min/max segsites per chunk
     int minSegSitesPerChunk;
@@ -4575,7 +4582,8 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 		svector.push_back(s_i);
 
 		string strToWrite = stringify( x_i )+"\t"+stringify( h_i )+"\t"+stringify( s_i )+"\t"+stringify( pT_i )+"\t"+stringify( accept )+"\t"+stringify( chain )+"\t"+stringify( double(accept)/double(chain) )+"\n";
-		bgzipWriterMCMC.Write(strToWrite.c_str(), strToWrite.size());
+		//bgzipWriterMCMC.Write(strToWrite.c_str(), strToWrite.size());
+		if(bgzf_write(bgzipWriterMCMC,strToWrite.c_str(),strToWrite.size()) != int(strToWrite.size())){  cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
 	    }
 	    
 	    accept++;
@@ -4596,7 +4604,8 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     cerr<<endl;
     cout<<setprecision(10)<<"mcmc"<<"\tfinal\t"<<h_i<<"\t"<<s_i<<"\t"<<pT_i<<"\t"<<x_i<<"\t"<<endl;
 
-    bgzipWriterMCMC.Close();    
+    if(bgzf_close(bgzipWriterMCMC) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
+    //bgzipWriterMCMC.Close();    
 	
     //cerr<<"Baum Welch"<<endl;
 
@@ -4680,13 +4689,22 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     
 
     string headerHMMpost =   "#CHROM\tBEGIN\tEND\tp[ROH]\tp[nonROH]\n";
-    Internal::BgzfStream  bgzipWriterHMMpost;
-    bgzipWriterHMMpost.Open(outFilePrefix+outFileSuffixHMMpost, IBamIODevice::WriteOnly);
-    if(!bgzipWriterHMMpost.IsOpen()){
+    //Internal::BgzfStream  bgzipWriterHMMpost;
+    BGZF * bgzipWriterHMMpost=NULL;
+    // bgzipWriterHMMpost.Open(outFilePrefix+outFileSuffixHMMpost, IBamIODevice::WriteOnly);
+    // if(!bgzipWriterHMMpost.IsOpen()){
+    // 	cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixHMMpost)<<" in bgzip writer"<<endl;
+    // 	exit(1);
+    // }
+    bgzipWriterHMMpost = bgzf_open(string(outFilePrefix+outFileSuffixHMMpost).c_str(), "w");
+    if (bgzipWriterHMMpost == NULL) { // region invalid or reference name not found
 	cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixHMMpost)<<" in bgzip writer"<<endl;
-	exit(1);
+	exit(1);	
     }
-    bgzipWriterHMMpost.Write(headerHMMpost.c_str(), headerHMMpost.size());
+    
+    //bgzipWriterHMMpost.Write(headerHMMpost.c_str(), headerHMMpost.size());
+    if(bgzf_write(bgzipWriterHMMpost,headerHMMpost.c_str(),headerHMMpost.size()) != int(headerHMMpost.size())){ cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+    
     uint64_t rohSegments   =0;
     uint64_t nonrohSegments=0;
     uint64_t unsureSegments=0;
@@ -4746,7 +4764,9 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 		unsureSegments += sizeChunk;
 	    }
 	}
-	bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());	
+	//bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());
+	if( bgzf_write(bgzipWriterHMMpost,strToWrite.c_str(),strToWrite.size()) != int(strToWrite.size())){	cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+
     }
 
     if(inROH ){//was already in ROH
@@ -4754,7 +4774,9 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     }
 
 
-    bgzipWriterHMMpost.Close();    
+    if(bgzf_close(bgzipWriterHMMpost) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
+
+    //bgzipWriterHMMpost.Close();    
     cerr<<"Written trace to "<<(outFilePrefix+outFileSuffixHMMpost)<<endl;
 
     hmmRes toreturn;
@@ -4860,11 +4882,13 @@ int main (int argc, char *argv[]) {
     bool wroteEverything=false;
     int lastWrittenChunk=-1;   
     string headerHest="#CHROM\tBEGIN\tEND\tVALIDSITES\th\terr\thLow\thHigh\n";    
-    Internal::BgzfStream  bgzipWriterInfo;
+    //Internal::BgzfStream  bgzipWriterInfo;
+    BGZF *  bgzipWriterInfo=NULL;
+    
     string stringinfo ;
     vector<emissionUndef> heteroEstResults;
-    Internal::BgzfStream  bgzipWriterHest;
-
+    //Internal::BgzfStream  bgzipWriterHest;
+    BGZF * bgzipWriterHest=NULL;
 
 
     
@@ -4874,15 +4898,20 @@ int main (int argc, char *argv[]) {
     GenomicWindows     rw ;
     int    bpToExtract;
     int                   rc;
-    RefVector  references;
-    BamReader reader;
+    // RefVector  references;
+    // BamReader reader;
+    aux_t *data   =NULL;//bam reader
+    hts_idx_t *idx=NULL; //bam index
+
+    
     string previousChrWritten="###";
     bool skipToHMM =false;
     bool skipTheHMM=false;
     ifstream myFileFAI;
     //string filenameFAI;
     string headerVCFFile;
-    Internal::BgzfStream  bgzipWriterGL;
+    //    Internal::BgzfStream  bgzipWriterGL;
+    BGZF *  bgzipWriterGL=NULL;
     int maxChains   =  50000;
     double fracChainsBurnin   =  0.1;
 
@@ -5242,23 +5271,40 @@ int main (int argc, char *argv[]) {
 
     //Testing BAM file
 
-    if ( !reader.Open(bamFileToOpen) ) {
-	cerr << "Could not open input BAM file:" << bamFileToOpen <<endl;
-    	exit(1);
+    //bam_hdr_t *h = NULL; // BAM header of the 1st input
+    
+    data->fp = sam_open_format(bamFileToOpen.c_str(), "r", NULL); // open BAM
+
+    if(data->fp == NULL) {
+	cerr<<"ERROR: Could not open input BAM file "<<bamFileToOpen<<""<<endl;
+	exit(1);
     }
-
-    reader.LocateIndex();
-
-    if(!reader.HasIndex()){
-    	cerr << "The BAM file: " << bamFileToOpen <<" does not have an index"<<endl;
-    	exit(1);
+    idx = sam_index_load(data->fp, bamFileToOpen.c_str());  // load the index
+    if (idx == NULL) {
+	cerr<<"ERROR: Cannot load index for bamfile "<<bamFileToOpen<<""<<endl;
+	exit(1);
     }
+    data->hdr = sam_hdr_read(data->fp);    // read the BAM header
 
-    // retrieve reference data
-    references = reader.GetReferenceData();
+    //bam_get_tid(data->hdr, currentChunk->rangeGen.getChrName().c_str() );
+    
+    // if ( !reader.Open(bamFileToOpen) ) {
+    // 	cerr << "Could not open input BAM file:" << bamFileToOpen <<endl;
+    // 	exit(1);
+    // }
+
+    // reader.LocateIndex();
+
+    // if(!reader.HasIndex()){
+    // 	cerr << "The BAM file: " << bamFileToOpen <<" does not have an index"<<endl;
+    // 	exit(1);
+    // }
+
+    // // retrieve reference data
+    // references = reader.GetReferenceData();
 
 
-    reader.Close();
+    // reader.Close();
 
 
     
@@ -5512,11 +5558,17 @@ int main (int argc, char *argv[]) {
 	//	cerr<<"Lambda coverage: " <<rateForPoissonCov<<endl;	
 	stringinfo= stringify(rateForPoissonCov)+"\n";       
 	
-	bgzipWriterInfo.Open(outFilePrefix+".rginfo.gz", IBamIODevice::WriteOnly);
-	if(!bgzipWriterInfo.IsOpen()){
+	bgzipWriterInfo = bgzf_open( string(outFilePrefix+".rginfo.gz").c_str(), "w");
+	if (bgzipWriterInfo == NULL) { // region invalid or reference name not found
 	    cerr<<"Cannot open file "<<(outFilePrefix+".rginfo.gz")<<" in bgzip writer"<<endl;
-	    return 1;
+	    exit(1);	
 	}
+
+	// bgzipWriterInfo.Open(outFilePrefix+".rginfo.gz", IBamIODevice::WriteOnly);
+	// if(!bgzipWriterInfo.IsOpen()){
+	//     cerr<<"Cannot open file "<<(outFilePrefix+".rginfo.gz")<<" in bgzip writer"<<endl;
+	//     return 1;
+	// }
 	
 	
 	for (map<string,rgInfo>::iterator it=rg2info.begin(); it!=rg2info.end(); ++it){
@@ -5533,9 +5585,14 @@ int main (int argc, char *argv[]) {
 	    cerr<<"RG:\t"<<stringify(it->first)<<"\t"<<(it->second.isPe?"PE":"SE")<<"\t"<<stringify(it->second.maxReadLength)<<endl;
 	    stringinfo+=s;
 	}
-	bgzipWriterInfo.Write(stringinfo.c_str(), stringinfo.size());
 
-	bgzipWriterInfo.Close();
+	if(bgzf_write(bgzipWriterInfo,stringinfo.c_str(),stringinfo.size()) != int(stringinfo.size())){ cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+	//bgzipWriterInfo.Write(stringinfo.c_str(), stringinfo.size());
+	
+
+	//bgzipWriterInfo.Close();
+	if(bgzf_close(bgzipWriterInfo) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
+
 	//exit(1);
     }else{ //not lambdaCovSpecified
 	//use the rate specified via the command line
@@ -5767,15 +5824,21 @@ int main (int argc, char *argv[]) {
     // return 1;
     //writing h estimates
 
+    bgzipWriterHest = bgzf_open(string(outFilePrefix+".hEst.gz").c_str(), "w");
 
-    bgzipWriterHest.Open(outFilePrefix+".hEst.gz", IBamIODevice::WriteOnly);
-    if(!bgzipWriterHest.IsOpen()){
+     if (bgzipWriterHest == NULL) { // region invalid or reference name not found
 	cerr<<"Cannot open file "<<(outFilePrefix+".hEst.gz")<<" in bgzip writer"<<endl;
-	return 1;
-    }
+	exit(1);	
+     }
+    // bgzipWriterHest.Open(outFilePrefix+".hEst.gz", IBamIODevice::WriteOnly);
+    // if(!bgzipWriterHest.IsOpen()){
+    // 	cerr<<"Cannot open file "<<(outFilePrefix+".hEst.gz")<<" in bgzip writer"<<endl;
+    // 	return 1;
+    // }
 
-        
-    bgzipWriterHest.Write(headerHest.c_str(), headerHest.size());
+     if(bgzf_write(bgzipWriterHest,headerHest.c_str(),headerHest.size()) != int(headerHest.size())) { cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+
+     //bgzipWriterHest.Write(headerHest.c_str(), headerHest.size());
 
     
 
@@ -5783,11 +5846,19 @@ int main (int argc, char *argv[]) {
     
     
     if(outputgenol){
-	bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
-	if(!bgzipWriterGL.IsOpen()){
+
+	bgzipWriterGL = bgzf_open(string(outFilePrefix+".vcf.gz").c_str(), "w");
+
+	if (bgzipWriterGL == NULL) { // region invalid or reference name not found
 	    cerr<<"Cannot open file "<<(outFilePrefix+".vcf.gz")<<" in bgzip writer"<<endl;
-	    return 1;
+	    exit(1);	
 	}
+
+	// bgzipWriterGL.Open(outFilePrefix+".vcf.gz", IBamIODevice::WriteOnly);
+	// if(!bgzipWriterGL.IsOpen()){
+	//     cerr<<"Cannot open file "<<(outFilePrefix+".vcf.gz")<<" in bgzip writer"<<endl;
+	//     return 1;
+	// }
     
     
 	// if(outFileSiteLLFlag){
@@ -5845,7 +5916,9 @@ int main (int argc, char *argv[]) {
     headerVCFFile+="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleName+"\n";	
 
     if(outputgenol){
-	bgzipWriterGL.Write(headerVCFFile.c_str(),headerVCFFile.size());
+	//bgzipWriterGL.Write(headerVCFFile.c_str(),headerVCFFile.size());
+	if(bgzf_write(bgzipWriterGL,headerVCFFile.c_str(),headerVCFFile.size()) != int(headerVCFFile.size())) { cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+
     }
     // }
 #endif
@@ -5944,7 +6017,8 @@ int main (int argc, char *argv[]) {
 		heteroEstResults.push_back(hetResToAdd);
 				
 		// cerr<<"writing "<<strToWrite<<endl;
-		bgzipWriterHest.Write(strToWrite.c_str(), strToWrite.size());
+		//bgzipWriterHest.Write(strToWrite.c_str(), strToWrite.size());
+		if(bgzf_write(bgzipWriterHest,strToWrite.c_str(),strToWrite.size()) != int(strToWrite.size())) { cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
 
 		//#ifdef LATER
 		//sizeGenome+=dataToWrite->vecPositionResults->size();
@@ -5956,11 +6030,15 @@ int main (int argc, char *argv[]) {
 		    for(unsigned int i=0;i<dataToWrite->vecPositionResults->size();i++){
 			//cerr<<i<<endl;
 			// cerr<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID)<<endl;
-			strToWrite += dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID);
+
+			strToWrite += dataToWrite->vecPositionResults->at(i)->toString( data->hdr,dataToWrite->refID);
+			//strToWrite += dataToWrite->vecPositionResults->at(i)->toString(&references,dataToWrite->refID);
 			//cout<<i<<"\t"<<dataToWrite->vecPositionResults->at(i)->toString(references);
 			if( (i%500) == 499){
 			    //if(outFileSiteLLFlag){
-			    bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size());
+			    if(bgzf_write(bgzipWriterGL,strToWrite.c_str(),strToWrite.size())  != int(strToWrite.size())){ cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+
+			    //bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size());
 			    //}
 			    strToWrite="";
 			}
@@ -5972,7 +6050,10 @@ int main (int argc, char *argv[]) {
 		    if(!strToWrite.empty()){
 			// if(outFileSiteLLFlag){
 			// 	if(outFileSiteLLFlag){ 
-			bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size()); 
+			if(bgzf_write(bgzipWriterGL,strToWrite.c_str(),strToWrite.size()) != int(strToWrite.size())){ cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+
+			//bgzipWriterGL.Write(strToWrite.c_str(), strToWrite.size());
+			
 			// 	}
 			// }
 		    }
@@ -6015,11 +6096,15 @@ int main (int argc, char *argv[]) {
     ///////////////////////
     //end Writing data out/
     ///////////////////////
-    bgzipWriterHest.Close();
+
+    if(bgzf_close(bgzipWriterHest) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }
+
+    //bgzipWriterHest.Close();
 
 #ifndef DEBUGFIRSTWINDOWS
     if(outputgenol){
-	bgzipWriterGL.Close();
+	//bgzipWriterGL.Close();
+	if(bgzf_close(bgzipWriterGL) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
     }
 #endif
 

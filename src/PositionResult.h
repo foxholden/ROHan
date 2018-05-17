@@ -9,16 +9,21 @@
 #define PositionResult_h
 
 
+#include <sstream>      // std::stringstream
 
 #include <string>
 
-#include <api/BamConstants.h>
-#include <api/BamMultiReader.h>
+/* #include <api/BamConstants.h> */
+/* #include <api/BamMultiReader.h> */
 
+
+extern "C" {
+#include "htslib/sam.h"
+}
 #include "utils.h"
 
 using namespace std;
-using namespace BamTools;
+//using namespace BamTools;
 
 class PositionResult{
  private:
@@ -52,7 +57,8 @@ class PositionResult{
     PositionResult();
     PositionResult(const PositionResult & other);
     ~PositionResult();
-    string toString(const RefVector * references,const int & refID) const;
+    //string toString(const RefVector * references,const int & refID) const;
+    string toString(const bam_hdr_t * references,const int & refID) const;
 
     PositionResult & operator= (const PositionResult & other);
     //    friend ostream & operator<<(ostream & os, const PositionResult & ct);
