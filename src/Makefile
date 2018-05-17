@@ -7,7 +7,7 @@ LDFLAGS  = -lgsl -lgslcblas -llzma -lbz2 -lz  -lpthread
 LDLIBS   = ../lib/samtools/bedidx.o ../lib/htslib/libhts.a ../lib/samtools/libbam.a ../lib/samtools/libst.a 
 
 
-all:  ../lib/libgab/utils.o ../lib/libharu/src/.libs/libhpdf.a rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
+all:  ../lib/libgab/utils.o ../lib/libharu/src/.libs/libhpdf.a ../lib/htslib/libhts.a ../lib/samtools/bedidx.o rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
 
 %.o: %.cpp #../lib/libgab/utils.o  
 	${CXX} ${CXXFLAGS} $^ -o $@
