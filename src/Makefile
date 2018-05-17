@@ -51,7 +51,7 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 	git clone --recursive https://github.com/samtools/samtools.git ../lib/samtools/
 
 ../lib/libgab/utils.o:  ../lib/libgab/utils.h
-	cd ../lib/libgab/ &&  make utils.o && cd ../..
+	cd ../lib/libgab/ &&  make utils.o && make -C gzstream/ && cd ../..
 
 ../lib/libgab/utils.h:
 	rm -rfv ../lib/libgab/
