@@ -105,7 +105,7 @@ string PositionResult::toString(const bam_hdr_t * references,const int & refID) 
     // cerr<<references->at(refID).RefName<<"\t";
     // cerr<<pos<<"\t";
 
-//s<<references->at(refID).RefName<<"\t";
+    //s<<references->at(refID).RefName<<"\t";
     s<<references->target_name[refID]<<"\t";
     s<<pos<<"\t";
     //ID

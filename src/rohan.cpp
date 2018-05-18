@@ -26,6 +26,7 @@ extern "C" {
 #include "htslib/faidx.h"
 #include "htslib/tbx.h"
 #include "htslib/bgzf.h"
+#include "bam.h"
 
 #include "samtools.h"
 #include "sam_opts.h"
@@ -2536,40 +2537,51 @@ static int read_bamHET(void *data, bam1_t *b){ // read level filters better go h
 	// int32_t qlen   = bam_cigar2qlen(b->core.n_cigar, bam_get_cigar(b));
 	int32_t qlen   = b->core.l_qseq;
 
-	int32_t isize  = b->core.n_cigar;
-	//cerr<<"read_bamHET1: "<<bam1_qname(b)<<endl;	  
+	//int32_t isize  = b->core.n_cigar;
+	// cerr<<"read_bamHET1: "<<bam1_qname(b)<<endl;	  
         if ( b->core.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP) ) continue;
-	//cerr<<"read_bamHET2: "<<bam1_qname(b)<<endl;	  
+	// cerr<<"read_bamHET2: "<<bam1_qname(b)<<endl;	  
 	
         if ( (int)b->core.qual < aux->min_mapQ ) continue;
-	//cerr<<"read_bamHET3: "<<bam1_qname(b)<<endl;	  
-
+	// cerr<<"read_bamHET3: "<<bam1_qname(b)<<endl;	  
+	// cerr<<aux->min_len<<" "<<qlen<<" "<<int(MINLENGTHFRAGMENT)<<" "<<int(MAXLENGTHFRAGMENT)<<endl;
         if ( aux->min_len && ( (qlen <  int(MINLENGTHFRAGMENT) ) || (qlen > int(MAXLENGTHFRAGMENT) ) )) continue;
 	//cerr<<"read_bamHET4: "<<bam1_qname(b)<<endl;	  
+	if(specifiedDeam){
+	    if( bam_is_paired( b) ) continue; //skip paired-end reads because we cannot get proper deamination
 
-	uint8_t *rgptr = bam_aux_get(b, "RG");
-	// cerr<<"rg1 "<<rgptr<<endl;
-	// cout<<"isize "<<isize<<endl;
-	if(rgptr){
-	    string rg = string( (const char*)(rgptr+1));
+	    uint8_t *rgptr = bam_aux_get(b, "RG");
+	    // cerr<<"rg1 "<<rgptr<<endl;
+	    // cout<<"isize "<<isize<<endl;
+	    string rg = "UNKNOWN";
+	    
+	    if(rgptr){
+		rg = string( (const char*)(rgptr+1));
+	    }
 	    //cerr<<"rg2 "<<rg<<endl;
 	    //TODO
 	    if(rg2info.find(rg) == rg2info.end()){
-		rgInfo toadd;
-		toadd.isPe          = bam_is_paired( b); //al.IsPaired();
-		toadd.maxReadLength = MIN2( MAX2(qlen,isize), 255);
-		rg2info[rg]         = toadd;
+		cerr << "Heterozygosity computation: found an unknown RG tag from  "<<bam1_qname(b)<<" for BAM file:" << bamFileToOpen <<endl;
+		//exit(1);	
 	    }else{
-		rg2info[rg].isPe          = rg2info[rg].isPe || bam_is_paired(b); //al.IsPaired();
-		rg2info[rg].maxReadLength = MIN2( MAX2( MAX2(qlen,isize), rg2info[rg].maxReadLength ), 255);
-	    }
-	    
+		if(!rg2info[rg].isPe){ //if single end
+		    if(qlen == rg2info[rg].maxReadLength){//probably reached the end of the read length, we will keep maxlength-1 and under		
+			cerr<<"name "<<bam1_qname(b)<<"\t"<<rg<<endl;
+			continue;
+		    }
+		}else{
+		    //since we skipped the paired reads, if we have reached here
+		    //we can add single-end fragments 		    
+		}
+	    }	    
+	    // }else{
+	    // 	//cerr<<"WARNING: Could not retrieve RG tag from : "<<bam1_qname(b)<<" discarding"<<endl;	  	    
+	    // }
 	}
-	
-	if(specifiedDeam){
-	    if( bam_is_paired( b) ) continue; //skip paired-end reads because we cannot get proper deamination
-	}
-	//cerr<<"read_bamHET5: "<<bam1_qname(b)<<endl;	  
+	// if(specifiedDeam){
+	//     if( bam_is_paired( b) ) continue; //skip paired-end reads because we cannot get proper deamination
+	// }
+	// cerr<<"read_bamHET5: "<<bam1_qname(b)<<endl;	  
 
         break;
     }
@@ -2892,6 +2904,8 @@ void *mainHeteroComputationThread(void * argc){
     }
 
     h = data[0]->hdr; // easy access to the header of the 1st BAM
+    dataToWrite->refID = bam_get_tid(h,currentChunk->rangeGen.getChrName().c_str());
+
     if (reg) {
         beg     = data[0]->iter->beg; // and to the parsed region coordinates
         end     = data[0]->iter->end;
@@ -2923,7 +2937,7 @@ void *mainHeteroComputationThread(void * argc){
 #endif
     
     while ((ret=bam_mplp_auto(mplp, &tid, &pos, n_plp, plp)) > 0) { // come to the next covered position	
-	cerr<<endl<<(pos+1)<<" "<<" -----------------------"<<endl;
+	//cerr<<endl<<(pos+1)<<" "<<" -----------------------"<<endl;
 	
 	if (pos < beg || pos >= end) continue; // out of range; skip
         if (tid >= h->n_targets) continue;     // diff number of @SQ lines per file?
@@ -3028,7 +3042,7 @@ void *mainHeteroComputationThread(void * argc){
 		//     cerr<<bam1_qname(p->b)<<endl;	  
 		// }
 #ifdef DEBUGHTS
-		//cerr<< bam1_qname(p->b)<<" "<<j<<" "<<int((p->b)->core.flag)<<" "<<p->b->core.n_cigar<<" p="<<(p->cd.p)<<" i="<<int(p->cd.i)<<" f="<<float(p->cd.f)<<" "<<p->is_del<<" "<<p->is_refskip<<" "<<p->indel<<" "<<p->level<<" "<<p->aux<<" "<<endl;
+		cerr<< bam1_qname(p->b)<<" "<<j<<" "<<int((p->b)->core.flag)<<" "<<p->b->core.n_cigar<<" p="<<(p->cd.p)<<" i="<<int(p->cd.i)<<" f="<<float(p->cd.f)<<" "<<p->is_del<<" "<<p->is_refskip<<" "<<p->indel<<" "<<p->level<<" "<<p->aux<<" "<<endl;
 
 #endif
 
@@ -3107,7 +3121,7 @@ void *mainHeteroComputationThread(void * argc){
 		probMM += likeMismatchProbMap[m]; 
 		basesRetained++;
 
-		totalBasesL++;
+
 		foundSites=true;
 
 		singleRead sr_;
@@ -3126,7 +3140,7 @@ void *mainHeteroComputationThread(void * argc){
 
 #ifdef DEBUGHTS
 		//cerr<<isRev<<" "<<"ACGT"[int(sr_.base)]<<" "<<int(sr_.qual)<<" "<<int(sr_.mapq)<<" "<<int(m)<<" "<<int(sr_.lengthF)<<" "<<int(sr_.pos5p)<<" "<< bam1_qname(p->b)<<" "<<int((p->b)->core.flag)<<" "<<p->b->core.n_cigar<<" p="<<(p->cd.p)<<" i="<<int(p->cd.i)<<" f="<<float(p->cd.f)<<" "<<p->indel<<" "<<p->level<<endl;
-		cout<<isRev<<" "<<int(sr_.base)<<" "<<int(sr_.qual)<<" "<<int(sr_.mapq)<<" "<<int(m)<<" "<<int(sr_.lengthF)<<" "<<int(sr_.pos5p)<<" "<< bam1_qname(p->b)<<" "<<int((p->b)->core.flag)<<endl;
+		cerr<<"ADD "<<isRev<<" "<<int(sr_.base)<<" "<<int(sr_.qual)<<" "<<int(sr_.mapq)<<" "<<int(m)<<" "<<int(sr_.lengthF)<<" "<<int(sr_.pos5p)<<" "<< bam1_qname(p->b)<<" "<<int((p->b)->core.flag)<<endl;
 #endif
 		
 		// if(isRev){
@@ -3136,13 +3150,15 @@ void *mainHeteroComputationThread(void * argc){
 		//     sr_.pos5p = uint8_t(  pileupData.PileupAlignments[i].PositionInAlignment ); 
 		// }
 		// sr_.isrv=isRev;
+		totalBasesL++;
 		piToAdd.readsVec.push_back(sr_);
 
 //currLevelVec.push_back(p->level);
-		totalBasesL ++;
+		//totalBasesL ++;
 
 		
 #ifdef DEBUGHTS
+		if(0){
 		// printf("%d,",p->b);
 		// printf("%d,",bam_get_seq(p->b));
 		// @discussion Each base is encoded in 4 bits: 1 for A, 2 for C, 4 for G,
@@ -3177,6 +3193,7 @@ void *mainHeteroComputationThread(void * argc){
 		//printf("%d-",bam_is_failed(p->b));
 		cerr<<bam_is_failed(p->b)<<",";
 		cerr<<bam_mqual(p->b)<<"-";
+		}
 #endif
             }//end for each base at pos
             //printf("\tc=%d", n_plp[i] - m); // this the depth to output
@@ -3190,7 +3207,7 @@ void *mainHeteroComputationThread(void * argc){
 	    }
 
 	    piForGenomicWindow->push_back(piToAdd);
-	    cerr<<piToAdd.readsVec.size()<<endl;
+	    //cerr<<"readsVec size= "<<piToAdd.readsVec.size()<<endl;
 	    prevPos = pos;
 
 	}//end for all pos
@@ -3606,7 +3623,7 @@ void *mainHeteroComputationThread(void * argc){
 	checkResults("pthread_mutex_lock()\n", rc);
 	
 	//cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(hv->getTotalBases())<<" bases on "<<thousandSeparator(hv->getTotalSites())<<" sites average coverage: "<<(hv->getTotalSites()!=0 ? stringify(double(hv->getTotalBases())/double(hv->getTotalSites())) : "no sites found" )<<endl;
-	cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(totalSitesL)<<" bases on "<<thousandSeparator(totalBasesL)<<" sites average coverage: "<<(totalSitesL!=0 ? stringify(double(totalBasesL)/double(totalSitesL)) : "no sites found" )<<endl;
+	cerr<<"Thread #"<<rankThread <<" done reading "<<thousandSeparator(totalBasesL)<<" bases on "<<thousandSeparator(totalSitesL)<<" sites average coverage: "<<(totalSitesL!=0 ? stringify(double(totalBasesL)/double(totalSitesL)) : "no sites found" )<<endl;
 	
 	rc = pthread_mutex_unlock(&mutexCERR);
 	checkResults("pthread_mutex_unlock()\n", rc);
@@ -3828,21 +3845,26 @@ static int read_bamCOV(void *data, bam1_t *b){ // read level filters better go h
 	uint8_t *rgptr = bam_aux_get(b, "RG");
 	// cerr<<"rg1 "<<rgptr<<endl;
 	// cout<<"isize "<<isize<<endl;
+	string rg="UNKNOWN";
 	if(rgptr){
-	    string rg = string( (const char*)(rgptr+1));
-	    //cerr<<"rg2 "<<rg<<endl;
-	    
-	    if(rg2info.find(rg) == rg2info.end()){
-		rgInfo toadd;
-		toadd.isPe          = bam_is_paired( b); //al.IsPaired();
-		toadd.maxReadLength = MIN2( MAX2(qlen,isize), 255);
-		rg2info[rg]         = toadd;
-	    }else{
-		rg2info[rg].isPe          = rg2info[rg].isPe || bam_is_paired(b); //al.IsPaired();
-		rg2info[rg].maxReadLength = MIN2( MAX2( MAX2(qlen,isize), rg2info[rg].maxReadLength ), 255);
-	    }
-	    
+	    rg = string( (const char*)(rgptr+1));
 	}
+	//cerr<<"rg2 "<<rg<<endl;	    
+
+	if(rg2info.find(rg) == rg2info.end()){
+	    rgInfo toadd;
+	    toadd.isPe          = bam_is_paired( b); //al.IsPaired();
+	    toadd.maxReadLength = MIN2( MAX2(qlen,isize), 255);
+	    rg2info[rg]         = toadd;
+	}else{
+	    rg2info[rg].isPe          = rg2info[rg].isPe || bam_is_paired(b); //al.IsPaired();
+	    rg2info[rg].maxReadLength = MIN2( MAX2( MAX2(qlen,isize), rg2info[rg].maxReadLength ), 255);
+	}
+	    
+	// }else{
+	//     //cerr<<"WARNING: Could not get RG tag from read "<<bam1_qname(b)<<endl;
+	    
+	// }
 	if(specifiedDeam){
 	    if( bam_is_paired( b) ) continue; //skip paired-end reads because we cannot get proper deamination
 	}
@@ -5292,6 +5314,12 @@ int main (int argc, char *argv[]) {
     }
     data->hdr = sam_hdr_read(data->fp);    // read the BAM header
 
+    // for(int rid=0;rid<100;rid++){
+    // 	cout<<rid<<endl;
+    // 	cout<<data->hdr->target_name[rid]<<endl;
+    // }
+
+    
     //bam_get_tid(data->hdr, currentChunk->rangeGen.getChrName().c_str() );
     
     // if ( !reader.Open(bamFileToOpen) ) {
@@ -5577,7 +5605,7 @@ int main (int argc, char *argv[]) {
 	// }
 	
 	
-	for (map<string,rgInfo>::iterator it=rg2info.begin(); it!=rg2info.end(); ++it){
+	for(map<string,rgInfo>::iterator it=rg2info.begin(); it!=rg2info.end(); ++it){
 	    string s = stringify(it->first)+"\t"+stringify(it->second.isPe)+"\t"+stringify(it->second.maxReadLength)+"\n";
 	    
 	    if(it->second.isPe)
