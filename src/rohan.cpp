@@ -4396,7 +4396,7 @@ void *mainCoverageComputationThread(void * argc){
 
 // useminmidmax 0:min 1:mid 2:max
 
-hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & heteroEstResults, const int maxChains , const double fracChainsBurnin,const long double rohmu,const unsigned char useminmidmax){
+hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & heteroEstResults, const int maxChains , const double fracChainsBurnin,const long double rohmu,const unsigned char useminmidmax, bool noROH){
 
     cerr<<"Creating HMM";
     // for(unsigned int i=0;i<heteroEstResults.size();i++){
@@ -4506,19 +4506,35 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     long double pT_i = randomProb()*(pTupper-pTlower) + pTlower;
     long double pT_i_1;
     //long double pTlower =       numeric_limits<double>::epsilon();
-        
+    if(	noROH ){
+	pTlower  = 0.0;
+	pT_i     = 0.0;
+	pT_i_1   = 0.0;	
+    }
+
     random_device rd;
     default_random_engine dre (rd());
     //int maxChains = 100000;
     //chain 0
 
     hmm.setHetRateForNonROH(h_i);
-    hmm.setTransprob(pT_i);
+    if(noROH){
+	hmm.setTransprob(0.0);
+    }else{
+	hmm.setTransprob(pT_i);
+    }
     hmm.setNrwPerSizeChunk( (unsigned int)s_i );
     hmm.recomputeProbsNonROH();
 
-    hmm.setHetRateForROH(rohmu);
+    if(noROH){
+	hmm.setHetRateForROH(0.0);	
+    }else{
+	hmm.setHetRateForROH(rohmu);
+    }
     hmm.recomputeProbsROH();
+    
+
+
     
     
     cerr<<".";
@@ -4555,9 +4571,11 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 
 
 	normal_distribution<long double> distribution_pT(pT_i,(pTupper-pTlower)/partition  );
-	pT_i_1      = distribution_pT(dre);
-	if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
-	    pT_i_1      = pT_i;
+	if( !noROH ){
+	    pT_i_1      = distribution_pT(dre);
+	    if(pT_i_1 <= pTlower     ||  pT_i_1 >= pTupper     ){
+		pT_i_1      = pT_i;
+	    }
 	}
 
 	//normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
@@ -4629,8 +4647,6 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     if(bgzf_close(bgzipWriterMCMC) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
     //bgzipWriterMCMC.Close();    
 	
-    //cerr<<"Baum Welch"<<endl;
-
 	
 
     //hvector and pvector contain the values
@@ -4931,6 +4947,8 @@ int main (int argc, char *argv[]) {
     string previousChrWritten="###";
     bool skipToHMM =false;
     bool skipTheHMM=false;
+    bool noROH=false;
+
     ifstream myFileFAI;
     //string filenameFAI;
     string headerVCFFile;
@@ -4979,7 +4997,7 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +"--tvonly"     +"\t\t\t"    + ""  +"\t\t"+"Only consider transversions  (default: "+booleanAsString(tvonly)+")"+"\n"+
 	"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"recommended for highly damaged samples where damage cannot be accurately quantified "+"\n"+
 	//"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"heterozygosity estimates will be multiplied by ([tstv]+1)"+"\n"+
-
+	"\t\t"+""  +"" +"--noroh"    +"\t\t\t"    + ""        +"\t\t\t"+"Do not allow any region to be flagged as ROH (default: "+booleanAsString(noROH)+")"+"\n"+	
 
 	"\t\t"+""  +"" +"--auto"     +"\t\t\t"    + "[file]"  +"\t\t\t"+"Use only the chromosome/scaffolds in this file   (default: use every chromosome)"+"\n"+
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"this is done to avoid including sex chromosomes in the calculation"+"\n"+
@@ -5075,6 +5093,11 @@ int main (int argc, char *argv[]) {
 
         if( string(argv[i]) == "--nohmm"  ){
 	    skipTheHMM=true;
+            continue;
+        }
+
+        if( string(argv[i]) == "--noroh"  ){
+	    noROH=true;
             continue;
         }
 	
@@ -6282,15 +6305,15 @@ int main (int argc, char *argv[]) {
 
 
     //lower
-    hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN);
+    hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN,noROH);
     cerr<<"min h est. "<<hmmResmin.hAvg<<" hMin "<<hmmResmin.hMin<<" hMax "<<hmmResmin.hMax<<" s "<<hmmResmin.sAvg<<" sMin "<<hmmResmin.sMin<<" sMax "<<hmmResmin.sMax<<" p avg. "<<hmmResmin.pAvg<<" pMin "<<hmmResmin.pMin<<" pMax "<<hmmResmin.pMax<<" rohS "<<hmmResmin.rohSegments<<" nonrohS "<<hmmResmin.nonrohSegments<<" unsure "<<hmmResmin.unsureSegments<<endl;
 
     //mid
-    hmmRes hmmResmid=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMID);
+    hmmRes hmmResmid=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMID,noROH);
     cerr<<"mid h est. "<<hmmResmid.hAvg<<" hMin "<<hmmResmid.hMin<<" hMax "<<hmmResmid.hMax<<" s "<<hmmResmid.sAvg<<" sMin "<<hmmResmid.sMin<<" sMax "<<hmmResmid.sMax<<" p avg. "<<hmmResmid.pAvg<<" pMin "<<hmmResmid.pMin<<" pMax "<<hmmResmid.pMax<<" rohS "<<hmmResmid.rohSegments<<" nonrohS "<<hmmResmid.nonrohSegments<<" unsure "<<hmmResmid.unsureSegments<<endl;
 
     //upper
-    hmmRes hmmResmax=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMAX);
+    hmmRes hmmResmax=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMAX,noROH);
     cerr<<"max h est. "<<hmmResmax.hAvg<<" hMin "<<hmmResmax.hMin<<" hMax "<<hmmResmax.hMax<<" s "<<hmmResmax.sAvg<<" sMin "<<hmmResmax.sMin<<" sMax "<<hmmResmax.sMax<<" p avg. "<<hmmResmax.pAvg<<" pMin "<<hmmResmax.pMin<<" pMax "<<hmmResmax.pMax<<" rohS "<<hmmResmax.rohSegments<<" nonrohS "<<hmmResmax.nonrohSegments<<" unsure "<<hmmResmax.unsureSegments<<endl;
 
     //return 1;
