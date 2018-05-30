@@ -137,6 +137,7 @@ char offsetQual=33;
 //                                         4 u       Ne
 int minSegSitesPer1M=  80; // 0.00008	 = 4*2e-8* 1000
 int maxSegSitesPer1M=5000; // 0.00500    = 4*2e-8*62500
+double  rho1M=20; 
 
 long double likeMatch           [MAXBASEQUAL+1];
 long double likeMismatch        [MAXBASEQUAL+1];
@@ -4482,12 +4483,18 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 
     long double hlower = double( minSegSitesPer1M )/double(1000000);
     long double hupper = double( maxSegSitesPer1M )/double(1000000);
-
+    
     //number of non-recombining chunks per window
     long double s_i    = 100.0; //starting value, there are 100 non-recombining window in sizeChunk
     long double s_i_1;
-
-    long double slower = 1.0;       // the whole sizeChunk is a non-recombining window
+    // cout<<"rhoWindow "<<rhoWindow<<endl;
+    // for(int i=0;i<200;i++){
+    // 	long double prho = s_i/(s_i+rho1M);
+    // 	cout<<i<<"\t"<<prho<<"\t"<<gsl_ran_negative_binomial_pdf(i, prho ,s_i)<<endl;
+	
+    // }
+    // exit(1);
+    long double slower = 3.0;       // the whole sizeChunk is a non-recombining window
     long double supper = sizeChunk; // 1 base is a non-recombining window
     
 
@@ -4538,9 +4545,10 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     
     
     cerr<<".";
-    // for(unsigned int i=0;i<heteroEstResults.size();i++){
-    // 	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
-    // }
+    for(unsigned int i=0;i<heteroEstResults.size();i++){
+     	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
+    }
+    
     // return 1;
     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
     //cerr<<"test fwd"<<endl;
@@ -4581,10 +4589,18 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	//normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
 	normal_distribution<long double> distribution_s(s_i,  2  );
 	s_i_1      = distribution_s(dre);
-	if(s_i_1 <= slower       ||  s_i_1 >= supper     ){
-	    s_i_1      = s_i;
-	}
+	long double prior_S;
+	long double prho = rho1M/(rho1M+rho1M);
 
+
+	if(s_i_1 <= slower       ||  s_i_1 >= supper     ){
+	    prior_S = gsl_ran_negative_binomial_pdf(s_i_1, prho , rho1M);
+	    s_i_1      = s_i;
+	}else{
+	    prior_S = gsl_ran_negative_binomial_pdf(s_i_1, prho , rho1M);
+	}
+	prior_S = MAX2( numeric_limits<double>::min(), prior_S);
+	//cout<<s_i<<"\t"<<s_i_1<<"\t"<<prior_S<<"\t"<<prho<<"\t"<<rho1M<<endl;
 
 	//set new model parameters
 	// cerr<<"old   h_i   "<<h_i<<" "<<" pT_i "<<" "<<pT_i<<" s_i  "<<s_i <<endl;
@@ -4602,8 +4618,9 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	// tmpResFWD = forwardProbUncertaintyMissing(&hmm,heteroEstResults, sizeChunk,useminmidmax);
 	tmpResFWD = forwardProbMissing(&hmm,heteroEstResults, sizeChunk,useminmidmax);
  
-
-	x_i_1     = tmpResFWD.llik;
+	
+	x_i_1     = tmpResFWD.llik +logl(prior_S);
+	//cout<<prior_S<<" "<<logl(prior_S)<<endl;
 	//	cerr<<"x_i_1 "<<x_i_1<<endl;
 	if(chain>(maxChains/4)){
 	    pTlower = pTlowerSecondHalf;
@@ -4712,11 +4729,14 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     hmm.setNrwPerSizeChunk( (unsigned int)sAvg );
     hmm.recomputeProbsNonROH();
 
+    //TODO remove
+    verbose=true;
+   
     
-    fbreturnVal postprob = forwardBackwardProbMissing(&hmm, heteroEstResults , sizeChunk,useminmidmax);
+    fbreturnVal postprob = forwardBackwardProbMissing(&hmm, heteroEstResults , sizeChunk,useminmidmax,verbose);
     
     cerr<<"...HMM done"<<endl;
-
+    exit(1);
 
     string outFileSuffixHMMpost;
     if(useminmidmax == HMMCODEMIN) { outFileSuffixHMMpost = ".min"; }
@@ -6308,6 +6328,7 @@ int main (int argc, char *argv[]) {
     hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN,noROH);
     cerr<<"min h est. "<<hmmResmin.hAvg<<" hMin "<<hmmResmin.hMin<<" hMax "<<hmmResmin.hMax<<" s "<<hmmResmin.sAvg<<" sMin "<<hmmResmin.sMin<<" sMax "<<hmmResmin.sMax<<" p avg. "<<hmmResmin.pAvg<<" pMin "<<hmmResmin.pMin<<" pMax "<<hmmResmin.pMax<<" rohS "<<hmmResmin.rohSegments<<" nonrohS "<<hmmResmin.nonrohSegments<<" unsure "<<hmmResmin.unsureSegments<<endl;
 
+    
     //mid
     hmmRes hmmResmid=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMID,noROH);
     cerr<<"mid h est. "<<hmmResmid.hAvg<<" hMin "<<hmmResmid.hMin<<" hMax "<<hmmResmid.hMax<<" s "<<hmmResmid.sAvg<<" sMin "<<hmmResmid.sMin<<" sMax "<<hmmResmid.sMax<<" p avg. "<<hmmResmid.pAvg<<" pMin "<<hmmResmid.pMin<<" pMax "<<hmmResmid.pMax<<" rohS "<<hmmResmid.rohSegments<<" nonrohS "<<hmmResmid.nonrohSegments<<" unsure "<<hmmResmid.unsureSegments<<endl;
