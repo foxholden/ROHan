@@ -4589,17 +4589,17 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	//normal_distribution<long double> distribution_s(s_i,  (supper-slower)/partition  );
 	normal_distribution<long double> distribution_s(s_i,  2  );
 	s_i_1      = distribution_s(dre);
-	long double prior_S;
-	long double prho = rho1M/(rho1M+rho1M);
+	// long double prior_S;
+	// long double prho = rho1M/(rho1M+rho1M);
 
 
 	if(s_i_1 <= slower       ||  s_i_1 >= supper     ){
-	    prior_S = gsl_ran_negative_binomial_pdf(s_i_1, prho , rho1M);
+	    ///prior_S = gsl_ran_negative_binomial_pdf(s_i_1, prho , rho1M);
 	    s_i_1      = s_i;
 	}else{
-	    prior_S = gsl_ran_negative_binomial_pdf(s_i_1, prho , rho1M);
+	    //prior_S = gsl_ran_negative_binomial_pdf(s_i_1, prho , rho1M);
 	}
-	prior_S = MAX2( numeric_limits<double>::min(), prior_S);
+	//prior_S = MAX2( numeric_limits<double>::min(), prior_S);
 	//cout<<s_i<<"\t"<<s_i_1<<"\t"<<prior_S<<"\t"<<prho<<"\t"<<rho1M<<endl;
 
 	//set new model parameters
@@ -4620,7 +4620,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	tmpResFWD = forwardProbMissing(&hmm,heteroEstResults, sizeChunk,useminmidmax);
  
 	
-	x_i_1     = tmpResFWD.llik +logl(prior_S);
+	x_i_1     = tmpResFWD.llik; //+logl(prior_S);
 	//cout<<prior_S<<" "<<logl(prior_S)<<endl;
 	//	cerr<<"x_i_1 "<<x_i_1<<endl;
 	if(chain>(maxChains/4)){
