@@ -60,7 +60,7 @@ public:
     
     void setH(long double newH);
     void setNrwPerSizeChunk(unsigned int nrwPerSizeChunk_); //nrw = non-recombining window
-    void recomputeProbs();
+    void recomputeProbs(bool verbose=false);
     void setSecond(HmmState * second);
 };
 #endif

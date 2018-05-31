@@ -51,8 +51,8 @@ public:
     
     void setTransprob(long double newTrans);
     void setNrwPerSizeChunk(unsigned int nrwPerSizeChunk);
-    void recomputeProbsROH();
-    void recomputeProbsNonROH();
+    void recomputeProbsROH(   bool verbose=false);
+    void recomputeProbsNonROH(bool verbose=false);
     
     int  getMinSegSitesPerChunk();
     int  getMaxSegSitesPerChunk();
@@ -353,14 +353,14 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 
 	    long double p_e=-1;
 	    if(!observed[k].undef){
-	      p_e= hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax,
-									observed[k].hlow,
-									observed[k].h,
-									observed[k].hhigh,
-									sizeChunk,
-									hmm->getMinSegSitesPerChunk(),
-									hmm->getMaxSegSitesPerChunk()),
-							sizeChunk );
+		p_e= hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax,
+									  observed[k].hlow,
+									  observed[k].h,
+									  observed[k].hhigh,
+									  sizeChunk,
+									  hmm->getMinSegSitesPerChunk(),
+									  hmm->getMaxSegSitesPerChunk()),
+							  sizeChunk );
 	    }
 	    /* usemin?  */
 	    /* 						   ((int)(observed[k].hlow *sizeChunk)): */

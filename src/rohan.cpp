@@ -39,7 +39,7 @@ extern "C" {
 #define bam_is_rmdup(b)     (((b)->core.flag&BAM_FDUP)        != 0)
 #define bam_is_failed(b)    ( bam_is_qcfailed(b) || bam_is_rmdup(b) )
 #define bam_mqual(b)        ((b)->core.qual)
-#define bam1_qname(b) (bam_get_qname((b)))
+#define bam1_qname(b)       (bam_get_qname((b)))
 
 typedef struct {     // auxiliary data structure
     samFile *fp;     // the file handle
@@ -4610,6 +4610,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	hmm.setTransprob(pT_i_1);
 	hmm.setNrwPerSizeChunk( (unsigned int)s_i_1 );
 	hmm.recomputeProbsNonROH();
+	hmm.recomputeProbsROH();
 
 	
 	//x_i_1=forwardProb(&hmm, emittedH , sizeChunk);
@@ -4724,19 +4725,21 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     // hAvg = 0.0007467025205;
     // pAvg = 0.0960255;
     
+    //TODO remove
+    //verbose=true;
+
     hmm.setHetRateForNonROH(hAvg);
     hmm.setTransprob(pAvg);
     hmm.setNrwPerSizeChunk( (unsigned int)sAvg );
-    hmm.recomputeProbsNonROH();
+    hmm.recomputeProbsNonROH(verbose);    
+    hmm.recomputeProbsROH(verbose);
 
-    //TODO remove
-    verbose=true;
    
     
     fbreturnVal postprob = forwardBackwardProbMissing(&hmm, heteroEstResults , sizeChunk,useminmidmax,verbose);
     
     cerr<<"...HMM done"<<endl;
-    exit(1);
+    //    exit(1);
 
     string outFileSuffixHMMpost;
     if(useminmidmax == HMMCODEMIN) { outFileSuffixHMMpost = ".min"; }
@@ -6322,16 +6325,17 @@ int main (int argc, char *argv[]) {
 
 
     
-
+    
+    //exit(1);
 
     //lower
     hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN,noROH);
     cerr<<"min h est. "<<hmmResmin.hAvg<<" hMin "<<hmmResmin.hMin<<" hMax "<<hmmResmin.hMax<<" s "<<hmmResmin.sAvg<<" sMin "<<hmmResmin.sMin<<" sMax "<<hmmResmin.sMax<<" p avg. "<<hmmResmin.pAvg<<" pMin "<<hmmResmin.pMin<<" pMax "<<hmmResmin.pMax<<" rohS "<<hmmResmin.rohSegments<<" nonrohS "<<hmmResmin.nonrohSegments<<" unsure "<<hmmResmin.unsureSegments<<endl;
 
-    
     //mid
     hmmRes hmmResmid=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMID,noROH);
     cerr<<"mid h est. "<<hmmResmid.hAvg<<" hMin "<<hmmResmid.hMin<<" hMax "<<hmmResmid.hMax<<" s "<<hmmResmid.sAvg<<" sMin "<<hmmResmid.sMin<<" sMax "<<hmmResmid.sMax<<" p avg. "<<hmmResmid.pAvg<<" pMin "<<hmmResmid.pMin<<" pMax "<<hmmResmid.pMax<<" rohS "<<hmmResmid.rohSegments<<" nonrohS "<<hmmResmid.nonrohSegments<<" unsure "<<hmmResmid.unsureSegments<<endl;
+
 
     //upper
     hmmRes hmmResmax=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMAX,noROH);

@@ -161,15 +161,16 @@ void Hmm::setHetRateForROH(long double newH){
 }
 
 void Hmm::setNrwPerSizeChunk(unsigned int nrwPerSizeChunk){
+    hmmstates[0]->setNrwPerSizeChunk(nrwPerSizeChunk);
     hmmstates[1]->setNrwPerSizeChunk(nrwPerSizeChunk);
 }
 
-void Hmm::recomputeProbsROH(){
-    hmmstates[0]->recomputeProbs();
+void Hmm::recomputeProbsROH(bool verbose){
+    hmmstates[0]->recomputeProbs(verbose);
 }
 
-void Hmm::recomputeProbsNonROH(){
-    hmmstates[1]->recomputeProbs();
+void Hmm::recomputeProbsNonROH(bool verbose){
+    hmmstates[1]->recomputeProbs(verbose);
 }
 
 void Hmm::setTransprob(long double newTrans){
