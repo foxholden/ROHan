@@ -93,7 +93,9 @@ int PositionResult::base2HomoIndex(const char b) const{
     exit(1);    
 }
 
-string PositionResult::toString(const RefVector  * references, const int & refID) const{
+//string PositionResult::toString(const RefVector  * references, const int & refID) const{
+string PositionResult::toString(const bam_hdr_t * references,const int & refID) const{
+
     //cerr<<"toString: "<<endl;
     stringstream s;
     s.precision(13);
@@ -103,7 +105,8 @@ string PositionResult::toString(const RefVector  * references, const int & refID
     // cerr<<references->at(refID).RefName<<"\t";
     // cerr<<pos<<"\t";
 
-    s<<references->at(refID).RefName<<"\t";
+    //s<<references->at(refID).RefName<<"\t";
+    s<<references->target_name[refID]<<"\t";
     s<<pos<<"\t";
     //ID
     s<<"."<<"\t";

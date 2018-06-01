@@ -28,11 +28,11 @@ static vector<long double> lnFactVec;
 #define HMMCODEMAX 2
 
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
+#define MIN2(a,b) (((a)<(b))?(a):(b))
+#define MAX2(a,b) (((a)>(b))?(a):(b))
 
-#define MIN3(a,b,c) MIN(MIN(a,b),c)
-#define MAX3(a,b,c) MAX(MAX(a,b),c)
+#define MIN3(a,b,c) MIN2(MIN2(a,b),c)
+#define MAX3(a,b,c) MAX2(MAX2(a,b),c)
 
 
 
@@ -207,6 +207,8 @@ typedef struct {
     uint8_t lengthF;             
     /* int dist5p; */
     /* int dist3p; */
+
+
 #ifdef DEBUGSINGLEREAD
     //string name; //TO REMOVE
 #endif
@@ -230,6 +232,7 @@ typedef struct {
     //int refID;
     int posAlign;
     int avgMQ;
+
     int          baseC[4];
     bool skipPosition;
 } positionInformation;

@@ -51,8 +51,8 @@ public:
     
     void setTransprob(long double newTrans);
     void setNrwPerSizeChunk(unsigned int nrwPerSizeChunk);
-    void recomputeProbsROH();
-    void recomputeProbsNonROH();
+    void recomputeProbsROH(   bool verbose=false);
+    void recomputeProbsNonROH(bool verbose=false);
     
     int  getMinSegSitesPerChunk();
     int  getMaxSegSitesPerChunk();
@@ -137,7 +137,7 @@ typedef struct {
     GenomicRange rangeGen;
 } emissionUndef;
 
-//#define DEBUGFWD
+#define DEBUGFWD
 
 inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissionUndef> & observed, unsigned int sizeChunk,bool verbose=false){
     int nObservations  = int(observed.size());
@@ -197,9 +197,9 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 		}else{//not undefined and not break
 		    
 		    f[state][k]     =		    logsumNotrans+                                       //previous probability without transition probability
-		                                    observed[k].weight*logRobust( p_e ) +                                   //emission probability by state
-		                                    logRobust( hmm->startingState[state]) ;              //probability of "re"starting at state "state"
-    }
+			observed[k].weight*logRobust( p_e ) +                                   //emission probability by state
+			logRobust( hmm->startingState[state]) ;              //probability of "re"starting at state "state"
+		}
 	    }else{
 		if(observed[k].undef){
 		    f[state][k] =		    logsum;   //forego emission probability just count sum of all probs for every previous state
@@ -212,13 +212,13 @@ inline fbreturnVal forwardProbUncertaintyMissing (Hmm * hmm, const vector<emissi
 			logsum;                                                              //sum of all probs for ev
 		}
 	    }
-
+	    
 
 #ifdef DEBUGFWD
 	    if(verbose)
 		cout<<""<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" undef="<<observed[k].undef<<" chrb="<<observed[k].chrBreak<<" w="<<observed[k].weight<<endl;
 #endif
-
+	    
 	}//each state
 
     }//end each obs
@@ -353,14 +353,14 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 
 	    long double p_e=-1;
 	    if(!observed[k].undef){
-	      p_e= hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax,
-									observed[k].hlow,
-									observed[k].h,
-									observed[k].hhigh,
-									sizeChunk,
-									hmm->getMinSegSitesPerChunk(),
-									hmm->getMaxSegSitesPerChunk()),
-							sizeChunk );
+		p_e= hmm->hmmstates[state]->probEmission( returnMinMidMax(useminmidmax,
+									  observed[k].hlow,
+									  observed[k].h,
+									  observed[k].hhigh,
+									  sizeChunk,
+									  hmm->getMinSegSitesPerChunk(),
+									  hmm->getMaxSegSitesPerChunk()),
+							  sizeChunk );
 	    }
 	    /* usemin?  */
 	    /* 						   ((int)(observed[k].hlow *sizeChunk)): */
@@ -420,7 +420,7 @@ inline fbreturnVal forwardProbMissing (Hmm * hmm, const vector<emissionUndef> & 
 
 #ifdef DEBUGFWD
 	    if(verbose)
-		cerr<<""<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" "<<observed[k].hlow<<" "<<observed[k].hhigh<<" undef="<<observed[k].undef<<" chrb="<<observed[k].chrBreak<<" w="<<observed[k].weight<<" "<<observed[k].rangeGen<<" "<<returnMinMidMax(useminmidmax,observed[k].hlow,observed[k].h,observed[k].hhigh,sizeChunk,hmm->getMinSegSitesPerChunk(),hmm->getMaxSegSitesPerChunk())<<" "<<hmm->getMaxSegSitesPerChunk()<<endl;
+		cerr<<""<<"f["<<state<<"]["<<k<<"] ="<<f[state][k]<<" h "<< hmm->hmmstates[state]->getH()<<" p_e="<<p_e<<" p_e==0 "<<(p_e==0)<<" log(p_e)="<<logRobust(p_e)<<" logsum="<<logsum<<" "<<observed[k].hlow<<" "<<observed[k].h<<" "<<observed[k].hhigh<<" undef="<<observed[k].undef<<" chrb="<<observed[k].chrBreak<<" w="<<observed[k].weight<<" "<<observed[k].rangeGen<<" "<<returnMinMidMax(useminmidmax,observed[k].hlow,observed[k].h,observed[k].hhigh,sizeChunk,hmm->getMinSegSitesPerChunk(),hmm->getMaxSegSitesPerChunk())<<" "<<hmm->getMaxSegSitesPerChunk()<<endl;
 #endif
 
 	}//each state

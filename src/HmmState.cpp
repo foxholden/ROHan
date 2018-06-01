@@ -225,7 +225,7 @@ void HmmState::setNrwPerSizeChunk(unsigned int nrwPerSizeChunk_){
     nrwPerSizeChunk = nrwPerSizeChunk_;
 }
 
-void HmmState::recomputeProbs(){
+void HmmState::recomputeProbs(bool verbose){
     //need to recompute the probabilitiesForEmission
     delete probabilitiesForEmission;
     probabilitiesForEmission = new vector<long double> (maxSegSitesPerChunk+1,0.0);
@@ -242,9 +242,10 @@ void HmmState::recomputeProbs(){
 	if(isnan(probMut) || isinf(probMut) ){
 	  probMut = numeric_limits<double>::min();
 	}else{
-	  probMut = MAX( probMut , numeric_limits<double>::min() );
+	  probMut = MAX2( probMut , numeric_limits<double>::min() );
 	}
-	//cerr<<"theta "<<theta<<"\t"<<mutations<<"\t"<<probMut<<endl;
+	if(verbose)
+	    cerr<<"theta "<<theta<<"\tthetaScale "<<thetaScale<<"\t"<<sizeChunk<<"\t"<<nrwPerSizeChunk<<"\t"<<mutations<<"\t"<<probMut<<endl;
 	probabilitiesForEmission->at(mutations) = probMut;
     }
 
