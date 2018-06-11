@@ -2567,7 +2567,7 @@ static int read_bamHET(void *data, bam1_t *b){ // read level filters better go h
 	    }else{
 		if(!rg2info[rg].isPe){ //if single end
 		    if(qlen == rg2info[rg].maxReadLength){//probably reached the end of the read length, we will keep maxlength-1 and under		
-			cerr<<"name "<<bam1_qname(b)<<"\t"<<rg<<endl;
+			//cerr<<"name "<<bam1_qname(b)<<"\t"<<rg<<endl;
 			continue;
 		    }
 		}else{
