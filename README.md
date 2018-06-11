@@ -39,19 +39,21 @@ or
 Installation
 ----------------------
 
-1) make sure you have "cmake", "libtool" and "git" installed, check for it by typing " git --version" and "cmake --version".  
+1) make sure you have "cmake", "libtool", "libpng" and "git" installed, check for it by typing " git --version" and "cmake --version".  
 
 For Ubuntu:
 
      sudo apt-get install git
      sudo apt-get install cmake
      sudo apt-get install libtool
+     sudo apt-get install libpng-dev
 
 For MacOS, if you have Homebrew (https://brew.sh/) installed: 
 
      brew install git
      brew install cmake
      brew install libtool
+     brew install libpng
 
 2) make sure you have gcc that supports -std=c++11, gcc version 4.7 or above. Type "gcc -v" and check the version. For both Ubuntu and MacOS, 
 
@@ -67,7 +69,6 @@ For MacOS, if you get the problem: fatal error: 'lzma.h' file not found, this is
 
 Quick start
 ----------------------
-
 
 
 Preparing the BAM file
