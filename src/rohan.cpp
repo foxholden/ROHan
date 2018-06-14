@@ -1710,7 +1710,7 @@ inline void computeLLinternal(const diNucleotideProb priorGenotype,
 	//If the function is log( f(x) ) where f(x) (called internalFunction) is the likelihood function then
 	//  d/dx log( f(x) ) = f'(x) / f(x)
 	//  and 
-	//  d^2/d^2x log( f(x) ) = [f''(x) f(x) + f'(x) ] / [ f(x) ]^2
+	//  d^2/d^2x log( f(x) ) = [f''(x) f(x) + f'(x)^2 ] / [ f(x) ]^2
 	loglikelihoodForEveryBaBdD2 +=  ( internalFunctionD2 * internalFunction - powl(internalFunctionD1,2) ) / powl( internalFunction , 2 );
 
 #ifdef DEBUGCOMPUTELL	
