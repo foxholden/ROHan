@@ -4545,9 +4545,9 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     
     
     cerr<<".";
-    for(unsigned int i=0;i<heteroEstResults.size();i++){
-     	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
-    }
+    // for(unsigned int i=0;i<heteroEstResults.size();i++){
+    //  	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
+    // }
     
     // return 1;
     //x_i    =  forwardProb(&hmm, emittedH , sizeChunk);
