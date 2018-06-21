@@ -35,7 +35,6 @@ ref2DNAprof.o:	ref2DNAprof.cpp
 ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-
 ../lib/htslib/libhts.a:  ../lib/htslib/hts_internal.h
 	cd ../lib/htslib/ && make && cd ../..
 
@@ -67,6 +66,6 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 	cd ../lib/libharu/ && ./buildconf.sh && ./configure && make
 
 clean :
-	rm -f *.o testComp  testCompCont  refPlusSegToGeno sitesPlusGeno  testPrior  rohan  ref2DNAprof
+	rm -f *.o testComp  testCompCont  refPlusSegToGeno sitesPlusGeno  testPrior  rohan  ref2DNAprof 
 
 
