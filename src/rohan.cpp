@@ -2943,7 +2943,7 @@ void *mainHeteroComputationThread(void * argc){
 	if (pos < beg || pos >= end) continue; // out of range; skip
         if (tid >= h->n_targets) continue;     // diff number of @SQ lines per file?
 	
-	char refC = seq[ pos-currentChunk->rangeGen.getStartCoord()+1 ];
+	char refC = toupper(seq[ pos-currentChunk->rangeGen.getStartCoord()+1 ]);
 	if(refC == 'N'){//skip unresolved
 	    continue;
 	}
@@ -4094,7 +4094,7 @@ void *mainCoverageComputationThread(void * argc){
 	if (pos < beg || pos >= end) continue; // out of range; skip
         if (tid >= h->n_targets) continue;     // diff number of @SQ lines per file?
 	
-	char refc = seq[ pos-currentChunk->rangeGen.getStartCoord()+1 ];
+	char refc = toupper(seq[ pos-currentChunk->rangeGen.getStartCoord()+1 ]);
 	if(refc == 'N'){//skip unresolved
 	    continue;
 	}

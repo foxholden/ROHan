@@ -58,7 +58,7 @@ int PositionResult::bases2hetIndex(char c1, char c2) const{
     if(c1=='G' && c2=='T')
 	return 8;
 
-    cerr<<"PositionResult: wrong state bases2hetIndex()"<<c1<<" "<<c2<<endl;
+    cerr<<"PositionResult: wrong state bases2hetIndex() c1="<<c1<<" c2="<<c2<<endl;
     exit(1);
     
 }
