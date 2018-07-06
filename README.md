@@ -70,6 +70,7 @@ For MacOS, if you get the problem: fatal error: 'lzma.h' file not found, this is
 Quick start
 ----------------------
 
+TODO
 
 Preparing the BAM file
 -----------------
@@ -78,12 +79,30 @@ Preparing the BAM file
 
 rohan --tstv [TSTV ratio] 
 
-2) Do not apply any filter as mapping quality and base quality are all informative. Duplicate removal is very recommended. Simply use the fail QC flag to remove reads/fragments that have failed basic quality control (e.g. for duplicates). Simply sort and index and provide ROHan the same reference used for mapping. 
+2) Do not apply any filters as mapping quality and base quality are all informative in the model. Duplicate removal is very recommended. Simply use the fail QC flag to remove reads/fragments that have failed basic quality control (e.g. for duplicates). Simply sort and index and provide ROHan the same reference used for mapping. 
 
 
+3) Is this adna damage? if not skip to XX
 
-Documentation
+Description of output files
 -----------------
+
+
+|                  File                |                           Contents                               | 
+| ------------------------------------ |:----------------------------------------------------------------:| 
+[output prefix].hEst.gz                | local estimates of heterozygosity                                | 
+[output prefix].het_1_X.pdf            | Plot of the local estimates of heterozygosity 1 of X             | 
+[output prefix].hmm_1_X.pdf            | Plot of the posterior decoding for HMM 1 of X                    | 
+[output prefix].max.hmmmcmc.gz         | Log of the MCMC using maximum estimates of heterozygosity        | 
+[output prefix].max.hmmp.gz            | HMM posterior decoding using maximum estimates of heterozygosity | 
+[output prefix].mid.hmmmcmc.gz         | Log of the MCMC using mid. estimates of heterozygosity           | 
+[output prefix].mid.hmmp.gz            | HMM posterior decoding using mid. estimates of heterozygosity    | 
+[output prefix].min.hmmmcmc.gz         | Log of the MCMC using minimum estimates of heterozygosity        | 
+[output prefix].min.hmmp.gz            | HMM posterior decoding using minimum estimates of heterozygosity | 
+[output prefix].rginfo.gz              | List of read groups and average coverage                         | 
+[output prefix].summary.txt            | Fraction of the genome in ROH and heterozygosity outside of ROH  | 
+[output prefix].vcf.gz                 | Posterior probabilities for the genotypes                        | 
+
 
 
 
@@ -95,7 +114,6 @@ FAQ
 ### Why do I have such huge confidence intervals for potential ROH regions?
 
 This is normal, as we use the second derivative for the confidence intervals, the shape of the likelihood function is somewhat flat around 0 which leads to overestimated confidence intervals. 
-
 
 
 ### I have regions that have clear signs of being runs of homozygosity however they do not get flagged as such, why?

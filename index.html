@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<!-- saved from url=(0032)http://grenaud.github.io/ROHan/ -->
+<html lang="en-US" style="" class="gr__grenaud_github_io"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+<!-- Begin Jekyll SEO tag v2.5.0 -->
+<title>ROHan | Joint inference of Runs of Homozygosity and heterozygosity</title>
+<meta name="generator" content="Jekyll v3.7.3">
+<meta property="og:title" content="ROHan">
+<meta property="og:locale" content="en_US">
+<meta name="description" content="Joint inference of Runs of Homozygosity and heterozygosity">
+<meta property="og:description" content="Joint inference of Runs of Homozygosity and heterozygosity">
+<link rel="canonical" href="http://grenaud.github.io/ROHan/">
+<meta property="og:url" content="http://grenaud.github.io/ROHan/">
+<meta property="og:site_name" content="ROHan">
+<script type="text/javascript" defer="" async="">let isCwZExtension = true;</script><script type="application/ld+json">
+{"name":"ROHan","description":"A C++ class of useful little functions","@type":"WebSite","url":"http://grenaud.github.io/ROHan/","headline":"ROHan","@context":"http://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+    <link rel="stylesheet" href="./index_files/style.css">
+    <script src="./index_files/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+    <script src="./index_files/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="/ROHan/assets/css/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body data-gr-c-s-loaded="true" data-feedly-mini="yes"><div id="StayFocusd-infobar" style="display:none;">
+    <img src="chrome-extension://laankejkbhbdhmipfmgcngdelahlfoji/common/img/eye_19x19_red.png">
+    <span id="StayFocusd-infobar-msg"></span>
+    <span id="StayFocusd-infobar-links">
+        <a id="StayFocusd-infobar-never-show">hide forever</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+        <a id="StayFocusd-infobar-hide">hide once</a>
+    </span>
+</div>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/grenaud/ROHan">View On GitHub</a></li>
+          
+        </nav>
+      </div><!-- end header -->
+
+    <div class="wrapper">
+
+      <section>
+        <div id="title">
+          <h1>ROHan</h1>
+          <p> Joint inference of Runs of Homozygosity and heterozygosity </p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/grenaud">grenaud</a></span>
+          
+        </div>
+
+        
+<h1 id="ROHan">ROHan</h1>
+
+<p>ROHan is a Bayesian framework to estimate local rates of heterozygosity, infer runs of homozygosity (ROH) and compute global rates of heterozygosity. ROHan can work on modern and ancient samples with signs of ancient DNA damage.</p>
+
+<h3 id="Downloading">Downloading</h3>
+
+<p>Go to <a href="https://github.com/grenaud/rohan">https://github.com/grenaud/rohan</a> and either:
+
+<ol>  
+<li> Download the ZIP </li>
+
+or
+
+<li> Do a:
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+  git clone --depth 1 https://github.com/grenaud/rohan.git"
+</code></pre></div></div>
+</li>
+</ol>
+</p>
+	
+<h3 id="installing">Installing</h3>
+
+
+<ol>
+  <li> make sure you have "cmake", "libtool", "libpng" and "git" installed, check for it by typing " git --version" and "cmake --version".  
+
+For Ubuntu:
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+     sudo apt-get install git
+     sudo apt-get install cmake
+     sudo apt-get install libtool
+     sudo apt-get install libpng-dev
+</code></pre></div></div>
+For MacOS, if you have Homebrew (<a href="https://brew.sh/">https://brew.sh/</a>) installed: 
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+     brew install git
+     brew install cmake
+     brew install libtool
+     brew install libpng
+</code></pre></div></div>
+</li>
+<li> make sure you have gcc that supports -std=c++11, gcc version 4.7 or above. Type "gcc -v" and check the version. For both Ubuntu and MacOS, 
+</li>
+<li>  As the makefile uses "git clone" to download subpackages, please make sure that the computer on which you are installing ROHan has access to the internet. Once done, simply type :
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+cd ROHan
+make
+</code></pre></div></div>
+For MacOS, if you get the problem: fatal error: 'lzma.h' file not found, this is a problem building htslib with homebrew, please refer to the following htslib page: <a href="https://github.com/samtools/htslib/issues/493">https://github.com/samtools/htslib/issues/493</a>
+
+</li>
+
+<li> (optional) Either put the executable in the overall path or add the path to your $PATH environment or add an alias to be able to run "rohan" from any directory.</li>
+</ol>
+
+<h2 id="Documentation">Documentation</h2>
+
+<p>Please refer to the README.md in the repository for usage and frequently asked questions.</p>
+	
+<h2 id="authors">Authors</h2>
+
+<ul>
+  <li>Gabriel Renaud - <a href="https://github.com/grenaud">grenaud</a> gabriel [dot] reno [ at sign ] gmail.com</li>
+</ul>
+
+<h2 id="license">License</h2>
+
+<p>This project is licensed under the GPL 3.0 License - see the LICENSE file for details</p>
+
+
+      </section>
+
+    </div>
+
+    
+  
+
+<div id="feedly-mini" title="feedly Mini tookit"></div></body></html>
