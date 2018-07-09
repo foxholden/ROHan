@@ -75,14 +75,26 @@ TODO
 Preparing the BAM file
 -----------------
 
-1) Make sure you know the transition/transversion ratio for the species/population you are working with. 
+1) Make sure you know the transition/transversion ratio for the species/population you are working with. This ratio will be specified via:
 
-rohan --tstv [TSTV ratio] 
+    rohan --tstv [TSTV ratio] 
 
 2) Do not apply any filters as mapping quality and base quality are all informative in the model. Duplicate removal is very recommended. Simply use the fail QC flag to remove reads/fragments that have failed basic quality control (e.g. for duplicates). Simply sort and index and provide ROHan the same reference used for mapping. 
 
 
-3) Is this adna damage? if not skip to XX
+3) Is your sample ancient DNA? if not skip to 4). If the sample has aDNA damage, it should be quantified in incorporated in the calculation. The following program is recommended:
+
+    bam2prof/bam2prof
+
+To get the best results, take a substantial subsample of your original BAM file and use it in bam2prof. 
+a) Find the ideal length for the -length parameter. Try increasing until substition rates level off.
+b) Keep increasing  -minq from 0 until the damage levels off.
+c) If you have substitutions outside of expected ones (e.g. C->T, G->A) consider using the -mask to filter out polymorphic positions
+
+4) 
+
+
+
 
 Description of output files
 -----------------
