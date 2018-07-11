@@ -32,6 +32,8 @@ extern "C" {
 #include "sam_opts.h"
 #include "bedidx.h"
 }
+
+#define bam_is_properpair(b)    (((b)->core.flag&BAM_FPROPER_PAIR) != 0)
 #define bam_is_paired(b)    (((b)->core.flag&BAM_FPAIRED) != 0)
 #define bam_is_pair1(b)     (((b)->core.flag&BAM_FREAD1)  != 0)
 #define bam_is_pair2(b)     (((b)->core.flag&BAM_FREAD2)  != 0)
@@ -2540,9 +2542,22 @@ static int read_bamHET(void *data, bam1_t *b){ // read level filters better go h
 
 	//int32_t isize  = b->core.n_cigar;
 	// cerr<<"read_bamHET1: "<<bam1_qname(b)<<endl;	  
+
+	//skip fragments marked as:
+	//1: unmapped
+	//2: secondary alignment, only retain primary
+	//3: QC failed
+	//4: PCR duplicates
         if ( b->core.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP) ) continue;
 	// cerr<<"read_bamHET2: "<<bam1_qname(b)<<endl;	  
-	
+	//if a reads is paired and not properly paired, skip
+	if( bam_is_paired( b) &&    
+	    !bam_is_properpair(b) ){ 
+	    continue; 
+	}
+		
+
+
         if ( (int)b->core.qual < aux->min_mapQ ) continue;
 	// cerr<<"read_bamHET3: "<<bam1_qname(b)<<endl;	  
 	// cerr<<aux->min_len<<" "<<qlen<<" "<<int(MINLENGTHFRAGMENT)<<" "<<int(MAXLENGTHFRAGMENT)<<endl;
@@ -3841,6 +3856,12 @@ static int read_bamCOV(void *data, bam1_t *b){ // read level filters better go h
 	int32_t isize  = b->core.n_cigar;
 	
         if ( b->core.flag & (BAM_FUNMAP | BAM_FSECONDARY | BAM_FQCFAIL | BAM_FDUP) ) continue;
+
+	if( bam_is_paired( b) &&    //if a reads is paired and not properly paired, skip
+	    !bam_is_properpair(b) ){ 
+	    continue; 
+	}
+
         if ( (int)b->core.qual < aux->min_mapQ ) continue;
         if ( aux->min_len && qlen < aux->min_len ) continue;
 	uint8_t *rgptr = bam_aux_get(b, "RG");
