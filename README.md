@@ -70,7 +70,13 @@ For MacOS, if you get the problem: fatal error: 'lzma.h' file not found, this is
 Quick start
 ----------------------
 
-TODO
+For test data, make sure you are connected to the internet and type:
+     cd testData/
+     make
+
+This will run ROHan on chromosome 21 for a West African individual from 1000G, the theta estimate has very large confidence due to the use of a single chromosome.
+
+
 
 Preparing the BAM file
 -----------------
