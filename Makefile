@@ -15,6 +15,7 @@ bam2prof/bam2prof.cpp:
 bam2prof/bam2prof: bam2prof/bam2prof.cpp
 	make -C bam2prof/
 	rm -rfv bam2prof/grenaud*/
+	rm -f bam2prof.zip
 
 src/rohan:
 	make -C  src/
