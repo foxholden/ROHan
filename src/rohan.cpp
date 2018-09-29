@@ -192,7 +192,7 @@ string fastaIndex;
 map<string,rgInfo> rg2info;
 bool specifiedDeam=false;
 bool verbose=false;
-bool outputgenol = true;
+bool outputgenol = false;
 bool tvonly=false;
 
 // 1D: mapping quality 
@@ -5028,7 +5028,8 @@ int main (int argc, char *argv[]) {
 	//"\t\t"+""+"\t"+"--ingeno"  + "\t\t"   +    "[infile]" +"\t\t"+"Read likelihoods in BGZIP and start comp. from there (default: none)"+"\n"+
 	"\t\t"+"-v"+","+"--verbose"  +"\t\t"      + ""             +"\t\t\t"+"Print extensive info  (default: "+booleanAsString(verbose)+")"+"\n"+  
 	//"\t\t"+"-f"+","+""           +"\t\t"      + ""             +"\t\t\t"+"Overwrite any .rginfo.gz (default: "+booleanAsString(ignoreExistingRGINFO)+")"+"\n"+  
-	"\t\t"+""+""+"--nogl"       +"\t\t\t"      + ""             +"\t\t\t"+"Do not output genotype likelihoods  (default: "+booleanAsString(!outputgenol)+")"+"\n"+  
+	//"\t\t"+""+""+"--nogl"       +"\t\t\t"      + ""             +"\t\t\t"+"Do not output genotype likelihoods  (default: "+booleanAsString(!outputgenol)+")"+"\n"+  
+	"\t\t"+""+""+"--gl"       +"\t\t\t"      + ""             +"\t\t\t"+"Produce genotype likelihoods  (default: "+booleanAsString(outputgenol)+")"+"\n"+  
 			      
 	"\n\tComputation options:\n"+	
 	"\t\t"+"-t"+"" +""           +"\t\t\t"    + "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
@@ -5221,8 +5222,13 @@ int main (int argc, char *argv[]) {
         }
 
 
-        if( string(argv[i]) == "--nogl" ){
-	    outputgenol=false;
+        // if( string(argv[i]) == "--nogl" ){
+	//     outputgenol=false;
+        //     continue;
+        // }
+
+        if( string(argv[i]) == "--gl" ){
+	    outputgenol=true;
             continue;
         }
 	

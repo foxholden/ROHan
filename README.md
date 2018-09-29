@@ -74,8 +74,11 @@ For test data, make sure you are connected to the internet and type:
      cd testData/
      make
 
-This will run ROHan on chromosome 21 for a West African individual from 1000G, the theta estimate has very large confidence due to the use of a single chromosome. It will also run chromosome 21 from the ancient Loschbour individual. Please be aware that the command for the profile uses no quality score filter: "-minq 0". We generally do not recommend this as this will inflate substitution rate. 
+This will run ROHan on chromosome 21 for: 
+* a West African individual from Phase 3 of the 1000G project
+* the ancient Loschbour individual (Lazardis et al.). Please be aware that the command for the profile uses no quality score filter: "-minq 0" because the quality scores were artificially decreased to account for damage during calling. We generally do not recommend this as this will inflate substitution rate. 
 
+For these cases, the theta estimate have very large confidence due to the use of a single chromosome. 
 
 
 Preparing the BAM file
@@ -98,16 +101,28 @@ b) Keep increasing  -minq from 0 until the damage levels off.
 c) If you have substitutions outside of expected ones (e.g. C->T, G->A) consider using the -mask to filter out polymorphic positions
 d) Have a look at the command line in the test data directory.
 
-4) Do you have extensive ancient DNA damage (e.g. 20% at the ends of greater) which could potentially affect the mapping? If so, we recommend filtering for reads in highly mappable regions, see : http://lh3lh3.users.sourceforge.net/snpable.shtml  to create mappability tracks
+4) Do you have extensive ancient DNA damage (e.g. 20% at the ends of greater) which could potentially affect the mapping? If so, we recommend filtering for reads in highly mappable regions, see : http://lh3lh3.users.sourceforge.net/snpable.shtml  to create mappability tracks.
 
 5) Create a file with the name of the autosomes, 1 chromosome per line ex:
     chr1
     chr2
     ...
 
-6) 
+6) Run ROHan, for modern samples run:
 
+     rohan --rohmu 2e-5   -o  [output prefix]  [reference genome]  [BAM file]
 
+For ancient samples run:
+
+     rohan --rohmu 2e-5 --deam5p  deamfile.5p.prof  --deam3p  deamfile.3p.prof    -o  [output prefix]  [reference genome]  [BAM file]
+
+where deamfile.5p.prof and deamfile.3p.prof are the substitution rates due to aDNA damage and not due to sequencing errors. You can add more threads in the calculation using "-t". Be aware that as this is a full likelihood model, the data needs to live in memory and therefore, using multiple threads can result in higher memory usage.
+
+If a mappability track was used, you can add the option: --map to filter wrt to mappable regions.
+
+7) Inspect your results. Refer to [output prefix].het_1_X.pdf and [output prefix].hmm_1_X.pdf, if there are regions labeled as non ROH despite the fact that they clearly show a depression in heterozygosity, re-run using --hmm and a higher value of --rohmu (e.g. for the example above, one could run using 5e-5).
+
+8) For ancient samples, if the result if really unexpected, you can re-run using --tvonly which will limit the estimate to transversions, this needs to be multiplied by (Ts/Tv+1) (ex: if Ts/Tv  = 2.1, multiply the results it by 3.1). This estimate can be an underestimate.
 
 
 Description of output files
