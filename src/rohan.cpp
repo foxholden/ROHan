@@ -5035,8 +5035,10 @@ int main (int argc, char *argv[]) {
 	"\t\t"+"-t"+"" +""           +"\t\t\t"    + "[threads]" +"\t\t"+"Number of threads to use (default: "+stringify(numberOfThreads)+")"+"\n"+
 	"\t\t"+""  +"" +"--phred64"  +"\t\t\t"    + ""          +"\t\t"+"Use PHRED 64 as the offset for QC scores (default : PHRED33)"+"\n"+
 	"\t\t"+""  +"" +"--size"     +"\t\t\t"    + "[bp]"      +"\t\t\t"+"Size of windows in bp  (default: "+thousandSeparator(sizeChunk)+")"+"\n"+	      
-	"\t\t"+""  +"" +"--bed"      +"\t\t\t"    + "[bed file]"+"\t\t"+"Only consider the regions in the bed file  (default: none)"+"\n"+
-	"\t\t"+""  +"" +"--map"      +"\t\t\t"    + "[bed file]"+"\t\t"+"Use a mappability filter  (default: none)"+"\n"+
+	"\t\t"+""  +"" +"--bed"      +"\t\t\t"    + "[bed file]"+"\t\t"+"Do not automatically generate genomic windows, use the regions in this bed file  (default: none)"+"\n"+
+	"\t\t"+""  +"" +"     "      +"\t\t\t"    + "          "+"\t\t"+"by default, the windows are automatically generated using the --size parameter"+"\n"+
+
+	"\t\t"+""  +"" +"--map"      +"\t\t\t"    + "[bed file]"+"\t\t"+"Use a mappability filter to filter on a per site basis  (default: none)"+"\n"+
    ///"\t\t"+""  +"" +"--first"      +"\t\t\t"    + ""+"\t\t"+"Do not shuffle the windows for coverage computations (default: "+booleanAsString(!shuffleWindCoverage)+")"+"\n"+	      
 	"\t\t"+""  +"" +"--tstv"     +"\t\t\t"    + "[tstv]"  +"\t\t\t"+"Ratio of transitions to transversions  (default: "+stringify(TStoTVratio)+")"+"\n"+
 	"\t\t"+""  +"" +"--tvonly"     +"\t\t\t"    + ""  +"\t\t"+"Only consider transversions  (default: "+booleanAsString(tvonly)+")"+"\n"+
@@ -5084,6 +5086,8 @@ int main (int argc, char *argv[]) {
         return 1;
     }
 
+    bool specifiedBED =false;
+    bool specifiedSIZE=false;
 
     for(int i=1;i<(argc);i++){ 
 
@@ -5147,7 +5151,8 @@ int main (int argc, char *argv[]) {
         }
 	
         if( string(argv[i]) == "--size"  ){
-	    sizeChunk=destringify<unsigned int>(argv[i+1]);
+	    sizeChunk=destringify<unsigned int>(argv[i+1]);	    
+	    specifiedSIZE=true;
             i++;
             continue;
         }
@@ -5166,6 +5171,7 @@ int main (int argc, char *argv[]) {
 
         if( string(argv[i]) == "--bed"  ){
 	    bedFile=string(argv[i+1]);
+	    specifiedBED = true;
             i++;
             continue;
         }
@@ -5290,6 +5296,11 @@ int main (int argc, char *argv[]) {
 
 
 	cerr<<"Error: unknown option "<<string(argv[i])<<endl;
+	return 1;
+    }
+
+    if(specifiedBED && specifiedSIZE){
+	cerr<<"Error: cannot simultaneously speficied --bed and --size"<<endl;
 	return 1;
     }
 

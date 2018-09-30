@@ -166,5 +166,8 @@ It is possible that you have genuine ROH but if you have a slight overestimate o
 -Green is output using the point estimates. Margenta are the estimates using upper bounds for local het. rates whereas red were computed using lower bounds of het. rates.
 
 
+### What is the difference between --bed and --map?
+
+- By default, ROHan generates windows of "--size"bp along autosomes, you can override this and use the regions in a bed file. With either option, you can specify individual sites to consider using --map, this is recommended for ancient samples with short fragment size and with some damage.
 
 
