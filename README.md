@@ -39,10 +39,11 @@ or
 Installation
 ----------------------
 
-1) make sure you have "cmake", "libtool", "libpng" and "git" installed, check for it by typing " git --version" and "cmake --version".  
+1) make sure you have "aclocal", "cmake", "libtool", "libpng" and "git" installed, check for it by typing " git --version" and "cmake --version".  
 
 For Ubuntu:
 
+     sudo apt-get install autotools-dev
      sudo apt-get install git
      sudo apt-get install cmake
      sudo apt-get install libtool
@@ -50,6 +51,8 @@ For Ubuntu:
 
 For MacOS, if you have Homebrew (https://brew.sh/) installed: 
 
+    brew install autoconf
+    brew install automake
      brew install git
      brew install cmake
      brew install libtool
