@@ -24,6 +24,8 @@ ROHan aims at:
 2) identifying ROHs using the results from 1). This is done via an hidden markov model whose parameters are optimized using a Markov Chain Monte Carlo
 3) using both 1) and 2), provide a global rate of heterozygosity
 
+Please refer to the LICENSE file for license information.
+
 Downloading:
 ----------------------
 
