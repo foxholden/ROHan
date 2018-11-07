@@ -30,5 +30,5 @@ Loschbour.hg19_1000g.chr21.bam.bai:
 	wget -O Loschbour.hg19_1000g.chr21.bam.bai https://www.dropbox.com/s/nhdvjcr1no71re3/Loschbour.hg19_1000g.chr21.bam.bai?dl=0
 
 
-Loschbour.hg19_1000g.summary.txt: Loschbour.hg19_1000g.chr21.bam.bai Loschbour.hg19_1000g.chr21.bam.bai  human_g1k_v37.masked.fa.fai
+Loschbour.hg19_1000g.summary.txt: Loschbour.hg19_1000g.chr21.bam.bai Loschbour.hg19_1000g.5p.prof Loschbour.hg19_1000g.chr21.bam.bai  human_g1k_v37.masked.fa.fai
 	../src/rohan --rohmu 5e-5 --deam5p Loschbour.hg19_1000g.5p.prof --deam3p Loschbour.hg19_1000g.3p.prof --out Loschbour.hg19_1000g --auto autosomes  --err ../illuminaProf/error.prof human_g1k_v37.masked.fa Loschbour.hg19_1000g.chr21.bam
