@@ -195,6 +195,13 @@ bool verbose=false;
 bool outputgenol = false;
 bool tvonly=false;
 
+bool usesuggestH=false;
+double sumhsuggest=0.0;
+int    nhsuggest  =0;
+
+bool suggestH=false;
+double suggestHval;
+
 // 1D: mapping quality 
 // 2D: length of fragment
 // 3D: base qual
@@ -1865,11 +1872,18 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
     checkResults("pthread_mutex_unlock()\n", rc);
 
     //max iterations
+
+
     int sitesPer1M=randomInt(minSegSitesPer1M,maxSegSitesPer1M);// between minSegSitesPer1M and maxSegSitesPer1M  and 1000 sites per million
     // long double theta     = double(sitesPer1M)/double(1000000); //theta
     // long double theta_t_1 = theta;
     long double hp;
     long double h=double(sitesPer1M)/double(1000000);
+    if(suggestH){
+	h=suggestHval;
+    }
+
+
     long double z=h;
 
     long double alpha_ = alpha;
@@ -3677,8 +3691,22 @@ void *mainHeteroComputationThread(void * argc){
 
     delete currentChunk;    //delete old chunk
 
-    queueDataTowrite.push(dataToWrite);
 
+    queueDataTowrite.push(dataToWrite);
+    if(usesuggestH){
+	if(queueDataTowrite.size()<10){
+	    sumhsuggest += dataToWrite->hetEstResults.h;
+	    nhsuggest  ++;
+	}
+	    
+	if(queueDataTowrite.size()==10){
+	    sumhsuggest += dataToWrite->hetEstResults.h;
+	    nhsuggest  ++;
+	    usesuggestH=true;
+	    suggestHval = (sumhsuggest / double(nhsuggest));
+	}
+
+    }
     rc = pthread_mutex_unlock(&mutexQueueToWrite);
     checkResults("pthread_mutex_unlock()\n", rc);
 
