@@ -93,9 +93,10 @@ using namespace std;
 //#define DEBUGCOMPUTELLEACHBASE
 //#define DEBUGPRECOMPUTEBABD 2610
 
+// #define DEBUGQUEUEDATATOWRITE
 
+// #define HETVERBOSE
 
-//#define HETVERBOSE
 //#define COVERAGETVERBOSE
 //#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
 
@@ -342,6 +343,8 @@ unsigned int sizeChunk =  1000000;
 string                                                             bamFileToOpen;
 string                                                             bedfilename;//only for mappability 
 queue< DataChunk * >                                               queueDataToprocess;
+queue< DataChunk * >                                               queueDataAllGenomic;//in case we cheat and use the first windows of data
+
 queue< DataChunk * >                                               queueDataForCoverage;
 
 priority_queue<DataToWrite *, vector<DataToWrite *>, CompareDataToWrite> queueDataTowrite;
@@ -2717,6 +2720,7 @@ void *mainHeteroComputationThread(void * argc){
 #endif
 	    return NULL;	
 	}else{
+
 #ifdef HETVERBOSE
 	    cerr<<"Thread #"<<rankThread<<" sleeping for "<<timeThreadSleep<<endl;
 #endif
@@ -3019,19 +3023,19 @@ void *mainHeteroComputationThread(void * argc){
 #endif
 	
 #ifdef AROUNDINDELS
-	    //if indels are found, remove 
-	    if( (prevPos+1) == pos){
-		prevIndel     = currIndel;
-		prevIndelSet  = currIndelSet;
-		// prevLevelsi = currLevelsi;
-		// for(int ci=0;ci<currLevelsi;ci++){
-		//     prevLevels[ci] = currLevels[ci];
-		// }		
-	    }else{
-		prevIndel   =false;
-		//prevLevelsi =0;
-		prevIndelSet.clear();
-	    }
+	//if indels are found, remove 
+	if( (prevPos+1) == pos){
+	    prevIndel     = currIndel;
+	    prevIndelSet  = currIndelSet;
+	    // prevLevelsi = currLevelsi;
+	    // for(int ci=0;ci<currLevelsi;ci++){
+	    //     prevLevels[ci] = currLevels[ci];
+	    // }		
+	}else{
+	    prevIndel   =false;
+	    //prevLevelsi =0;
+	    prevIndelSet.clear();
+	}
 #endif
 
 	//totalSitesL++;
@@ -3659,21 +3663,26 @@ void *mainHeteroComputationThread(void * argc){
 	checkResults("pthread_mutex_unlock()\n", rc);
     }
 
+//     if(totalSitesL == 0){
+// 	delete piForGenomicWindow;
+
+// #ifdef HETVERBOSE
+// 	cerr<<"Thread #"<<rankThread <<" is re-starting"<<endl;
+// #endif
+// 	goto checkqueue;	   
+//     }
 
 
-
-    //delete hv;
-    //TODO populate piForGenomicWindow using htslib
 
     dataToWrite->hetEstResults = computeLL(piForGenomicWindow,
 					   dataToWrite->vecPositionResults,
-					   rankThread);
-    
+					   rankThread);   
     delete piForGenomicWindow;
 	
-
+    
 
     //call computeLL here
+
 #ifdef HETVERBOSE
     cerr<<"Thread #"<<rankThread <<" is done with computations"<<endl;
 #endif
@@ -3687,10 +3696,14 @@ void *mainHeteroComputationThread(void * argc){
     rc = pthread_mutex_lock(&mutexQueueToWrite);
     checkResults("pthread_mutex_lock()\n", rc);
     
-
-
     delete currentChunk;    //delete old chunk
 
+#ifdef DEBUGQUEUEDATATOWRITE
+    //cout<<"range1 "<<currentChunk->rangeGen<<endl;
+    cerr<<"dataToWrite range: "<<dataToWrite->rangeGen<<"rank: "<<dataToWrite->rank<<" #sites: "<<totalSitesL<<endl;
+    //dataToWrite->refID         =  refID;
+
+#endif
 
     queueDataTowrite.push(dataToWrite);
     if(usesuggestH){
@@ -3985,6 +3998,7 @@ void *mainCoverageComputationThread(void * argc){
 #endif
 	    return NULL;	
 	}else{
+
 #ifdef COVERAGETVERBOSE
 	    cerr<<"Thread #"<<rankThread<<" sleeping for "<<timeThreadSleep<<endl;
 #endif
@@ -4986,8 +5000,8 @@ int main (int argc, char *argv[]) {
     // bool   useVCFoutput      = false;
     int lastOpt=1;
 
-        // double lambdaCov=0;
-    // bool   lambdaCovSpecified=false;
+    double lambdaCov=0;
+    bool   lambdaCovSpecified=false;
     TStoTVratio=2.1;
     // string genoFileAsInput    ="";
     // bool   genoFileAsInputFlag=false;
@@ -5007,6 +5021,8 @@ int main (int argc, char *argv[]) {
     unsigned int      rank  = 0;
     int          lastRank   =-1;
     vector<GenomicRange> v ;
+    vector<GenomicRange> allGenomic ;
+
     GenomicWindows     rw ;
     int    bpToExtract;
     int                   rc;
@@ -5277,12 +5293,12 @@ int main (int argc, char *argv[]) {
             continue;
         }
 
-        // if(string(argv[i]) == "--lambda"  ){
-	//     lambdaCovSpecified=true;
-        //     lambdaCov         =destringify<double>(argv[i+1]);
-	//     i++;
-        //     continue;
-        // }
+        if(string(argv[i]) == "--lambda"  ){
+	    lambdaCovSpecified=true;
+            lambdaCov         =destringify<double>(argv[i+1]);
+	    i++;
+            continue;
+        }
 
         if(string(argv[i]) == "--tstv"  ){
             TStoTVratio         =destringify<long double>(argv[i+1]);
@@ -5563,21 +5579,25 @@ int main (int argc, char *argv[]) {
     }else{
 	v = rw.getGenomicWindows(bpToExtract,0);
     }
-
+    allGenomic = rw.getGenomicWindows(bpToExtract,0);
     
     if( !autosomeFile.empty()){
 
 	vector<GenomicRange> newV;
+	vector<GenomicRange> newAllgenomic;
+	
 	
 	for(unsigned int i=0;i<v.size();i++){
 	    if( listAutosomes.find( v[i].getChrName() ) == listAutosomes.end() ){//not found
 		
 	    }else{//found
-		newV.push_back( v[i] );
+		newV.push_back(          v[i] );
+		newAllgenomic.push_back( v[i] );		
 	    }
 	}
 
 	v=newV;
+	allGenomic = newAllgenomic;
     }
 
     if( v.size() == 0 ){    
@@ -5605,6 +5625,32 @@ int main (int argc, char *argv[]) {
 	queueDataToprocess.push(currentChunk);
 	rank++;
     }
+
+
+
+    rank  = 0;
+    for(unsigned int i=0;i<allGenomic.size();i++){
+#ifdef DEBUGFIRSTWINDOWS
+	if(i==DEBUGFIRSTWINDOWS)
+	    break;
+#endif
+
+	//cout<<"genomic region #"<<i<<" "<<v[i]<<endl;
+	DataChunk * currentChunk = new DataChunk();
+	
+	currentChunk->rangeGen   = allGenomic[i];
+	currentChunk->rank       = rank;
+	//lastRank                 = rank;
+	//sizeGenome             += v[i].getLength();
+
+	
+	queueDataAllGenomic.push(currentChunk);
+	rank++;
+    }
+
+
+
+
     readDataDone=true;
     //    return 1;
 
@@ -5614,94 +5660,96 @@ int main (int argc, char *argv[]) {
     if( ignoreExistingRGINFO || (!isFile(outFilePrefix+".rginfo.gz")) ){
 
 	// if(!genoFileAsInputFlag){
-	int bpToComputeCoverage = 10000000;
-	int genomicRegionsToUse = bpToComputeCoverage/bpToExtract;
-	if( genomicRegionsToUse > int(queueDataToprocess.size())){
-	    genomicRegionsToUse = int(queueDataToprocess.size());
-	}
-    
-
-	//renabled
-	if(shuffleWindCoverage){
-	    queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
-	}else{
-	    queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
-	}
-	//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
-	unsigned int queueDataForCoverageOrigsize = queueDataForCoverage.size();
-	//cerr<<queueDataForCoverageOrigsize<<endl;
-
-	pthread_mutex_init(&mutexQueueToRead,   NULL);
-	pthread_mutex_init(&mutexQueueToWrite,  NULL);
-	pthread_mutex_init(&mutexRank ,         NULL);
-	pthread_mutex_init(&mutexCERR ,         NULL);
-	pthread_mutex_init(&mutexCOUNTCOV ,     NULL);
-
-
-	for(int i=0;i<numberOfThreads;i++){
-	    rc = pthread_create(&threadCov[i], NULL, mainCoverageComputationThread, NULL);
-	    checkResults("pthread_create()\n", rc);
-	}
-
-	if(verbose){	    
-	    cerr<<"Creating threads for coverage calculation, need to process="<<queueDataForCoverage.size()<<" out of a total of "<<queueDataToprocess.size()<<endl;
-	}
-
-
-	//TODO to code?
-	// rc = pthread_mutex_lock(&mutexCERR);
-	// checkResults("pthread_mutex_lock()\n", rc);
-
-	// if(verbose){
-	// 	cerr<<"Thread#"<<threadID<<" starting pre-computations size of window: "<<thousandSeparator(piForGenomicWindow->size())<<endl;
-	// }
-    
-	// rc = pthread_mutex_unlock(&mutexCERR);
-	// checkResults("pthread_mutex_unlock()\n", rc);
-
-	// pthread_mutex_t  mutexCOUNTCOV              = PTHREAD_MUTEX_INITIALIZER;
-	// unsigned int queueDataForCoverageOrigsizeSum;
-
-	while(queueDataForCoverage.size()!=0){
-	    if(verbose){	    
-		cerr<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataForCoverageOrigsize<<endl;
-	    }else{
-		printprogressBarCerr( float(queueDataForCoverageOrigsize- queueDataForCoverage.size() ) / float(queueDataForCoverageOrigsize) );
+	    int bpToComputeCoverage = 10000000;
+	    int genomicRegionsToUse = bpToComputeCoverage/bpToExtract;
+	    if( genomicRegionsToUse > int(queueDataToprocess.size())){
+		genomicRegionsToUse = int(queueDataToprocess.size());
 	    }
-	    sleep(timeThreadSleep);
-	}
-	printprogressBarCerr( float(queueDataForCoverageOrigsize- queueDataForCoverage.size() ) / float(queueDataForCoverageOrigsize) );//print 100%
+    
+
+	    //renabled
+	    if(shuffleWindCoverage){//we shuffle
+		queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
+	    }else{//we just take the first elements
+		//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
+		queueDataForCoverage = subFirstElemsQueue( queueDataAllGenomic,genomicRegionsToUse);
+	    }
+	    //queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
+	    unsigned int queueDataForCoverageOrigsize = queueDataForCoverage.size();
+	    //cerr<<queueDataForCoverageOrigsize<<endl;
+
+	    pthread_mutex_init(&mutexQueueToRead,   NULL);
+	    pthread_mutex_init(&mutexQueueToWrite,  NULL);
+	    pthread_mutex_init(&mutexRank ,         NULL);
+	    pthread_mutex_init(&mutexCERR ,         NULL);
+	    pthread_mutex_init(&mutexCOUNTCOV ,     NULL);
+
+
+	    for(int i=0;i<numberOfThreads;i++){
+		rc = pthread_create(&threadCov[i], NULL, mainCoverageComputationThread, NULL);
+		checkResults("pthread_create()\n", rc);
+	    }
+
+	    if(verbose){	    
+		cerr<<"Creating threads for coverage calculation, need to process="<<queueDataForCoverage.size()<<" out of a total of "<<queueDataToprocess.size()<<endl;
+	    }
+
+
+	    //TODO to code?
+	    // rc = pthread_mutex_lock(&mutexCERR);
+	    // checkResults("pthread_mutex_lock()\n", rc);
+
+	    // if(verbose){
+	    // 	cerr<<"Thread#"<<threadID<<" starting pre-computations size of window: "<<thousandSeparator(piForGenomicWindow->size())<<endl;
+	    // }
+    
+	    // rc = pthread_mutex_unlock(&mutexCERR);
+	    // checkResults("pthread_mutex_unlock()\n", rc);
+
+	    // pthread_mutex_t  mutexCOUNTCOV              = PTHREAD_MUTEX_INITIALIZER;
+	    // unsigned int queueDataForCoverageOrigsizeSum;
+
+	    while(queueDataForCoverage.size()!=0){
+		if(verbose){	    
+		    cerr<<getDateString()<<" "<<getTimeString()<<" # of slices left to process: "<<queueDataForCoverage.size()<<"/"<<queueDataForCoverageOrigsize<<endl;
+		}else{
+		    printprogressBarCerr( float(queueDataForCoverageOrigsize- queueDataForCoverage.size() ) / float(queueDataForCoverageOrigsize) );
+		}
+		sleep(timeThreadSleep);
+	    }
+	    printprogressBarCerr( float(queueDataForCoverageOrigsize- queueDataForCoverage.size() ) / float(queueDataForCoverageOrigsize) );//print 100%
 	
-	//waiting for threads to finish
-	for (int i=0; i <numberOfThreads; ++i) {	
-	    rc = pthread_join(threadCov[i], NULL);
-	    checkResults("pthread_join()\n", rc);
-	}
+	    //waiting for threads to finish
+	    for (int i=0; i <numberOfThreads; ++i) {	
+		rc = pthread_join(threadCov[i], NULL);
+		checkResults("pthread_join()\n", rc);
+	    }
 
-	if(!verbose)
-	    cerr<<endl;//flush the progress bar
+	    if(!verbose)
+		cerr<<endl;//flush the progress bar
 	
-	cerr<<"..done"<<endl;
+	    cerr<<"..done"<<endl;
 
-	pthread_mutex_destroy(&mutexRank);
-	pthread_mutex_destroy(&mutexQueueToRead);
-	pthread_mutex_destroy(&mutexQueueToWrite);
-	pthread_mutex_destroy(&mutexCERR);
-	pthread_mutex_destroy(&mutexCOUNTCOV);
+	    pthread_mutex_destroy(&mutexRank);
+	    pthread_mutex_destroy(&mutexQueueToRead);
+	    pthread_mutex_destroy(&mutexQueueToWrite);
+	    pthread_mutex_destroy(&mutexCERR);
+	    pthread_mutex_destroy(&mutexCOUNTCOV);
 
 
 
-	//    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
+	    //    cout<<"Final" <<" "<<totalBasesSum<<"\t"<<totalSitesSum<<"\t"<<double(totalBasesSum)/double(totalSitesSum)<<endl;
 	
-	rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
-	if(totalSitesSum ==0 ){
-	  //cerr<<"No data was found for the entire BAM file for the region "<<endl;
-	  cerr<<"No data was found for the entire BAM file for the regions you defined, please verify the BAM file"<<endl;
-	  return 1;
-	}
-	cerr<<"Final computation:" <<" bases="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda coverage="<<rateForPoissonCov<<endl;
-	//pthread_exit(NULL);	
-	//	cerr<<"Lambda coverage: " <<rateForPoissonCov<<endl;	
+	    rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
+	    if(totalSitesSum ==0 ){
+		//cerr<<"No data was found for the entire BAM file for the region "<<endl;
+		cerr<<"No data was found for the entire BAM file for the regions you defined, please verify the BAM file"<<endl;
+		return 1;
+	    }
+	    cerr<<"Final computation:" <<" bases="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda coverage="<<rateForPoissonCov<<endl;
+	    //pthread_exit(NULL);	
+	    //	cerr<<"Lambda coverage: " <<rateForPoissonCov<<endl;	
+
 	stringinfo= stringify(rateForPoissonCov)+"\n";       
 	
 	bgzipWriterInfo = bgzf_open( string(outFilePrefix+".rginfo.gz").c_str(), "w");
@@ -5739,6 +5787,13 @@ int main (int argc, char *argv[]) {
 	//bgzipWriterInfo.Close();
 	if(bgzf_close(bgzipWriterInfo) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
 
+	if(!lambdaCovSpecified){
+
+	}else{
+	    rateForPoissonCov=lambdaCov;
+	    cerr<<"Using user-specified lambda coverage="<<rateForPoissonCov<<endl;
+	}
+
 	//exit(1);
     }else{ //not lambdaCovSpecified
 	//use the rate specified via the command line
@@ -5755,7 +5810,9 @@ int main (int argc, char *argv[]) {
 	    //retrieving coverage
 	    getline (infoFilePreComputed,l);
 	    rateForPoissonCov = destringify<long double>(l);
-
+	    if(lambdaCovSpecified){
+		rateForPoissonCov = lambdaCov;
+	    }
 	    cerr<<"lambda coverage="<<rateForPoissonCov<<endl;
 	    while ( getline (infoFilePreComputed,l)){		
 		vector<string> tempv = allTokens(l,'\t');		
@@ -6216,12 +6273,12 @@ int main (int argc, char *argv[]) {
 		
 		if(dataToWrite->rank == lastRank)
 		    wroteEverything=true;	
+
 		delete dataToWrite;
 	    }else{
 		//do nothing, we have to wait for the chunk with the right rank
 		rc = pthread_mutex_unlock(&mutexQueueToWrite);
-		checkResults("pthread_mutex_unlock()\n", rc);
-	
+		checkResults("pthread_mutex_unlock()\n", rc);	
 	    }
 
 	}else{//end if queue not empty
