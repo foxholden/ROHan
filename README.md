@@ -104,7 +104,7 @@ i) If the sample is not too divergent from the reference used you can simply use
  To get the best results, take a substantial subsample of your original BAM file and use it in bam2prof. 
  a) Find the ideal length for the -length parameter. Try increasing until substition rates level off.
  b) Keep increasing  -minq from 0 until the damage levels off.
- c) If you have substitutions outside of expected ones (e.g. C->T, G->A) consider using the second option (see ii) )
+ c) If you have a high rate of substitutions outside of expected ones (e.g. C->T, G->A) consider using the second option (see ii) )
  d) Have a look at the command line in the test data directory.
 
 ii) Use the script to estimate damage by masking polymorphic positions, this is especially important if the divergence between the reference genome and sample is great and there are a lot of polymorphic positions:
