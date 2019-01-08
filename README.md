@@ -95,16 +95,28 @@ Preparing the BAM file
 2) Do not apply any filters as mapping quality and base quality are all informative in the model. Duplicate removal is very recommended. Simply use the fail QC flag to remove reads/fragments that have failed basic quality control (e.g. for duplicates). Simply sort and index and provide ROHan the same reference used for mapping. 
 
 
-3) Is your sample ancient DNA? if not skip to 5). If the sample has aDNA damage, it should be quantified in incorporated in the calculation. The following program can be used:
+3) Is your sample ancient DNA? if not skip to 5). If the sample has aDNA damage, it should be quantified in incorporated in the calculation. There are 2 ways to do this:
+
+i) If the sample is not too divergent from the reference used you can simply use:
 
     bam2prof/bam2prof
 
-To get the best results, take a substantial subsample of your original BAM file and use it in bam2prof. 
-a) Find the ideal length for the -length parameter. Try increasing until substition rates level off.
-b) Keep increasing  -minq from 0 until the damage levels off.
-c) If you have substitutions outside of expected ones (e.g. C->T, G->A) consider using the -mask to filter out polymorphic positions
-d) Have a look at the command line in the test data directory.
+ To get the best results, take a substantial subsample of your original BAM file and use it in bam2prof. 
+ a) Find the ideal length for the -length parameter. Try increasing until substition rates level off.
+ b) Keep increasing  -minq from 0 until the damage levels off.
+ c) If you have substitutions outside of expected ones (e.g. C->T, G->A) consider using the second option (see ii) )
+ d) Have a look at the command line in the test data directory.
 
+ii) Use the script to estimate damage by masking polymorphic positions, this is especially important if the divergence between the reference genome and sample is great and there are a lot of polymorphic positions:
+
+    src/estimateDamage.pl    [reference fasta] [input .bam file]
+
+ For example:
+
+    src/estimateDamage.pl    Equcab20_nucl.fasta ancientHorse.bam
+
+ type the command without any arguments for a description of the different arguments.
+ 
 4) Do you have extensive ancient DNA damage (e.g. 20% at the ends of greater) which could potentially affect the mapping? If so, we recommend filtering for reads in highly mappable regions, see : http://lh3lh3.users.sourceforge.net/snpable.shtml  to create mappability tracks.
 
 5) Create a file with the name of the autosomes, 1 chromosome per line ex:
@@ -167,7 +179,7 @@ It is possible that you have genuine ROH but if you have a slight overestimate o
 
 ### What are the 3 different lines on the HMM plot?
 
--Green is output using the point estimates. Margenta are the estimates using upper bounds for local het. rates whereas red were computed using lower bounds of het. rates.
+- The green line is the output using the point estimates. Margenta are the estimates using upper bounds for local het. rates whereas red were computed using lower bounds of het. rates.
 
 
 ### What is the difference between --bed and --map?

@@ -22,7 +22,7 @@ HG02891.summary.txt: human_g1k_v37.masked.fa.fai HG02891.21.bam.bai
 
 
 Loschbour.hg19_1000g.5p.prof: Loschbour.hg19_1000g.chr21.bam.bai
-	samtools view -F1 -h -q 30 Loschbour.hg19_1000g.chr21.bam| awk '{if( substr($$1,1,1)=="@"  || length($$10)>45){ print $$0; }}'  | head -n 1000000 | samtools view -bS - | ../bam2prof/bam2prof -5p Loschbour.hg19_1000g.5p.prof -3p Loschbour.hg19_1000g.3p.prof -minq 0  -length 40  - 
+	samtools view -F1 -h -q 30 Loschbour.hg19_1000g.chr21.bam| awk '{if( substr($$1,1,1)=="@"  || length($$10)>45){ print $$0; }}'  | head -n 1000000 | samtools view -bS - | ../bam2prof/bam2prof -5p Loschbour.hg19_1000g.5p.prof -3p Loschbour.hg19_1000g.3p.prof -minq 30  -length 40  - 
 
 
 Loschbour.hg19_1000g.chr21.bam.bai:

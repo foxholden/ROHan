@@ -30,7 +30,7 @@ my $pathdir = join("/",@arraycwd);
 
 my $minq=30;
 my $minl=35;
-my $subsam=10000000;
+my $subsam=1000000;
 my $length=10;
 
 
@@ -150,7 +150,7 @@ sub usage
 
 		"\t\t--length\t[length]\tDo not consider bases beyond this length  (Default: ".$length." )\n".
 		"\t\t--map\t\t[bed file]\tUse these mappability tracked in bed format  (Default: ".$length." )\n".
-		"\t\t--threads\t\t[# threads]\tNumber of threads to use  (Default: ".$threads." )\n".
+		"\t\t--threads\t[# threads]\tNumber of threads to use  (Default: ".$threads." )\n".
 
 		  "\n".
                 " \tSubstitutions reported: specify either one of the 3 possible options:\n".
