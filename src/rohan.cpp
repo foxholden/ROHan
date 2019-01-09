@@ -96,6 +96,7 @@ using namespace std;
 // #define DEBUGQUEUEDATATOWRITE
 
 // #define HETVERBOSE
+#define DEBUGBOXINGALG
 
 //#define COVERAGETVERBOSE
 //#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
@@ -1830,16 +1831,16 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 
     int rc;
 
-    rc = pthread_mutex_lock(&mutexCERR);
-    checkResults("pthread_mutex_lock()\n", rc);
-
     if(verbose){
+	rc = pthread_mutex_lock(&mutexCERR);
+	checkResults("pthread_mutex_lock()\n", rc);
+	
 	cerr<<"Thread#"<<threadID<<" starting pre-computations size of window: "<<thousandSeparator(piForGenomicWindow->size())<<endl;
+	
+	rc = pthread_mutex_unlock(&mutexCERR);
+	checkResults("pthread_mutex_unlock()\n", rc);
     }
     
-    rc = pthread_mutex_unlock(&mutexCERR);
-    checkResults("pthread_mutex_unlock()\n", rc);
-
     hResults hresToReturn;
     hresToReturn.sites = piForGenomicWindow->size();
 
@@ -1864,16 +1865,15 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
     //END pre-computing babdlikelihood
     /////////////////////////////////////////
 
-    rc = pthread_mutex_lock(&mutexCERR);
-    checkResults("pthread_mutex_lock()\n", rc);
-
     if(verbose){
-	cerr<<"Thread#"<<threadID<<" done pre-computing computing "<<endl;
-    }
-    
-    rc = pthread_mutex_unlock(&mutexCERR);
-    checkResults("pthread_mutex_unlock()\n", rc);
+	rc = pthread_mutex_lock(&mutexCERR);
+	checkResults("pthread_mutex_lock()\n", rc);
 
+	cerr<<"Thread#"<<threadID<<" done pre-computing computing "<<endl;
+
+	rc = pthread_mutex_unlock(&mutexCERR);
+	checkResults("pthread_mutex_unlock()\n", rc);
+    }
     //max iterations
 
 
@@ -1882,6 +1882,15 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
     // long double theta_t_1 = theta;
     long double hp;
     long double h=double(sitesPer1M)/double(1000000);
+
+    long double hPosD1;//last h with lowest positive D1
+    long double hPosD1LLD1;//last h with lowest positive D1
+    bool        hPosD1init=false;//last h with lowest positive D1
+    
+    long double hNegD1;//last h with lowest positive D1 
+    long double hNegD1LLD1;//last h with lowest positive D1 
+    bool        hNegD1init=false;//last h with lowest positive D1 
+
     if(suggestH){
 	h=suggestHval;
     }
@@ -2007,12 +2016,75 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 	z = beta_*z + loglikelihoodForEveryPositionForEveryBaBdD1;
 	long double hnew = h + alpha_*z;
 
+
+	//Begin avoiding overshooting
+	if(hPosD1init==false){
+
+	    if(loglikelihoodForEveryPositionForEveryBaBdD1>0){
+		hPosD1      =h;
+		hPosD1LLD1  =loglikelihoodForEveryPositionForEveryBaBdD1;
+		hPosD1init  =true;
+
+		
+#ifdef DEBUGBOXINGALG
+		cerr<<"Thread#"<<threadID<<" found a + lower bound for h "<<h<<" d1 "<<hPosD1LLD1<<endl;
+#endif
+	    }
+			    	  	    
+	}else{//was initialized
+	    if(loglikelihoodForEveryPositionForEveryBaBdD1>0){
+		if(hPosD1LLD1 < loglikelihoodForEveryPositionForEveryBaBdD1){//wrong direction
+
+		    if(hNegD1init){
+			long double hnewCorrect = (hPosD1 + hNegD1)/2.0;
+#ifdef DEBUGBOXINGALG
+			cerr<<"Thread#"<<threadID<<" overshot with new h "<<hnew<<" moving instead to "<<hnewCorrect<<endl;
+#endif
+
+			hnew = hnewCorrect;
+
+		    }else{
+			cerr<<"Thread#"<<threadID<<" error the gradient went in the wrong direction "<<h<<" d1 "<<hPosD1LLD1<<endl;
+			exit(1);
+		    }
+		    
+		}else{//better h found
+		    hPosD1      =h;
+		    hPosD1LLD1  =loglikelihoodForEveryPositionForEveryBaBdD1;
+		}
+
+	    }
+	    
+	}
+
+	// if(hNegD1init==false){
+	//     if(loglikelihoodForEveryPositionForEveryBaBdD1<0){
+	// 	hNegD1    =h;
+	// 	hNegD1LL  =loglikelihoodForEveryPositionForEveryBaBd;
+	// 	hNegD1init=true;
+	//     }
+	// }
+	
+	
+	long double hPosD1;//last h with lowest positive D1
+	long double hPosD1LL;//last h with lowest positive D1
+	bool        hPosD1init=false;//last h with lowest positive D1
+    
+	long double hNegD1;//last h with lowest positive D1 
+	long double hNegD1LL;//last h with lowest positive D1 
+	bool        hNegD1init=false;//last h with lowest positive D1 
+
+	
+	
 	if(loglikelihoodForEveryPositionForEveryBaBdD1 > 0){
 	    iterationWithPositiveD1++;
 	}else{
 	    iterationWithNegativeD1++;
 	}
 
+
+
+	
 	
 	if(verbose){
 	    rc = pthread_mutex_lock(&mutexCERR);
@@ -2032,15 +2104,16 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 	//if(abs(hnew-h)<hPrecision){
 	if(fabsl(loglikelihoodForEveryPositionForEveryBaBdD1) < loglikelihoodForEveryPositionForEveryBaBdD1ForConvergence){
 
-	    rc = pthread_mutex_lock(&mutexCERR);
-	    checkResults("pthread_mutex_lock()\n", rc);
-
-	    if(verbose)
+	    if(verbose){
+		rc = pthread_mutex_lock(&mutexCERR);
+		checkResults("pthread_mutex_lock()\n", rc);
+		
 		cerr<<"Thread#"<<threadID<<" converged "<<endl;
-
-	    rc = pthread_mutex_unlock(&mutexCERR);
-	    checkResults("pthread_mutex_unlock()\n", rc);
-
+		
+		rc = pthread_mutex_unlock(&mutexCERR);
+		checkResults("pthread_mutex_unlock()\n", rc);
+	    }
+	    
 	    lastIteration=true;
 	    hasConverged =true;
 	    //break;
@@ -2252,16 +2325,17 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 	}
 	
 	if(iterationsGrad == (iterationsMax-2)){
-	    rc = pthread_mutex_lock(&mutexCERR);
-	    checkResults("pthread_mutex_lock()\n", rc);
-
 	    if(verbose){
-		cerr<<"Thread#"<<threadID<<" did not converge"<<endl;
-	    }
-	    
-	    rc = pthread_mutex_unlock(&mutexCERR);
-	    checkResults("pthread_mutex_unlock()\n", rc);
+		rc = pthread_mutex_lock(&mutexCERR);
+		checkResults("pthread_mutex_lock()\n", rc);
 
+
+		cerr<<"Thread#"<<threadID<<" did not converge"<<endl;
+
+	    
+		rc = pthread_mutex_unlock(&mutexCERR);
+		checkResults("pthread_mutex_unlock()\n", rc);
+	    }
 	    hasConverged =false;
 	    lastIteration=true;
 	    //break;
