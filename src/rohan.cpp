@@ -96,7 +96,7 @@ using namespace std;
 // #define DEBUGQUEUEDATATOWRITE
 
 // #define HETVERBOSE
-#define DEBUGBOXINGALG
+// #define DEBUGBOXINGALG
 
 //#define COVERAGETVERBOSE
 //#define DUMPTRIALLELIC //hack to remove tri-allelic, we need to account for them
@@ -1883,16 +1883,16 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
     long double hp;
     long double h=double(sitesPer1M)/double(1000000);
 
-    long double hPosD1;//last h with lowest positive D1
-    long double hPosD1LLD1;//last h with lowest positive D1
+    long double hPosD1 = double(minSegSitesPer1M)/double(1000000);//last h with lowest positive D1
+    //long double hPosD1LLD1=-1;//last h with lowest positive D1
     bool        hPosD1init=false;//last h with lowest positive D1
     
-    long double hNegD1;//last h with lowest positive D1 
-    long double hNegD1LLD1;//last h with lowest positive D1 
+    long double hNegD1 = double(maxSegSitesPer1M)/double(1000000);//last h with lowest positive D1 
+    //    long double hNegD1LLD1=-1;//last h with lowest positive D1 
     bool        hNegD1init=false;//last h with lowest positive D1 
 
     if(suggestH){
-	h=suggestHval;
+	h=suggestHval;	
     }
 
 
@@ -2018,63 +2018,88 @@ inline hResults computeLL(const vector<positionInformation> * piForGenomicWindow
 
 
 	//Begin avoiding overshooting
-	if(hPosD1init==false){
+	if(loglikelihoodForEveryPositionForEveryBaBdD1>0){//in positive derivative, need to increase h
 
-	    if(loglikelihoodForEveryPositionForEveryBaBdD1>0){
+	    if(hPosD1init==false){//init the positive boundary
+
 		hPosD1      =h;
-		hPosD1LLD1  =loglikelihoodForEveryPositionForEveryBaBdD1;
+		//hPosD1LLD1  =loglikelihoodForEveryPositionForEveryBaBdD1;
 		hPosD1init  =true;
-
 		
 #ifdef DEBUGBOXINGALG
-		cerr<<"Thread#"<<threadID<<" found a + lower bound for h "<<h<<" d1 "<<hPosD1LLD1<<endl;
+		cerr<<"Thread#"<<threadID<<" found a + lower bound for h "<<h<<"  range  "<<hPosD1<<" - "<<hNegD1<<endl;
 #endif
-	    }
-			    	  	    
-	}else{//was initialized
-	    if(loglikelihoodForEveryPositionForEveryBaBdD1>0){
-		if(hPosD1LLD1 < loglikelihoodForEveryPositionForEveryBaBdD1){//wrong direction
-
-		    if(hNegD1init){
-			long double hnewCorrect = (hPosD1 + hNegD1)/2.0;
+		
+	    }else{//was initialized, should be better, otherwise it would be blocked
+	    
+		hPosD1      =h;
+		//hPosD1LLD1  =loglikelihoodForEveryPositionForEveryBaBdD1;
 #ifdef DEBUGBOXINGALG
-			cerr<<"Thread#"<<threadID<<" overshot with new h "<<hnew<<" moving instead to "<<hnewCorrect<<endl;
+		cerr<<"Thread#"<<threadID<<" found a + lower bound for h "<<h<<"  range  "<<hPosD1<<" - "<<hNegD1<<endl;
 #endif
+			    	  
+	    }
+	    
+	    if(hPosD1init && hNegD1init){//check if hnew will overshoot
+		// previous      new one
+		if(hNegD1<hnew || hnew<hPosD1  ){//wrong direction		
 
-			hnew = hnewCorrect;
-
-		    }else{
-			cerr<<"Thread#"<<threadID<<" error the gradient went in the wrong direction "<<h<<" d1 "<<hPosD1LLD1<<endl;
-			exit(1);
-		    }
+		    long double hnewCorrect = (hPosD1 + hNegD1)/2.0;
+#ifdef DEBUGBOXINGALG
+		    cerr<<"Thread#"<<threadID<<" overshot in - with new h "<<hnew<<" not in  "<<hPosD1<<" - "<<hNegD1<<" moving instead to "<<hnewCorrect<<endl;
+#endif
 		    
-		}else{//better h found
-		    hPosD1      =h;
-		    hPosD1LLD1  =loglikelihoodForEveryPositionForEveryBaBdD1;
-		}
+		    hnew = hnewCorrect;
+		    
+		}else{
+		    //ok
+		}		    
+	    }
+	    
+	}else{ //	if(loglikelihoodForEveryPositionForEveryBaBdD1<0){ //in negatvive derivative, need to decrease h
 
+	    if(hNegD1init==false){
+	    
+		hNegD1      =h;
+		///hNegD1LLD1  =loglikelihoodForEveryPositionForEveryBaBdD1;
+		hNegD1init  =true;
+		
+#ifdef DEBUGBOXINGALG
+		cerr<<"Thread#"<<threadID<<" found a - lower bound for h "<<h<<"  range  "<<hPosD1<<" - "<<hNegD1<<endl;
+#endif    
+			    	  	    
+	    }else{//was initialized, should be better, otherwise it would be blocked
+
+		hNegD1      =h;
+		//hNegD1LLD1  =loglikelihoodForEveryPositionForEveryBaBdD1;
+			
+#ifdef DEBUGBOXINGALG
+		cerr<<"Thread#"<<threadID<<" found a - lower bound for h "<<h<<"  range  "<<hPosD1<<" - "<<hNegD1<<endl;
+#endif
+		
+	   	    
+	    }
+
+	    if(hPosD1init && hNegD1init){//check if hnew will overshoot
+		// previous      new one
+		if(hNegD1<hnew || hnew<hPosD1  ){//wrong direction
+
+		    long double hnewCorrect = (hPosD1 + hNegD1)/2.0;
+#ifdef DEBUGBOXINGALG
+		    cerr<<"Thread#"<<threadID<<" overshot in + with new h "<<hnew<<" not in  "<<hPosD1<<" - "<<hNegD1<<" moving instead to "<<hnewCorrect<<endl;
+#endif
+		    
+		    hnew = hnewCorrect;
+		    
+		}else{
+		    //ok
+		}		    
 	    }
 	    
 	}
+	
 
-	// if(hNegD1init==false){
-	//     if(loglikelihoodForEveryPositionForEveryBaBdD1<0){
-	// 	hNegD1    =h;
-	// 	hNegD1LL  =loglikelihoodForEveryPositionForEveryBaBd;
-	// 	hNegD1init=true;
-	//     }
-	// }
-	
-	
-	long double hPosD1;//last h with lowest positive D1
-	long double hPosD1LL;//last h with lowest positive D1
-	bool        hPosD1init=false;//last h with lowest positive D1
-    
-	long double hNegD1;//last h with lowest positive D1 
-	long double hNegD1LL;//last h with lowest positive D1 
-	bool        hNegD1init=false;//last h with lowest positive D1 
-
-	
+		    
 	
 	if(loglikelihoodForEveryPositionForEveryBaBdD1 > 0){
 	    iterationWithPositiveD1++;
