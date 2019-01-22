@@ -55,46 +55,82 @@ fileExists($bam2prof);
 print STDERR  "..success\n";
 $bam2prof = abs_path($bam2prof);
 
+
+
+sub findcommandAlias{#does not work with background processes
+  my ($cmdtorun) = @_;
+  print STDERR "trying to find executable ". $cmdtorun."..";
+  my $command;
+
+  if($mock != 1){
+    my $cmdtodetect = "which ".$cmdtorun."";
+    my $out = `$cmdtodetect`;
+
+    chomp($out);
+
+    if( $out =~ /^(.+)$/){#found
+      #my @ar = split(" ",$out);
+      #$command=$ar[$#ar]."\n";
+      $command=$1;
+      chomp( $command );
+      print STDERR ".. found: ".$command."\n";
+    }else{
+      $cmdtodetect = "bash -i -c \"alias |grep  ".$cmdtorun."=\"";
+
+      $out = `$cmdtodetect`;
+
+      if( $out =~ /^alias (\S+)=(.+)$/){
+	$command=$2;
+	chomp( $command );
+	my @arrcmd = split //, $command;
+
+	#removing beginning chars
+	while($arrcmd[0] ne '/'){
+	  shift(@arrcmd);
+	}
+	#removing trailing chars
+	while( (ord($arrcmd[ $#arrcmd ]) == 32) || (ord($arrcmd[ $#arrcmd ]) == 39) ){
+	  pop(@arrcmd);
+	}
+
+	my $command = join("",@arrcmd);
+
+
+	print STDERR ".. found: ".$command."\n";
+      }else{
+	print STDERR "cannot find executable ".$cmdtorun."\n";
+	die;
+      }
+    }
+
+  }else{
+    print STDERR ".. running as mock: ".$cmdtorun."\n";
+    $command = $cmdtorun;
+  }
+  return $command;
+
+}
+
 sub findcommand{
   my ($cmdtorun) = @_;
   print STDERR "trying to find executable ". $cmdtorun."..";
   my $command;
 
   if($mock != 1){
-    my $cmdtodetect = "bash -i -c \"type ".$cmdtorun."\"";
+    my $cmdtodetect = "which ".$cmdtorun."";
     my $out = `$cmdtodetect`;
+
     chomp($out);
-    if( $out =~ /^(\S+)\s+is\s+(\S+)$/){
+
+    if( $out =~ /^(.+)$/){#found
       #my @ar = split(" ",$out);
       #$command=$ar[$#ar]."\n";
-      $command=$2;
+      $command=$1;
       chomp( $command );
       print STDERR ".. found: ".$command."\n";
     }else{
-      if( $out =~ /^(\S+)\s+is aliased to\s+(.+)$/){
-
-	$cmdtodetect = "bash -i -c \"unalias ".$cmdtorun." && type ".$cmdtorun."\"";
-	$out = `$cmdtodetect`;
-
-	if( $out =~ /^(\S+)\s+is\s+(\S+)$/){
-	  $command=$2;
-	  chomp( $command );
-	  print STDERR ".. found: ".$command."\n";
-	}else{
-	  print STDERR "cannot resolve the alias ".$cmdtorun."\n";
-	  die;
-	}
-	#my @ar = split(" ",$out);
-	#$command=$ar[$#ar]."\n";
-	#$command=$2;
-	#$command =~ s/^`//g;
-	#$command =~ s/'$//g;
-	#chomp( $command );
-	#print STDERR ".. alias found: ".$command."\n";
-      }else{
-	print STDERR "cannot find executable ".$cmdtorun."\n";
-	die;
-      }
+      print STDERR "cannot find executable ".$cmdtorun."\n";
+      die;
     }
 
   }else{
