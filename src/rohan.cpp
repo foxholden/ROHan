@@ -1806,6 +1806,10 @@ inline void computeLLinternal(const diNucleotideProb priorGenotype,
 	    loglikelihoodForEveryPositionForEveryBaBdD1 +=                                                                 loglikelihoodForEveryBaBdD1;
 	    loglikelihoodForEveryPositionForEveryBaBdD2 +=                                                                 loglikelihoodForEveryBaBdD2; 
 	}else{// do not use hard cutoffs, use coverage prior
+	    cerr<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBd<<endl;
+	    cerr<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBdD1<<endl;
+	    cerr<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBdD2<<endl;
+
 	    loglikelihoodForEveryPositionForEveryBaBd   += cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBd;
 	    loglikelihoodForEveryPositionForEveryBaBdD1 += cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD1; 
 	    loglikelihoodForEveryPositionForEveryBaBdD2 += cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD2; 
@@ -5994,9 +5998,9 @@ int main (int argc, char *argv[]) {
     // #endif
     
     cov2ProbSite = new vector<long double> (MAXCOV+1,0);
-#ifdef CORRECTCOV
+    //#ifdef CORRECTCOV
     populatedCoverateVector( string(argv[0]) , cov2ProbSite , rateForPoissonCov, MAXCOV );
-#endif
+    //#endif
 
 
     for(int i=0;i<=MAXCOV;i++){
