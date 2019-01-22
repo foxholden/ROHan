@@ -70,7 +70,7 @@ using namespace std;
 //#define MAX(a,b) (((a)>(b))?(a):(b))
 
 //#define DEBUGFIRSTWINDOWS 3
-#define CORRECTCOV
+//#define CORRECTCOV
 //#define ONLYUSECOV 12
 // #define ONLYUSECOVMIN 5
 // #define ONLYUSECOVMAX 49
@@ -203,6 +203,10 @@ int    nhsuggest  =0;
 
 bool suggestH=false;
 double suggestHval;
+
+bool covcutoffs   =false;
+int  covcutoffsmin=0;
+int  covcutoffsmax=MAXCOV;
 
 // 1D: mapping quality 
 // 2D: length of fragment
@@ -1779,23 +1783,40 @@ inline void computeLLinternal(const diNucleotideProb priorGenotype,
 	// loglikelihoodForEveryPositionForEveryBaBdD2 += loglikelihoodForEveryBaBdD2; // \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
 
 	// \prod_{site} \sum_{genotype} (\prod_{fragment} P(D|G))*P(G)
-#if defined(ONLYUSECOV) || defined(ONLYUSECOVMIN) || defined(ONLYUSECOVMAX)
-	//cout<<piForGenomicWindow->at(p).readsVec.size()<<endl;
+	//#if defined(ONLYUSECOV) || defined(ONLYUSECOVMIN) || defined(ONLYUSECOVMAX)
+	// if(piForGenomicWindow->at(p).readsVec.size() < ONLYUSECOVMIN){
+	//     continue;
+	// }
 
-	if(piForGenomicWindow->at(p).readsVec.size() < ONLYUSECOVMIN){
-	    continue;
+	// if(piForGenomicWindow->at(p).readsVec.size() > ONLYUSECOVMAX){
+	//     continue;
+	// }
+
+	if(covcutoffs){//do not rely on coverage prior, use hard cutoffs instead
+	    
+	    if( int(piForGenomicWindow->at(p).readsVec.size()) < covcutoffsmin){
+		continue;
+	    }
+
+	    if( int(piForGenomicWindow->at(p).readsVec.size()) > covcutoffsmax){
+		continue;
+	    }
+
+	    loglikelihoodForEveryPositionForEveryBaBd   +=                                                                 loglikelihoodForEveryBaBd;
+	    loglikelihoodForEveryPositionForEveryBaBdD1 +=                                                                 loglikelihoodForEveryBaBdD1;
+	    loglikelihoodForEveryPositionForEveryBaBdD2 +=                                                                 loglikelihoodForEveryBaBdD2; 
+	}else{// do not use hard cutoffs, use coverage prior
+	    loglikelihoodForEveryPositionForEveryBaBd   += cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBd;
+	    loglikelihoodForEveryPositionForEveryBaBdD1 += cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD1; 
+	    loglikelihoodForEveryPositionForEveryBaBdD2 += cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD2; 
 	}
-
-	if(piForGenomicWindow->at(p).readsVec.size() > ONLYUSECOVMAX){
-	    continue;
-	}
-
-#endif
-	loglikelihoodForEveryPositionForEveryBaBd   +=
-#ifdef CORRECTCOV
-	    cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
-#endif
-	    loglikelihoodForEveryBaBd;
+	
+	//#endif
+	// loglikelihoodForEveryPositionForEveryBaBd   +=
+	//     //#ifdef CORRECTCOV
+	//     cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+	//     //#endif
+	//     loglikelihoodForEveryBaBd;
 	// #ifdef DEBUGCOV
 
 	// 	    cerr<<loglikelihoodForEveryPositionForEveryBaBd<<" "<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() )<<" "<<loglikelihoodForEveryBaBd<<" l="<<piForGenomicWindow->at(p).readsVec.size()<<"#"<<endl;
@@ -1805,16 +1826,16 @@ inline void computeLLinternal(const diNucleotideProb priorGenotype,
 	// 	    }
 	// #endif
 	    
-	loglikelihoodForEveryPositionForEveryBaBdD1 +=
-#ifdef CORRECTCOV
-	    cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
-#endif
-	    loglikelihoodForEveryBaBdD1; 
-	loglikelihoodForEveryPositionForEveryBaBdD2 +=
-#ifdef CORRECTCOV
-	    cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
-#endif
-	    loglikelihoodForEveryBaBdD2; 
+	// 	loglikelihoodForEveryPositionForEveryBaBdD1 +=
+	// #ifdef CORRECTCOV
+	// 	    cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+	// #endif
+	// 	    loglikelihoodForEveryBaBdD1; 
+	// 	loglikelihoodForEveryPositionForEveryBaBdD2 +=
+	// #ifdef CORRECTCOV
+	// 	    cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) *
+	// #endif
+	// 	    loglikelihoodForEveryBaBdD2; 
 
     }//END for each genomic position
 
@@ -5136,6 +5157,7 @@ int main (int argc, char *argv[]) {
     bool skipTheHMM=false;
     bool noROH=false;
 
+
     ifstream myFileFAI;
     //string filenameFAI;
     string headerVCFFile;
@@ -5193,7 +5215,7 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"this is done to avoid including sex chromosomes in the calculation"+"\n"+
 	"\t\t"+""  +"" +"--rohmu"    +"\t\t\t"    + "[rate]"  +"\t\t\t"+"Use this value as the expected mutation rate in ROHs   (default: "+stringify(rohmu)+")"+"\n"+
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"be careful when using this option as it can inflace the background estimate for theta"+"\n"+
-
+	"\t\t"+""  +"" +"--cov"      +"\t\t\t"    + "mincov,maxcov"+"\t\t"+"Ignore the prior probabilities on coverage, simply use these cutoffs  (default: prior probabilities are used)"+"\n"+
 
 	//			      "\t\t"+""  +""+"--lambda"     +"\t\t"    + "[lambda]" +"\t\t"+"Skip coverage computation, specify lambda manually  (default: "+booleanAsString(lambdaCovSpecified)+")"+"\n"+	      
 	"\n\t\tHMM:\n"+
@@ -5292,7 +5314,23 @@ int main (int argc, char *argv[]) {
 	    noROH=true;
             continue;
         }
+
 	
+        if( string(argv[i]) == "--cov"  ){
+	    covcutoffs=true;
+	    string sc = string(argv[i+1]);
+	    vector<string> scf=allTokens(sc,',');
+	    if(scf.size() != 1 ){
+		cerr<<"Error: for --cov, the format is mincov,maxcov"<<endl;
+		return 1;
+	    }
+
+	    covcutoffsmin = destringify<unsigned int>( scf[0] );
+	    covcutoffsmax = destringify<unsigned int>( scf[1] );
+            continue;
+        }
+
+
         if( string(argv[i]) == "--size"  ){
 	    sizeChunk=destringify<unsigned int>(argv[i+1]);	    
 	    specifiedSIZE=true;
