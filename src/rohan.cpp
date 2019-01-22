@@ -5320,13 +5320,14 @@ int main (int argc, char *argv[]) {
 	    covcutoffs=true;
 	    string sc = string(argv[i+1]);
 	    vector<string> scf=allTokens(sc,',');
-	    if(scf.size() != 1 ){
-		cerr<<"Error: for --cov, the format is mincov,maxcov"<<endl;
+	    if(scf.size() != 2 ){
+		cerr<<"Error: for --cov, the format is mincov,maxcov found "<<scf.size()<<" fields "<<endl;
 		return 1;
 	    }
 
 	    covcutoffsmin = destringify<unsigned int>( scf[0] );
 	    covcutoffsmax = destringify<unsigned int>( scf[1] );
+	    i++;
             continue;
         }
 
