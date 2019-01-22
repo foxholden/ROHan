@@ -309,7 +309,7 @@ my $deam3p1 = $outputprefix."_1.3p.prof";
 $bam2profcmd1 = $bam2profcmd1." -5p ".$deam5p1." ";
 $bam2profcmd1 = $bam2profcmd1." -3p ".$deam3p1." ";
 
-$bam2profcmd1 = $bam2profcmd1."  ".$outputprefix."_sub".$subsam.".bam";
+$bam2profcmd1 = $bam2profcmd1."  ".$outputprefix."_sub".$subsam.".bam 2> /dev/null";
 runcmd($bam2profcmd1);
 
 
