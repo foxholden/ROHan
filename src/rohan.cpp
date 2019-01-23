@@ -1806,9 +1806,9 @@ inline void computeLLinternal(const diNucleotideProb priorGenotype,
 	    loglikelihoodForEveryPositionForEveryBaBdD1 +=                                                                 loglikelihoodForEveryBaBdD1;
 	    loglikelihoodForEveryPositionForEveryBaBdD2 +=                                                                 loglikelihoodForEveryBaBdD2; 
 	}else{// do not use hard cutoffs, use coverage prior
-	    cerr<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBd<<endl;
-	    cerr<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBdD1<<endl;
-	    cerr<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBdD2<<endl;
+	    // cerr<<loglikelihoodForEveryPositionForEveryBaBd<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBd<<endl;
+	    // cerr<<loglikelihoodForEveryPositionForEveryBaBdD1<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBdD1<<endl;
+	    // cerr<<loglikelihoodForEveryPositionForEveryBaBdD2<<"\t"<<cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) <<"\t"<< loglikelihoodForEveryBaBdD2<<endl;
 
 	    loglikelihoodForEveryPositionForEveryBaBd   += cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBd;
 	    loglikelihoodForEveryPositionForEveryBaBdD1 += cov2ProbSite->at( piForGenomicWindow->at(p).readsVec.size() ) * loglikelihoodForEveryBaBdD1; 

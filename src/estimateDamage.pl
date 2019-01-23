@@ -424,10 +424,10 @@ runcmd($bam2profcmd2);
 
 #cleaning up
 if($noclean != 1){
-  my $commandrmsubsample = $cmdrm." -f ".$outputprefix."_sub.bam";
+  my $commandrmsubsample = $cmdrm." -f ".$outputprefix."_sub".$subsam.".bam";
   runcmd($commandrmsubsample);
 
-  my $commandrmsubsamplei = $cmdrm." -f ".$outputprefix."_sub.bam.bai";
+  my $commandrmsubsamplei = $cmdrm." -f ".$outputprefix."_sub".$subsam.".bam.bai";
   runcmd($commandrmsubsamplei);
 
   my $commandrm5p = $cmdrm." -f ".$outputprefix."_1.5p.prof";
