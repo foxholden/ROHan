@@ -5213,7 +5213,7 @@ int main (int argc, char *argv[]) {
 	"\t\t"+""  +"" +"--tvonly"     +"\t\t\t"    + ""  +"\t\t"+"Only consider transversions  (default: "+booleanAsString(tvonly)+")"+"\n"+
 	"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"recommended for highly damaged samples where damage cannot be accurately quantified "+"\n"+
 	//"\t\t"+""  +"" +""             +"\t\t\t"    + ""  +"\t\t\t"+"heterozygosity estimates will be multiplied by ([tstv]+1)"+"\n"+
-	"\t\t"+""  +"" +"--noroh"    +"\t\t\t"    + ""        +"\t\t\t"+"Do not allow any region to be flagged as ROH (default: "+booleanAsString(noROH)+")"+"\n"+	
+	//"\t\t"+""  +"" +"--noroh"    +"\t\t\t"    + ""        +"\t\t\t"+"Do not allow any region to be flagged as ROH (default: "+booleanAsString(noROH)+")"+"\n"+	
 
 	"\t\t"+""  +"" +"--auto"     +"\t\t\t"    + "[file]"  +"\t\t\t"+"Use only the chromosome/scaffolds in this file   (default: use every chromosome)"+"\n"+
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"this is done to avoid including sex chromosomes in the calculation"+"\n"+
@@ -6594,6 +6594,7 @@ int main (int argc, char *argv[]) {
     //exit(1);
 
     //lower
+    noROH=false;
     hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN,noROH);
     cerr<<"min h est. "<<hmmResmin.hAvg<<" hMin "<<hmmResmin.hMin<<" hMax "<<hmmResmin.hMax<<" s "<<hmmResmin.sAvg<<" sMin "<<hmmResmin.sMin<<" sMax "<<hmmResmin.sMax<<" p avg. "<<hmmResmin.pAvg<<" pMin "<<hmmResmin.pMin<<" pMax "<<hmmResmin.pMax<<" rohS "<<hmmResmin.rohSegments<<" nonrohS "<<hmmResmin.nonrohSegments<<" unsure "<<hmmResmin.unsureSegments<<endl;
 
@@ -6606,6 +6607,25 @@ int main (int argc, char *argv[]) {
     hmmRes hmmResmax=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMAX,noROH);
     cerr<<"max h est. "<<hmmResmax.hAvg<<" hMin "<<hmmResmax.hMin<<" hMax "<<hmmResmax.hMax<<" s "<<hmmResmax.sAvg<<" sMin "<<hmmResmax.sMin<<" sMax "<<hmmResmax.sMax<<" p avg. "<<hmmResmax.pAvg<<" pMin "<<hmmResmax.pMin<<" pMax "<<hmmResmax.pMax<<" rohS "<<hmmResmax.rohSegments<<" nonrohS "<<hmmResmax.nonrohSegments<<" unsure "<<hmmResmax.unsureSegments<<endl;
 
+    long double hAvg = hmmResmid.hAvg;
+    long double hMin = MIN3(  hmmResmin.hMin , hmmResmid.hMin  ,  hmmResmax.hMin );
+    long double hMax = MAX3(  hmmResmin.hMax , hmmResmid.hMax  ,  hmmResmax.hMax );
+
+
+    noROH=true;
+    hmmRes hmmResminNOROH=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN,noROH);
+    cerr<<"min h est. "<<hmmResminNOROH.hAvg<<" hMin "<<hmmResminNOROH.hMin<<" hMax "<<hmmResminNOROH.hMax<<" s "<<hmmResminNOROH.sAvg<<" sMin "<<hmmResminNOROH.sMin<<" sMax "<<hmmResminNOROH.sMax<<" p avg. "<<hmmResminNOROH.pAvg<<" pMin "<<hmmResminNOROH.pMin<<" pMax "<<hmmResminNOROH.pMax<<" rohS "<<hmmResminNOROH.rohSegments<<" nonrohS "<<hmmResminNOROH.nonrohSegments<<" unsure "<<hmmResminNOROH.unsureSegments<<endl;
+
+    //mid
+    hmmRes hmmResmidNOROH=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMID,noROH);
+    cerr<<"mid h est. "<<hmmResmidNOROH.hAvg<<" hMin "<<hmmResmidNOROH.hMin<<" hMax "<<hmmResmidNOROH.hMax<<" s "<<hmmResmidNOROH.sAvg<<" sMin "<<hmmResmidNOROH.sMin<<" sMax "<<hmmResmidNOROH.sMax<<" p avg. "<<hmmResmidNOROH.pAvg<<" pMin "<<hmmResmidNOROH.pMin<<" pMax "<<hmmResmidNOROH.pMax<<" rohS "<<hmmResmidNOROH.rohSegments<<" nonrohS "<<hmmResmidNOROH.nonrohSegments<<" unsure "<<hmmResmidNOROH.unsureSegments<<endl;
+
+
+    //upper
+    hmmRes hmmResmaxNOROH=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMAX,noROH);
+    cerr<<"max h est. "<<hmmResmaxNOROH.hAvg<<" hMin "<<hmmResmaxNOROH.hMin<<" hMax "<<hmmResmaxNOROH.hMax<<" s "<<hmmResmaxNOROH.sAvg<<" sMin "<<hmmResmaxNOROH.sMin<<" sMax "<<hmmResmaxNOROH.sMax<<" p avg. "<<hmmResmaxNOROH.pAvg<<" pMin "<<hmmResmaxNOROH.pMin<<" pMax "<<hmmResmaxNOROH.pMax<<" rohS "<<hmmResmaxNOROH.rohSegments<<" nonrohS "<<hmmResmaxNOROH.nonrohSegments<<" unsure "<<hmmResmaxNOROH.unsureSegments<<endl;
+
+
     //return 1;
     //////////////////////////////////
     //                              //
@@ -6613,9 +6633,9 @@ int main (int argc, char *argv[]) {
     //                              //
     //////////////////////////////////
 
-    long double hAvg=hmmResmid.hAvg;
-    long double hMin= MIN3(  hmmResmin.hMin , hmmResmid.hMin  ,  hmmResmax.hMin );
-    long double hMax= MAX3(  hmmResmin.hMax , hmmResmid.hMax  ,  hmmResmax.hMax );
+    long double hAvgNOROH = hmmResmidNOROH.hAvg;
+    long double hMinNOROH = MIN3(  hmmResminNOROH.hMin , hmmResmidNOROH.hMin  ,  hmmResmaxNOROH.hMin );
+    long double hMaxNOROH = MAX3(  hmmResminNOROH.hMax , hmmResmidNOROH.hMax  ,  hmmResmaxNOROH.hMax );
 
 
 
@@ -6888,7 +6908,8 @@ int main (int argc, char *argv[]) {
 	fileSummary<<"Github version: "<< returnGitHubVersion(string(argv[0]),"..") <<" "<<endl;
 	
 	
-	fileSummary << "Global heterozygosity rate:\t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;
+	fileSummary << "Global heterozygosity rate:  \t"<<hAvg<<"\t"<<hMin<<"\t"<<hMax<<endl;
+	fileSummary << "Heterozygosity in ROH/nonROH:\t"<<hAvgNOROH<<"\t"<<hMinNOROH<<"\t"<<hMaxNOROH<<endl;
 	
 	//fileSummary << "\t" <<"total\tfraction in %"<<endl;
 	fileSummary << "Segments unclassified    :\t"<<hmmResmid.unsureSegments <<" ("<<MIN3( hmmResmin.unsureSegments, hmmResmid.unsureSegments, hmmResmax.unsureSegments)<<","<<MAX3( hmmResmin.unsureSegments, hmmResmid.unsureSegments, hmmResmax.unsureSegments)<<")"<<endl;
