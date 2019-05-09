@@ -9,8 +9,8 @@
 <meta name="generator" content="Jekyll v3.7.3">
 <meta property="og:title" content="ROHan">
 <meta property="og:locale" content="en_US">
-<meta name="description" content="Joint inference of Runs of Homozygosity and heterozygosity">
-<meta property="og:description" content="Joint inference of Runs of Homozygosity and heterozygosity">
+<meta name="description" content="Joint inference of Runs of Homozygosity and rates of heterozygosity">
+<meta property="og:description" content="Joint inference of Runs of Homozygosity and rates of heterozygosity">
 <link rel="canonical" href="http://grenaud.github.io/ROHan/">
 <meta property="og:url" content="http://grenaud.github.io/ROHan/">
 <meta property="og:site_name" content="ROHan">
@@ -50,7 +50,7 @@
       <section>
         <div id="title">
           <h1>ROHan</h1>
-          <p> Joint inference of Runs of Homozygosity and heterozygosity </p>
+          <p> Joint inference of Runs of Homozygosity and rates of heterozygosity </p>
           <hr>
           <span class="credits left">Project maintained by <a href="https://github.com/grenaud">grenaud</a></span>
           
@@ -59,7 +59,19 @@
         
 <h1 id="ROHan">ROHan</h1>
 
-<p>ROHan is a Bayesian framework to estimate local rates of heterozygosity, infer runs of homozygosity (ROH) and compute global rates of heterozygosity. ROHan can work on modern and ancient samples with signs of ancient DNA damage.</p>
+<p>ROHan is a Bayesian framework to estimate local rates of heterozygosity, infer runs of homozygosity (ROH) and compute global rates of heterozygosity outside of ROHs. ROHan can work on modern and ancient samples with signs of ancient DNA damage.</p>
+
+<p>ROHan can work for sample with depth-of-coverage 4-5X or above for modern samples and 7-8X for damaged ancient samples. It makes the following assumptions:</p>
+<ul>
+<li>The per-base quality scores are sufficiently representative of the error rate, this should be the case for most modern Illumina runs.</li>
+<li>Inbreeding is sufficiently recent. ROHan cannot deal with very distant and continuous inbreeding.</li>
+<li>For ancient samples, you have adequately quantified the rates of ancient DNA damage (see README).</li>
+</ul>
+
+
+<p>The README contains usage and recommendation how to prepare your BAM file.</p>
+
+
 
 <h3 id="Downloading">Downloading</h3>
 
@@ -72,7 +84,7 @@ or
 
 <li> Do a:
 <div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
-  git clone --depth 1 https://github.com/grenaud/rohan.git"
+  git clone --depth 1 https://github.com/grenaud/rohan.git
 </code></pre></div></div>
 </li>
 </ol>
