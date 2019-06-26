@@ -138,7 +138,7 @@ If a mappability track was used, you can add the option: --map to filter wrt to 
 
 7) Inspect your results. Refer to [output prefix].het_1_X.pdf and [output prefix].hmm_1_X.pdf, if there are regions labeled as non ROH despite the fact that they clearly show a depression in heterozygosity, re-run using --hmm and a higher value of --rohmu (e.g. for the example above, one could run using 5e-5).
 
-8) For ancient samples, if the result if really unexpected, you can re-run using --tvonly which will limit the estimate to transversions, this needs to be multiplied by (Ts/Tv+1) (ex: if Ts/Tv  = 2.1, multiply the results it by 3.1). This estimate can be an underestimate.
+8) For ancient samples, if the result if really unexpected, you can re-run using --tvonly which will limit the estimate to transversions, the heterozygosity needs to be multiplied by (Ts/Tv+1) (ex: if Ts/Tv  = 2.1, multiply the results it by 3.1). This estimate can be an underestimate due to the lack of data.
 
 
 Description of output files
