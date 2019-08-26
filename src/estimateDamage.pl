@@ -505,6 +505,6 @@ print STDERR " 3' deamination file:  ".$deam3p2."\n";
 }
 
 
-die $outputprefix;
+warn $outputprefix;
 
 
