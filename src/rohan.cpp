@@ -5179,7 +5179,7 @@ int main (int argc, char *argv[]) {
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
     
-    long double rohmu=0.000000012;
+    long double rohmu=0.00001;
     
     const string usage=string("\nThis program co-estimates heterozygosity rates (theta) and large runs of homozygosity\n")+
 	"for modern and ancient samples\n\n"+
@@ -5217,7 +5217,7 @@ int main (int argc, char *argv[]) {
 
 	"\t\t"+""  +"" +"--auto"     +"\t\t\t"    + "[file]"  +"\t\t\t"+"Use only the chromosome/scaffolds in this file   (default: use every chromosome)"+"\n"+
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"this is done to avoid including sex chromosomes in the calculation"+"\n"+
-	"\t\t"+""  +"" +"--rohmu"    +"\t\t\t"    + "[rate]"  +"\t\t\t"+"Use this value as the expected mutation rate in ROHs   (default: "+stringify(rohmu)+")"+"\n"+
+	"\t\t"+""  +"" +"--rohmu"    +"\t\t\t"    + "[rate]"  +"\t\t\t"+"Use this value as the expected theta in ROHs   (default: "+stringify(rohmu)+")"+"\n"+
 	"\t\t"+""  +"" +""           +"\t\t\t"    + ""        +"\t\t\t"+"be careful when using this option as it can inflace the background estimate for theta"+"\n"+
 	"\t\t"+""  +"" +"--cov"      +"\t\t\t"    + "mincov,maxcov"+"\t\t"+"Ignore the prior probabilities on coverage, simply use these cutoffs  (default: prior probabilities are used)"+"\n"+
 
