@@ -5093,7 +5093,7 @@ int main (int argc, char *argv[]) {
     ////////////////////////////////////
 
 
-    string cwdProg=getCWD(argv[0]);    
+    string cwdProg=getCWD(argv[0]);
     string deam5pfreqE  = getFullPath(cwdProg+"../deaminationProfile/none.prof");
     string deam3pfreqE  = getFullPath(cwdProg+"../deaminationProfile/none.prof");
     //string illuminafreq = getFullPath(cwdProg+"../illuminaProf/null.prof");
