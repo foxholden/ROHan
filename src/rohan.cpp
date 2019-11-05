@@ -5999,7 +5999,7 @@ int main (int argc, char *argv[]) {
     
     cov2ProbSite = new vector<long double> (MAXCOV+1,0);
     //#ifdef CORRECTCOV
-    populatedCoverateVector( string(argv[0]) , cov2ProbSite , rateForPoissonCov, MAXCOV );
+    populatedCoverateVector( (cwdProg+string(argv[0])) , cov2ProbSite , rateForPoissonCov, MAXCOV );
     //#endif
 
 
