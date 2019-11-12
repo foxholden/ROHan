@@ -4929,29 +4929,45 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     //    exit(1);
 
     string outFileSuffixHMMpost;
+
+    
     if(useminmidmax == HMMCODEMIN) { outFileSuffixHMMpost = ".min"; }
     if(useminmidmax == HMMCODEMID) { outFileSuffixHMMpost = ".mid"; }
     if(useminmidmax == HMMCODEMAX) { outFileSuffixHMMpost = ".max"; }
+    string outFileSuffixHMMrohl = outFileSuffixHMMpost+".hmmrohl.gz";
     outFileSuffixHMMpost += ".hmmp.gz";
+
 
     
 
     string headerHMMpost =   "#CHROM\tBEGIN\tEND\tp[ROH]\tp[nonROH]\n";
     //Internal::BgzfStream  bgzipWriterHMMpost;
     BGZF * bgzipWriterHMMpost=NULL;
+    BGZF * bgzipWriterHMMrohl=NULL;
+    
     // bgzipWriterHMMpost.Open(outFilePrefix+outFileSuffixHMMpost, IBamIODevice::WriteOnly);
     // if(!bgzipWriterHMMpost.IsOpen()){
     // 	cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixHMMpost)<<" in bgzip writer"<<endl;
     // 	exit(1);
     // }
-    bgzipWriterHMMpost = bgzf_open(string(outFilePrefix+outFileSuffixHMMpost).c_str(), "w");
-    if (bgzipWriterHMMpost == NULL) { // region invalid or reference name not found
-	cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixHMMpost)<<" in bgzip writer"<<endl;
-	exit(1);	
+    if(	!noROH ){
+	bgzipWriterHMMpost = bgzf_open(string(outFilePrefix+outFileSuffixHMMpost).c_str(), "w");
+	if (bgzipWriterHMMpost == NULL) { // region invalid or reference name not found
+	    cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixHMMpost)<<" in bgzip writer"<<endl;
+	    exit(1);	
+	}
+
+	bgzipWriterHMMrohl = bgzf_open(string(outFilePrefix+outFileSuffixHMMrohl).c_str(), "w");
+	if (bgzipWriterHMMrohl == NULL) { // region invalid or reference name not found
+	    cerr<<"Cannot open file "<<(outFilePrefix+outFileSuffixHMMrohl)<<" in bgzip writer"<<endl;
+	    exit(1);	
+	}
+	if(bgzf_write(bgzipWriterHMMpost,headerHMMpost.c_str(),headerHMMpost.size()) != int(headerHMMpost.size())){ cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
     }
     
     //bgzipWriterHMMpost.Write(headerHMMpost.c_str(), headerHMMpost.size());
-    if(bgzf_write(bgzipWriterHMMpost,headerHMMpost.c_str(),headerHMMpost.size()) != int(headerHMMpost.size())){ cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+
+    
     
     uint64_t rohSegments   =0;
     uint64_t nonrohSegments=0;
@@ -4960,6 +4976,7 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     uint64_t rohSegmentsContiguousSum=0;
     vector<uint64_t> rohSegmentsContiguous;
     bool inROH=false;
+    string strToWriterohl="#";
     
     for(unsigned int c=0;c<heteroEstResults.size();c++){
 	string strToWrite=heteroEstResults[c].rangeGen.asBed()+"\t";//+"\t"+stringify(dataToWrite->hetEstResults.sites)+"\t";
@@ -4967,17 +4984,20 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	if(heteroEstResults[c].chrBreak){
 	    if(inROH && c!=0){//was already in ROH
 	      rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+	      if(strToWriterohl=="#"){   strToWriterohl = stringify( rohSegmentsContiguousSum ); }else{  strToWriterohl += "\n"+stringify( rohSegmentsContiguousSum );  }
 	      rohSegmentsContiguousSum=0;//reset
+
 	    }
 	    inROH=false;
 	}
 
-	if(heteroEstResults[c].undef){
+	if(heteroEstResults[c].undef){ 
 	    strToWrite+="NA\tNA\n";
 	    
 	    if(inROH && c!=0){//was already in ROH	      
-	      rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
-	      rohSegmentsContiguousSum=0;//reset
+		rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+		if(strToWriterohl=="#"){  strToWriterohl = stringify( rohSegmentsContiguousSum ); }else{ strToWriterohl += "\n"+stringify( rohSegmentsContiguousSum );  }
+		rohSegmentsContiguousSum=0;//reset
 	    }
 	    inROH=false;
 
@@ -5002,7 +5022,9 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 		if(inROH){//was already in ROH
 
 		  rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+		  if(strToWriterohl=="#"){  strToWriterohl = stringify( rohSegmentsContiguousSum ); }else{ strToWriterohl += "\n"+stringify( rohSegmentsContiguousSum );  }
 		  rohSegmentsContiguousSum=0;//reset
+
 		}else{//do nothing
 		    rohSegmentsContiguousSum  = 0;//superfluous
 		}
@@ -5013,20 +5035,27 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	    }
 	}
 	//bgzipWriterHMMpost.Write(strToWrite.c_str(), strToWrite.size());
-	if( bgzf_write(bgzipWriterHMMpost,strToWrite.c_str(),strToWrite.size()) != int(strToWrite.size())){	cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
-
+	if( !noROH ){
+	    if( bgzf_write(bgzipWriterHMMpost,strToWrite.c_str(),strToWrite.size()) != int(strToWrite.size())){	cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
+	}
     }
 
     if(inROH ){//was already in ROH
-      rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+	rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
+	if(strToWriterohl=="#"){  strToWriterohl = stringify( rohSegmentsContiguousSum ); }else{ strToWriterohl += "\n"+stringify( rohSegmentsContiguousSum );  }
     }
 
+    if(strToWriterohl=="#"){  strToWriterohl = "none found\n"; }else{ strToWriterohl += "\n"; }
+    
+    if(	!noROH ){
+	if( bgzf_write(bgzipWriterHMMrohl,strToWriterohl.c_str(),strToWriterohl.size()) != int(strToWriterohl.size())){	cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
 
-    if(bgzf_close(bgzipWriterHMMpost) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
+	if(bgzf_close(bgzipWriterHMMpost) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
+	if(bgzf_close(bgzipWriterHMMrohl) != 0 ){   cerr<<"Cannot close bgzip stream"<<endl;   exit(1);   }  
 
-    //bgzipWriterHMMpost.Close();    
-    cerr<<"Written trace to "<<(outFilePrefix+outFileSuffixHMMpost)<<endl;
-
+	cerr<<"Written trace to "<<(outFilePrefix+outFileSuffixHMMpost)<<endl;
+	cerr<<"Written ROH lengths to "<<(outFilePrefix+outFileSuffixHMMrohl)<<endl;
+    }
     hmmRes toreturn;
 
     toreturn.hAvg = hAvg;
@@ -6592,7 +6621,7 @@ int main (int argc, char *argv[]) {
     
     
     //exit(1);
-
+    cerr<<"Running HMM again to obtain global theta outside of ROHs"<<endl;
     //lower
     noROH=false;
     hmmRes hmmResmin=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN,noROH);
@@ -6611,7 +6640,7 @@ int main (int argc, char *argv[]) {
     long double hMin = MIN3(  hmmResmin.hMin , hmmResmid.hMin  ,  hmmResmax.hMin );
     long double hMax = MAX3(  hmmResmin.hMax , hmmResmid.hMax  ,  hmmResmax.hMax );
 
-
+    cerr<<"Running HMM again to obtain global theta both within and outside ROHs"<<endl;
     noROH=true;
     hmmRes hmmResminNOROH=runHMM(outFilePrefix,heteroEstResults,maxChains,fracChainsBurnin,rohmu,HMMCODEMIN,noROH);
     cerr<<"min h est. "<<hmmResminNOROH.hAvg<<" hMin "<<hmmResminNOROH.hMin<<" hMax "<<hmmResminNOROH.hMax<<" s "<<hmmResminNOROH.sAvg<<" sMin "<<hmmResminNOROH.sMin<<" sMax "<<hmmResminNOROH.sMax<<" p avg. "<<hmmResminNOROH.pAvg<<" pMin "<<hmmResminNOROH.pMin<<" pMax "<<hmmResminNOROH.pMax<<" rohS "<<hmmResminNOROH.rohSegments<<" nonrohS "<<hmmResminNOROH.nonrohSegments<<" unsure "<<hmmResminNOROH.unsureSegments<<endl;
