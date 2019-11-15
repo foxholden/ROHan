@@ -131,7 +131,8 @@ typedef struct {
     long double hhigh;
     long double errb;
     long double weight;// defined sites/sizechunk
-    
+    unsigned int sites;// defined sites
+
     bool undef;     //0 = defined,    1 = undefined
     bool chrBreak;  //0 = continuous, 1 = break
     GenomicRange rangeGen;

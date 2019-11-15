@@ -4731,9 +4731,9 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 
     
     
-    cerr<<".";
+    // cerr<<".";
     // for(unsigned int i=0;i<heteroEstResults.size();i++){
-    //  	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<endl;
+    //  	cerr<<"obs#"<<i<<" "<<heteroEstResults[i].chrBreak<<"\t"<<heteroEstResults[i].undef<<"\t"<<heteroEstResults[i].h<<"\t"<<heteroEstResults[i].hlow<<"\t"<<heteroEstResults[i].hhigh<<"\t"<<heteroEstResults[i].weight<<"\t"<<heteroEstResults[i].sites<<endl;
     // }
     
     // return 1;
@@ -4973,8 +4973,14 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
     uint64_t nonrohSegments=0;
     uint64_t unsureSegments=0;
 
+    unsigned int rohSegmentsContiguousCount=1;
     uint64_t rohSegmentsContiguousSum=0;
+    uint64_t rohSegmentsContiguousSitesSum=0;
+    string   rohSegmentsContiguousChr="";
+    unsigned int rohSegmentsContiguousStart=0;
+    unsigned int rohSegmentsContiguousEnd=0;
     vector<uint64_t> rohSegmentsContiguous;
+
     bool inROH=false;
     string strToWriterohl="#";
     
@@ -4984,9 +4990,13 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	if(heteroEstResults[c].chrBreak){
 	    if(inROH && c!=0){//was already in ROH
 	      rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
-	      if(strToWriterohl=="#"){   strToWriterohl = stringify( rohSegmentsContiguousSum ); }else{  strToWriterohl += "\n"+stringify( rohSegmentsContiguousSum );  }
+	      if(strToWriterohl=="#"){   strToWriterohl = stringify( rohSegmentsContiguousCount )+"\t"+stringify( rohSegmentsContiguousChr )+"\t"+stringify( rohSegmentsContiguousStart )+"\t"+stringify( rohSegmentsContiguousEnd )+"\t"+stringify( rohSegmentsContiguousSum )+"\t"+stringify( rohSegmentsContiguousSitesSum ); }else{  strToWriterohl += "\n"+ stringify( rohSegmentsContiguousCount )+"\t"+stringify( rohSegmentsContiguousChr )+"\t"+stringify( rohSegmentsContiguousStart )+"\t"+stringify( rohSegmentsContiguousEnd )+"\t"+stringify( rohSegmentsContiguousSum )+"\t"+stringify( rohSegmentsContiguousSitesSum );  }
 	      rohSegmentsContiguousSum=0;//reset
-
+	      rohSegmentsContiguousSitesSum=0;
+	      rohSegmentsContiguousChr="";
+	      rohSegmentsContiguousStart=0;
+	      rohSegmentsContiguousEnd=0;
+	      rohSegmentsContiguousCount++;
 	    }
 	    inROH=false;
 	}
@@ -4996,8 +5006,13 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	    
 	    if(inROH && c!=0){//was already in ROH	      
 		rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
-		if(strToWriterohl=="#"){  strToWriterohl = stringify( rohSegmentsContiguousSum ); }else{ strToWriterohl += "\n"+stringify( rohSegmentsContiguousSum );  }
+		if(strToWriterohl=="#"){  strToWriterohl =  stringify( rohSegmentsContiguousCount )+"\t"+stringify( rohSegmentsContiguousChr )+"\t"+stringify( rohSegmentsContiguousStart )+"\t"+stringify( rohSegmentsContiguousEnd )+"\t"+stringify( rohSegmentsContiguousSum )+"\t"+stringify( rohSegmentsContiguousSitesSum ); }else{ strToWriterohl += "\n"+ stringify( rohSegmentsContiguousCount )+"\t"+stringify( rohSegmentsContiguousChr )+"\t"+stringify( rohSegmentsContiguousStart )+"\t"+stringify( rohSegmentsContiguousEnd )+"\t"+stringify( rohSegmentsContiguousSum )+"\t"+stringify( rohSegmentsContiguousSitesSum );  }
 		rohSegmentsContiguousSum=0;//reset
+		rohSegmentsContiguousSitesSum=0;
+		rohSegmentsContiguousChr="";
+		rohSegmentsContiguousStart=0;
+		rohSegmentsContiguousEnd=0;
+		rohSegmentsContiguousCount++;
 	    }
 	    inROH=false;
 
@@ -5005,28 +5020,47 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 	    strToWrite+=stringify( exp(postprob.m[0][c]) )+"\t"+stringify( exp(postprob.m[1][c]) )+"\n";
 	}
 
-	if(     exp(postprob.m[0][c]) > 0.9){
+	if(     exp(postprob.m[0][c]) > 0.9){//confident in ROH
 	    rohSegments        += sizeChunk;
+
 
 	    if(inROH){//was already in ROH
 		rohSegmentsContiguousSum += sizeChunk;
+		rohSegmentsContiguousSitesSum += heteroEstResults[c].sites;
+		if(rohSegmentsContiguousChr      != heteroEstResults[c].rangeGen.getChrName()){
+		    cerr<<"The current chr "<<heteroEstResults[c].rangeGen.getChrName()<<" is different than the one in the same ROH:"<< rohSegmentsContiguousChr<<" please email the programmer with your .hEst file."<<endl;
+		}
+		//rohSegmentsContiguousStart    = heteroEstResults[c].rangeGen.getStartCoord(); start stays as is
+		rohSegmentsContiguousEnd      = heteroEstResults[c].rangeGen.getEndCoord();
 	    }else{//new ROH
-		rohSegmentsContiguousSum  = sizeChunk;
+		rohSegmentsContiguousSum      = sizeChunk;
+		rohSegmentsContiguousSitesSum = heteroEstResults[c].sites;
+		rohSegmentsContiguousChr      = heteroEstResults[c].rangeGen.getChrName();
+		rohSegmentsContiguousStart    = heteroEstResults[c].rangeGen.getStartCoord();
+		rohSegmentsContiguousEnd      = heteroEstResults[c].rangeGen.getEndCoord();
 	    }
 	    inROH=true;
 
 	}else{
-	    if( exp(postprob.m[1][c]) > 0.9){
+	    if( exp(postprob.m[1][c]) > 0.9){//confident not in ROH
 		nonrohSegments += sizeChunk;
 		
 		if(inROH){//was already in ROH
 
 		  rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
-		  if(strToWriterohl=="#"){  strToWriterohl = stringify( rohSegmentsContiguousSum ); }else{ strToWriterohl += "\n"+stringify( rohSegmentsContiguousSum );  }
+		  if(strToWriterohl=="#"){  strToWriterohl =  stringify( rohSegmentsContiguousCount )+"\t"+stringify( rohSegmentsContiguousChr )+"\t"+stringify( rohSegmentsContiguousStart )+"\t"+stringify( rohSegmentsContiguousEnd )+"\t"+stringify( rohSegmentsContiguousSum )+"\t"+stringify( rohSegmentsContiguousSitesSum ); }else{ strToWriterohl += "\n"+ stringify( rohSegmentsContiguousCount )+"\t"+stringify( rohSegmentsContiguousChr )+"\t"+stringify( rohSegmentsContiguousStart )+"\t"+stringify( rohSegmentsContiguousEnd )+"\t"+stringify( rohSegmentsContiguousSum )+"\t"+stringify( rohSegmentsContiguousSitesSum );  }
 		  rohSegmentsContiguousSum=0;//reset
-
+		  rohSegmentsContiguousSitesSum=0;
+		  rohSegmentsContiguousChr="";
+		  rohSegmentsContiguousStart=0;
+		  rohSegmentsContiguousEnd=0;
+		  rohSegmentsContiguousCount++;
 		}else{//do nothing
 		    rohSegmentsContiguousSum  = 0;//superfluous
+		    rohSegmentsContiguousSitesSum=0;
+		    rohSegmentsContiguousChr="";
+		    rohSegmentsContiguousStart=0;
+		    rohSegmentsContiguousEnd=0;		    
 		}
 		inROH=false;
 
@@ -5042,10 +5076,10 @@ hmmRes runHMM(const string & outFilePrefix, const    vector<emissionUndef> & het
 
     if(inROH ){//was already in ROH
 	rohSegmentsContiguous.push_back(rohSegmentsContiguousSum);
-	if(strToWriterohl=="#"){  strToWriterohl = stringify( rohSegmentsContiguousSum ); }else{ strToWriterohl += "\n"+stringify( rohSegmentsContiguousSum );  }
+	if(strToWriterohl=="#"){  strToWriterohl =  stringify( rohSegmentsContiguousCount )+"\t"+stringify( rohSegmentsContiguousChr )+"\t"+stringify( rohSegmentsContiguousStart )+"\t"+stringify( rohSegmentsContiguousEnd )+"\t"+stringify( rohSegmentsContiguousSum )+"\t"+stringify( rohSegmentsContiguousSitesSum ); }else{ strToWriterohl += "\n"+ stringify( rohSegmentsContiguousCount )+"\t"+stringify( rohSegmentsContiguousChr )+"\t"+stringify( rohSegmentsContiguousStart )+"\t"+stringify( rohSegmentsContiguousEnd )+"\t"+stringify( rohSegmentsContiguousSum )+"\t"+stringify( rohSegmentsContiguousSitesSum );  }
     }
 
-    if(strToWriterohl=="#"){  strToWriterohl = "none found\n"; }else{ strToWriterohl += "\n"; }
+    if(strToWriterohl=="#"){  strToWriterohl = "none found\n"; }else{ strToWriterohl = "#ROH_ID\tCHROM\tBEGIN\tEND\tROH_LENGTH\tVALIDATED_SITES\n"+strToWriterohl+"\n"; }
     
     if(	!noROH ){
 	if( bgzf_write(bgzipWriterHMMrohl,strToWriterohl.c_str(),strToWriterohl.size()) != int(strToWriterohl.size())){	cerr<<"Cannot write to bgzip stream"<<endl;   exit(1);  }
@@ -6400,6 +6434,8 @@ int main (int argc, char *argv[]) {
 		}
 		
 		hetResToAdd.weight = ( (long double)(dataToWrite->hetEstResults.sites) ) / ( (long double)(sizeChunk) );
+		hetResToAdd.sites  = dataToWrite->hetEstResults.sites;
+
 		hetResToAdd.undef  = (hetResToAdd.undef || isnan(hetResToAdd.h) || isnan(hetResToAdd.hlow) || isnan(hetResToAdd.hhigh) );
 		
 		heteroEstResults.push_back(hetResToAdd);
@@ -6616,6 +6652,8 @@ int main (int argc, char *argv[]) {
 		}
 		hetResToAdd.undef  = (hetResToAdd.undef || isnan(hetResToAdd.h) || isnan(hetResToAdd.hlow) || isnan(hetResToAdd.hhigh) );
 		hetResToAdd.weight = ( (long double)(sitesDefinedLine) ) / ( (long double)(sizeChunk) );
+		hetResToAdd.sites  = sitesDefinedLine;
+		//cerr<<hetResToAdd.sites<<endl;
 
 		if(verbose)
 		    cerr<<hetResToAdd.chrBreak<<"\t"<<hetResToAdd.undef<<"\t"<<hetResToAdd.h<<"\t"<<hetResToAdd.hlow<<"\t"<<hetResToAdd.hhigh<<"\t"<<hetResToAdd.weight<<endl;
