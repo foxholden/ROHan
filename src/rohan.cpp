@@ -5204,6 +5204,11 @@ int main (int argc, char *argv[]) {
     string autosomeFile;
     bool ignoreExistingRGINFO=false;
     bool shuffleWindCoverage=true;
+
+
+    string argvProg;
+    size_t posSlash;
+
     ////////////////////////////////////
     // BEGIN Parsing arguments        //
     ////////////////////////////////////
@@ -6028,7 +6033,16 @@ int main (int argc, char *argv[]) {
     
     cov2ProbSite = new vector<long double> (MAXCOV+1,0);
     //#ifdef CORRECTCOV
-    populatedCoverateVector( (cwdProg+string(argv[0])) , cov2ProbSite , rateForPoissonCov, MAXCOV );
+
+    argvProg=string(argv[0]);
+    posSlash=argvProg.find_last_of("/");
+    if(posSlash == string::npos){
+	//do nothing, leave argvProg as is
+    }else{
+        argvProg=argvProg.substr(posSlash+1);
+    }
+
+    populatedCoverateVector( (cwdProg+argvProg) , cov2ProbSite , rateForPoissonCov, MAXCOV );
     //#endif
 
 
