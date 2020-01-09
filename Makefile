@@ -7,7 +7,7 @@ bam2prof/bam2prof.cpp:
 	rm -rfv bam2prof/
 	mkdir -p bam2prof/
 	rm -f bam2prof.zip
-	wget -O bam2prof.zip https://github.com/grenaud/bam2prof/zipball/master
+	wget --no-check-certificate -O bam2prof.zip https://github.com/grenaud/bam2prof/zipball/master
 	unzip bam2prof.zip -d bam2prof
 	mv -v bam2prof/*/src/*  bam2prof/
 

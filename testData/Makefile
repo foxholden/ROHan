@@ -8,7 +8,7 @@ HG02891.21.bam.bai: HG02891.21.bam
 	samtools index HG02891.21.bam 
 
 human_g1k_v37.masked.fa.gz:
-	wget https://www.dropbox.com/s/4ayoefse8a5ri1n/human_g1k_v37.masked.fa.gz?dl=0 -O human_g1k_v37.masked.fa.gz
+	wget --no-check-certificate https://www.dropbox.com/s/4ayoefse8a5ri1n/human_g1k_v37.masked.fa.gz?dl=0 -O human_g1k_v37.masked.fa.gz
 
 human_g1k_v37.masked.fa: human_g1k_v37.masked.fa.gz
 	gunzip -f human_g1k_v37.masked.fa.gz
