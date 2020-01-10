@@ -146,7 +146,7 @@ Description of output files
 
 
 |                  File                |                           Contents                               | 
-| ------------------------------------ |:----------------------------------------------------------------:| 
+| ------------------------------------ |------------------------------------------------------------------| 
 [output prefix].hEst.gz                | local estimates of heterozygosity                                | 
 [output prefix].het_1_X.pdf            | Plot of the local estimates of heterozygosity 1 of X             | 
 [output prefix].hmm_1_X.pdf            | Plot of the posterior decoding for HMM 1 of X                    | 
@@ -161,7 +161,12 @@ Description of output files
 [output prefix].vcf.gz                 | Posterior probabilities for the genotypes                        | 
 
 
+In [output prefix].summary.txt, there are 2 lines:
 
+     Genome-wide theta outside ROH:	thetamid thetamin thetamax
+     Genome-wide theta inc. ROH:	thetamid thetamin thetamax
+
+The first line is for Watterson's theta for genomic regions excluding runs of homozygosity. The second is for Watterson's theta for the entire genome, including runs of homozygosity. 
 
 FAQ
 ----------------------
@@ -187,3 +192,12 @@ It is possible that you have genuine ROH but if you have a slight overestimate o
 - By default, ROHan generates windows of "--size"bp along autosomes, you can override this and use the regions in a bed file. With either option, you can specify individual sites to consider using --map, this is recommended for ancient samples with short fragment size and with some damage.
 
 
+### The percentage of classified segments does not sum up to one (100%), why?
+
+- The % of segments should not necessarily sum up to one. Segments can be:
+
+* in ROH
+* not in ROH
+* not sure
+
+Therefore, because of the segments in the "not sure" category, this percentages will not sum up to 100%.
