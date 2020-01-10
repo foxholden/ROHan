@@ -33,7 +33,7 @@ static vector<long double> lnFactVec;
 
 #define MIN3(a,b,c) MIN2(MIN2(a,b),c)
 #define MAX3(a,b,c) MAX2(MAX2(a,b),c)
-
+#define MID3(a,b,c) (((a)<(b))?( (((a)<(c))?( MIN2(b,c)):(a)) ):( (((b)<(c))?( MIN2(a,c)):(b)) ))
 
 
 typedef struct { 

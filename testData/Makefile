@@ -26,8 +26,8 @@ Loschbour.hg19_1000g.5p.prof: Loschbour.hg19_1000g.chr21.bam.bai
 
 
 Loschbour.hg19_1000g.chr21.bam.bai:
-	wget -O Loschbour.hg19_1000g.chr21.bam     https://www.dropbox.com/s/1n24l8jijh7a08m/Loschbour.hg19_1000g.chr21.bam?dl=0
-	wget -O Loschbour.hg19_1000g.chr21.bam.bai https://www.dropbox.com/s/nhdvjcr1no71re3/Loschbour.hg19_1000g.chr21.bam.bai?dl=0
+	wget --no-check-certificate -O Loschbour.hg19_1000g.chr21.bam     https://www.dropbox.com/s/1n24l8jijh7a08m/Loschbour.hg19_1000g.chr21.bam?dl=0
+	wget --no-check-certificate -O Loschbour.hg19_1000g.chr21.bam.bai https://www.dropbox.com/s/nhdvjcr1no71re3/Loschbour.hg19_1000g.chr21.bam.bai?dl=0
 
 
 Loschbour.hg19_1000g.summary.txt: Loschbour.hg19_1000g.chr21.bam.bai Loschbour.hg19_1000g.5p.prof Loschbour.hg19_1000g.chr21.bam.bai  human_g1k_v37.masked.fa.fai
