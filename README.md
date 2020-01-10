@@ -200,4 +200,5 @@ It is possible that you have genuine ROH but if you have a slight overestimate o
 * not in ROH
 * not sure
 
-Therefore, because of the segments in the "not sure" category, this percentages will not sum up to 100%.
+Therefore, because of the segments in the "not sure" category, this percentages will not necessarily sum up to 100%.
+
