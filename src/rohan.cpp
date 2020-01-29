@@ -3868,7 +3868,7 @@ void *mainHeteroComputationThread(void * argc){
 
 
 
-queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsample,unsigned int sizeToReturn){
+queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsample,unsigned int sizeToReturn,vector<GenomicRange> * rangesSelected){
 
     if( sizeToReturn > queueDataToSubsample.size()){
 	cerr<<"Cannot subsample the queue to the size required"<<endl;
@@ -3888,6 +3888,7 @@ queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsa
     
     for(unsigned int i=0;i<sizeToReturn;i++){
 	toReturn.push(myvectortemp[i]);
+	rangesSelected->push_back(myvectortemp[i]->rangeGen);
     }
 
     return toReturn;
@@ -3895,7 +3896,7 @@ queue< DataChunk * >  randomSubQueue(const queue< DataChunk * > queueDataToSubsa
 
 
 
-queue< DataChunk * >  subFirstElemsQueue(const queue< DataChunk * > queueDataToSubsample,unsigned int sizeToReturn){
+queue< DataChunk * >  subFirstElemsQueue(const queue< DataChunk * > queueDataToSubsample,unsigned int sizeToReturn,vector<GenomicRange> * rangesSelected){
 
     if( sizeToReturn > queueDataToSubsample.size()){
 	cerr<<"Cannot subsample the queue to the size required"<<endl;
@@ -3915,6 +3916,7 @@ queue< DataChunk * >  subFirstElemsQueue(const queue< DataChunk * > queueDataToS
     
     for(unsigned int i=0;i<sizeToReturn;i++){
 	toReturn.push(myvectortemp[i]);
+	rangesSelected->push_back(myvectortemp[i]->rangeGen);
     }
 
     return toReturn;
@@ -5597,9 +5599,10 @@ int main (int argc, char *argv[]) {
     if(skipToHMM){//skip het computations
 	goto beginhmm;
     }
-
+    
     cerr<<"Parsing arguments ...";
 
+    
     if( !isFile(fastaFile) ){
 	cerr<<"The fasta file "<<fastaFile<<" does not exists"<<endl;
 	return 1;	
@@ -5876,13 +5879,14 @@ int main (int argc, char *argv[]) {
 		genomicRegionsToUse = int(queueDataToprocess.size());
 	    }
     
-
+	    vector<GenomicRange> * rangesSelected=new vector<GenomicRange>();
+	    
 	    //renabled
 	    if(shuffleWindCoverage){//we shuffle
-		queueDataForCoverage = randomSubQueue( queueDataToprocess,genomicRegionsToUse);
+		queueDataForCoverage = randomSubQueue(     queueDataToprocess, genomicRegionsToUse,rangesSelected);
 	    }else{//we just take the first elements
 		//queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
-		queueDataForCoverage = subFirstElemsQueue( queueDataAllGenomic,genomicRegionsToUse);
+		queueDataForCoverage = subFirstElemsQueue( queueDataAllGenomic,genomicRegionsToUse,rangesSelected);
 	    }
 	    //queueDataForCoverage = subFirstElemsQueue( queueDataToprocess,genomicRegionsToUse);
 	    unsigned int queueDataForCoverageOrigsize = queueDataForCoverage.size();
@@ -5953,14 +5957,20 @@ int main (int argc, char *argv[]) {
 	    rateForPoissonCov    = ((long double)totalBasesSum)/((long double)totalSitesSum);
 	    if(totalSitesSum ==0 ){
 		//cerr<<"No data was found for the entire BAM file for the region "<<endl;
-		cerr<<"No data was found for the entire BAM file for the regions you defined, please verify the BAM file"<<endl;
+		cerr<<"No data was found for the entire BAM file for the regions you defined, please verify the BAM file. "<<endl;
+		cerr<<"The following regions had been selected. "<<endl;
+		for(unsigned int i=0;i<rangesSelected->size();i++){
+		    cerr<<(i+1)<<"\t"<<rangesSelected->at(i)<<endl;
+		}
+		cerr<<"If you are running tests, you can use the hidden option --first it will select the first genomic windows. "<<endl;
 		return 1;
 	    }
 	    cerr<<"Final computation:" <<" bases="<<totalBasesSum<<"\tsites="<<totalSitesSum<<"\tlambda coverage="<<rateForPoissonCov<<endl;
+	    delete(rangesSelected);
 	    //pthread_exit(NULL);	
 	    //	cerr<<"Lambda coverage: " <<rateForPoissonCov<<endl;	
 
-	stringinfo= stringify(rateForPoissonCov)+"\n";       
+	    stringinfo= stringify(rateForPoissonCov)+"\n";       
 	
 	bgzipWriterInfo = bgzf_open( string(outFilePrefix+".rginfo.gz").c_str(), "w");
 	if (bgzipWriterInfo == NULL) { // region invalid or reference name not found
