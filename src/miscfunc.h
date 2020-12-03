@@ -15,7 +15,7 @@
 #include <gzstream.h>
 
 
-#include "utils.h"
+#include "libgab.h"
 #include "GenomicRange.h"
 
 /* #define DEBUGCOV */

@@ -60,7 +60,7 @@ typedef struct {     // auxiliary data structure
 
 
 #include "miscfunc.h"
-#include "utils.h"
+#include "libgab.h"
 
 using namespace std;
 // using namespace BamTools;

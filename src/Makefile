@@ -7,24 +7,24 @@ LDFLAGS  = -lgsl -lcurl -lgslcblas -llzma -lbz2 -lz  -lpthread
 LDLIBS   = ../lib/samtools/bedidx.o ../lib/htslib/libhts.a ../lib/samtools/libbam.a ../lib/samtools/libst.a 
 
 
-all:  ../lib/libgab/utils.o ../lib/libharu/src/.libs/libhpdf.a ../lib/htslib/libhts.a ../lib/samtools/bedidx.o rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
+all:  ../lib/libgab/libgab.a ../lib/libharu/src/.libs/libhpdf.a ../lib/htslib/libhts.a ../lib/samtools/bedidx.o rohan refPlusSegToGeno sitesPlusGeno ref2DNAprof #testComp testCompCont
 
-%.o: %.cpp #../lib/libgab/utils.o  
+%.o: %.cpp #../lib/libgab/libgab.a  
 	${CXX} ${CXXFLAGS} $^ -o $@
 
 #testComp:	testComp.o 
 #	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
-#testCompCont:	testCompCont.o ../lib/libgab/utils.o  
+#testCompCont:	testCompCont.o ../lib/libgab/libgab.a  
 #	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 
-refPlusSegToGeno:	refPlusSegToGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstream/libgzstream.a
+refPlusSegToGeno:	refPlusSegToGeno.o ../lib/libgab/libgab.a   ../lib/libgab/gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-sitesPlusGeno:	sitesPlusGeno.o ../lib/libgab/utils.o   ../lib/libgab/gzstream/libgzstream.a
+sitesPlusGeno:	sitesPlusGeno.o ../lib/libgab/libgab.a   ../lib/libgab/gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-rohan:       rohan.o PdfWriter.o Hmm.o HmmState.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o  GenomicWindows.o GenomicRange.o  ../lib/libgab/FastQObj.o ../lib/libgab/FastQParser.o ../lib/libharu/src/.libs/libhpdf.a ../lib/libgab/utils.o  ../lib/libgab/gzstream/libgzstream.a 
+rohan:       rohan.o PdfWriter.o Hmm.o HmmState.o DataChunk.o DataToWrite.o GenoResults.o PositionResult.o miscfunc.o  GenomicWindows.o GenomicRange.o  ../lib/libgab/FastQObj.o ../lib/libgab/FastQParser.o ../lib/libharu/src/.libs/libhpdf.a ../lib/libgab/libgab.a  ../lib/libgab/gzstream/libgzstream.a 
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 
@@ -32,7 +32,7 @@ ref2DNAprof.o:	ref2DNAprof.cpp
 	${CXX} ${CXXFLAGS} ref2DNAprof.cpp
 
 
-ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
+ref2DNAprof:	ref2DNAprof.o ${LIBGAB}libgab.a  ${LIBGAB}gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 ../lib/htslib/libhts.a:  ../lib/htslib/hts_internal.h
@@ -49,10 +49,10 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}utils.o  ${LIBGAB}gzstream/libgzstream.a
 	rm -rf ../lib/samtools/
 	git clone --recursive https://github.com/samtools/samtools.git ../lib/samtools/
 
-../lib/libgab/utils.o:  ../lib/libgab/utils.h
-	cd ../lib/libgab/ &&  make utils.o && make -C gzstream/ && cd ../..
+../lib/libgab/libgab.a:  ../lib/libgab/libgab.h
+	cd ../lib/libgab/ &&  make libgab.a && make -C gzstream/ && cd ../..
 
-../lib/libgab/utils.h:
+../lib/libgab/libgab.h:
 	rm -rfv ../lib/libgab/
 	mkdir ../lib/libgab/
 	git clone --depth 1 https://github.com/grenaud/libgab.git ../lib/libgab/

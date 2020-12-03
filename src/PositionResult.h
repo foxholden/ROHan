@@ -20,7 +20,7 @@
 extern "C" {
 #include "htslib/sam.h"
 }
-#include "utils.h"
+#include "libgab.h"
 
 using namespace std;
 //using namespace BamTools;

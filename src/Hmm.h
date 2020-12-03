@@ -16,7 +16,7 @@
 #include "GenomicRange.h"
 #include "miscfunc.h"
 
-#include "utils.h"
+#include "libgab.h"
 
 #define NBRSTATES 2
 
