@@ -36,7 +36,7 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}libgab.a  ${LIBGAB}gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 ../lib/htslib/libhts.a:  ../lib/htslib/hts_internal.h
-	cd ../lib/htslib/ && make && cd ../..
+	cd ../lib/htslib/ && git submodule update --init --recursive && make && cd ../..
 
 ../lib/htslib/hts_internal.h:
 	rm -rfv ../lib/htslib/
