@@ -3062,7 +3062,8 @@ void *mainHeteroComputationThread(void * argc){
     }
 
     h = data[0]->hdr; // easy access to the header of the 1st BAM
-    dataToWrite->refID = bam_get_tid(h,currentChunk->rangeGen.getChrName().c_str());
+    //dataToWrite->refID = bam_get_seq(h,currentChunk->rangeGen.getChrName().c_str());
+    dataToWrite->refID = sam_hdr_name2tid(h,currentChunk->rangeGen.getChrName().c_str());
 
     if (reg) {
         beg     = data[0]->iter->beg; // and to the parsed region coordinates
