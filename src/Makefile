@@ -60,10 +60,11 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}libgab.a  ${LIBGAB}gzstream/libgzstream.a
 ../lib/libharu/include/hpdf.h:
 	rm -rf ../lib/libharu/
 	mkdir ../lib/libharu/
-	git clone --depth 1 https://github.com/libharu/libharu.git ../lib/libharu/
+	git clone  https://github.com/libharu/libharu.git ../lib/libharu/
+	cd ../lib/libharu/ && 	git checkout 4ae1d5f4c84459f130bf1b1ef4c5c330af8eca5d && cd ../..
 
 ../lib/libharu/src/.libs/libhpdf.a: ../lib/libharu/include/hpdf.h
-	cd ../lib/libharu/ && ./buildconf.sh && ./configure  --without-zlib --without-png && make
+	cd ../lib/libharu/ && ./buildconf.sh --force && ./configure  --without-zlib --without-png && make
 
 clean :
 	rm -f *.o testComp  testCompCont  refPlusSegToGeno sitesPlusGeno  testPrior  rohan  ref2DNAprof 
