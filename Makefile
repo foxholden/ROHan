@@ -1,5 +1,4 @@
-
-all:	src/rohan bam2prof/bam2prof
+all:	bin/rohan bam2prof/bam2prof
 	@echo "Done"
 
 
@@ -17,9 +16,8 @@ bam2prof/bam2prof: bam2prof/bam2prof.cpp
 	rm -rfv bam2prof/grenaud*/
 	rm -f bam2prof.zip
 
-src/rohan:
+bin/rohan:
 	make -C  src/
-
 
 
 clean:
