@@ -38,13 +38,15 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}libgab.a  ${LIBGAB}gzstream/libgzstream.a
 
 ../lib/htslib/libhts.a:  ../lib/htslib/hts_internal.h
 	cd ../lib/htslib/ && git submodule update --init --recursive && make && cd ../..
+#	cd ../lib/htslib/ && git submodule update --init --recursive && autoreconf -i && ./configure --disable-libcurl  && make && cd ../..
 
 ../lib/htslib/hts_internal.h:
 	rm -rfv ../lib/htslib/
 	git clone --recursive https://github.com/samtools/htslib.git ../lib/htslib/
 
 ../lib/samtools/bedidx.o:  ../lib/samtools/samtools.h
-	cd ../lib/samtools/ && make && cd ../..
+	cd ../lib/samtools/  &&   make && cd ../..
+#	cd ../lib/samtools/  && autoreconf -i && ./configure --disable-libcurl &&  make && cd ../..
 
 ../lib/samtools/samtools.h:
 	rm -rf ../lib/samtools/
