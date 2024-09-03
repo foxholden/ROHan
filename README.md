@@ -202,3 +202,29 @@ It is possible that you have genuine ROH but if you have a slight overestimate o
 
 Therefore, because of the segments in the "not sure" category, this percentages will not necessarily sum up to 100%.
 
+### How can I cite ROHan?
+
+Please cite the following:
+Gabriel Renaud, Kristian Hanghøj, Thorfinn Sand Korneliussen, Eske Willerslev, Ludovic Orlando, Joint Estimates of Heterozygosity and Runs of Homozygosity for Modern and Ancient Samples, Genetics, Volume 212, Issue 3, 1 July 2019, Pages 587–614, https://doi.org/10.1534/genetics.119.302057
+
+or in bibtex:
+
+         @article{10.1534/genetics.119.302057,
+        author = {Renaud, Gabriel and Hanghøj, Kristian and Korneliussen, Thorfinn Sand and Willerslev, Eske and Orlando, Ludovic},
+        title = "{{Joint Estimates of Heterozygosity and Runs of Homozygosity for Modern and Ancient Samples}}",
+        journal = {Genetics},
+        volume = {212},
+        number = {3},
+        pages = {587-614},
+        year = {2019},
+        month = {05},
+        abstract = "{Both the total amount and the distribution of heterozygous sites within individual genomes are informative about the genetic diversity of the population they belong to. Detecting true heterozygous sites in ancient genomes is complicated by the generally limited coverage achieved and the presence of post-mortem damage inflating sequencing errors. Additionally, large runs of homozygosity found in the genomes of particularly inbred individuals and of domestic animals can skew estimates of genome-wide heterozygosity rates. Current computational tools aimed at estimating runs of homozygosity and genome-wide heterozygosity levels are generally sensitive to such limitations. Here, we introduce ROHan, a probabilistic method which substantially improves the estimate of heterozygosity rates both genome-wide and for genomic local windows. It combines a local Bayesian model and a Hidden Markov Model at the genome-wide level and can work both on modern and ancient samples. We show that our algorithm outperforms currently available methods for predicting heterozygosity rates for ancient samples. Specifically, ROHan can delineate large runs of homozygosity (at megabase scales) and produce a reliable confidence interval for the genome-wide rate of heterozygosity outside of such regions from modern genomes with a depth of coverage as low as 5–6× and down to 7–8× for ancient samples showing moderate DNA damage. We apply ROHan to a series of modern and ancient genomes previously published and revise available estimates of heterozygosity for humans, chimpanzees and horses.}",
+        issn = {1943-2631},
+        doi = {10.1534/genetics.119.302057},
+        url = {https://doi.org/10.1534/genetics.119.302057},
+        eprint = {https://academic.oup.com/genetics/article-pdf/212/3/587/42104856/genetics0587.pdf},
+        }
+
+
+`
+
