@@ -2,8 +2,8 @@
 CXX      = g++ -std=c++11 #-g #-pg #-fpermissive #-g # -pg
 LIBGAB   = ../lib/libgab/
 
-CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/samtools/ -I../lib/htslib/  -I../lib/libharu/include/   -c
-LDFLAGS  = -lgsl -lcurl -lgslcblas -llzma -lbz2 -lz  -lpthread 
+CXXFLAGS = -Wall -lm -O3 -lz -I../lib/libgab/ -I../lib/libgab//gzstream/ -I../lib/samtools/ -I../lib/htslib/  -I../lib/libharu/include/ -I$(CONDA_PREFIX)/include  -c
+LDFLAGS  = -L$(CONDA_PREFIX)/lib -lgsl -lcurl -lgslcblas -llzma -lbz2 -lz  -lpthread 
 LDLIBS   = ../lib/samtools/bedidx.o ../lib/htslib/libhts.a ../lib/samtools/libst.a ../lib/samtools/libst.a 
 
 
@@ -37,7 +37,7 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}libgab.a  ${LIBGAB}gzstream/libgzstream.a
 	${CXX} -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 ../lib/htslib/libhts.a:  ../lib/htslib/hts_internal.h
-	cd ../lib/htslib/ && git submodule update --init --recursive && make && cd ../..
+	cd ../lib/htslib/ && git submodule update --init --recursive && make CPPFLAGS="-I$(CONDA_PREFIX)/include" LDFLAGS="-L$(CONDA_PREFIX)/lib" && cd ../..
 #	cd ../lib/htslib/ && git submodule update --init --recursive && autoreconf -i && ./configure --disable-libcurl  && make && cd ../..
 
 ../lib/htslib/hts_internal.h:
@@ -45,7 +45,7 @@ ref2DNAprof:	ref2DNAprof.o ${LIBGAB}libgab.a  ${LIBGAB}gzstream/libgzstream.a
 	git clone --recursive https://github.com/samtools/htslib.git ../lib/htslib/
 
 ../lib/samtools/bedidx.o:  ../lib/samtools/samtools.h
-	cd ../lib/samtools/  &&   make && cd ../..
+	cd ../lib/samtools/  &&   make CPPFLAGS="-I$(CONDA_PREFIX)/include" LDFLAGS="-L$(CONDA_PREFIX)/lib" && cd ../..
 #	cd ../lib/samtools/  && autoreconf -i && ./configure --disable-libcurl &&  make && cd ../..
 
 ../lib/samtools/samtools.h:

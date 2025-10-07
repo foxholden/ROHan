@@ -1,0 +1,22 @@
+# Build artifacts
+*.o
+*.a
+bin/rohan
+src/refPlusSegToGeno
+src/sitesPlusGeno
+src/ref2DNAprof
+src/testComp
+src/testCompCont
+src/Makefile.backup
+
+# Downloaded dependencies
+lib/htslib/
+lib/libgab/
+lib/libharu/
+lib/samtools/
+
+# bam2prof (downloaded and built)
+bam2prof/
+
+# Temporary files
+*.zip
